@@ -137,10 +137,12 @@ object SearchFrm: TSearchFrm
         Caption = 'Search results'
         Width = 600
       end>
+    PopupMenu = PopupMenu
     TabOrder = 5
     ViewStyle = vsReport
     OnColumnClick = ListViewColumnClick
     OnCompare = ListViewCompare
+    OnDblClick = ListViewDblClick
   end
   object StatusBar: TStatusBar
     Left = 0
@@ -149,5 +151,14 @@ object SearchFrm: TSearchFrm
     Height = 19
     Panels = <>
     SimplePanel = True
+  end
+  object PopupMenu: TPopupMenu
+    OnPopup = PopupMenuPopup
+    Left = 8
+    Top = 336
+    object pbGoto: TMenuItem
+      Caption = 'Go to ...'
+      OnClick = ListViewDblClick
+    end
   end
 end

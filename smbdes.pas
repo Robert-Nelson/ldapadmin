@@ -181,16 +181,6 @@ begin
 		d[i] := outbuf[i];
 end;
 
-// TODO : optimize with pointer use
-{procedure concat(var outbuf, in1, in2: array of Byte; l1, l2: Integer);
-var
-  i: Integer;
-begin
-	for i := 0 to l1 - 1 do
-		outbuf[i] := in1[i];
-	for i := 0 to l2 - 1 do
-		outbuf[l1 + i] := in2[i];
-end;}
 procedure concat(var outbuf, in1, in2: array of Byte; l1, l2: Integer);
 var
   pIn, pOut: ^Byte;

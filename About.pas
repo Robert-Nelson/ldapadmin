@@ -18,6 +18,7 @@ type
     Label6: TLabel;
     Label7: TLabel;
     Label8: TLabel;
+    Image1: TImage;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Label7Click(Sender: TObject);
   private

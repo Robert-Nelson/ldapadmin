@@ -230,7 +230,7 @@ var
   passwd: string;
 begin
   md5digest(PChar(Password), length(Password), adigest);
-  SetLength(passwd, Base64Size(SizeOf(digest)));
+  SetLength(passwd, Base64encSize(SizeOf(digest)));
   Base64Encode(adigest, SizeOf(digest), passwd[1]);
   Properties[eUserPassword] := '{MD5}' + passwd;
 end;
@@ -339,48 +339,12 @@ begin
 end;
 
 procedure TPosixAccount.Delete;
-var
-  plmSearch, plmEntry: PLDAPMessage;
-  ppcVals: PPChar;
-  pld: PLDAP;
-  attrs: PCharArray;
-  Entry: TLDAPEntry;
-
 begin
-
-  // Remove any references to uid from groups before deleting user itself;
-  pld := Session.pld;
-  SetLength(attrs, 2);
-  attrs[0] := 'cn';
-  attrs[1] := nil;
-
   if not Assigned(Items) then
     uid := Session.GetNameFromDN(dn);
-
-  LdapCheck(ldap_search_s(pld, PChar(Session.Base), LDAP_SCOPE_SUBTREE,
-                               PChar(Format(sMY_GROUP,[uid])), PChar(attrs), 0, plmSearch));
-  try
-    plmEntry := ldap_first_entry(pld, plmSearch);
-    while Assigned(plmEntry) do
-    begin
-      ppcVals := ldap_get_values(pld, plmEntry, attrs[0]);
-      if Assigned(ppcVals) then
-      begin
-        Entry := TLDAPEntry.Create(Session, ldap_get_dn(pld, plmEntry));
-        try
-          Entry.AddAttr('memberUid', uid, LDAP_MOD_DELETE);
-          Entry.Modify;
-        finally
-          LDAPCheck(ldap_value_free(ppcVals));
-          Entry.Free;
-        end;
-      end;
-      plmEntry := ldap_next_entry(pld, plmEntry);
-    end;
-  finally
-    LDAPCheck(ldap_msgfree(plmSearch));
-  end;
-
+  // Remove any references to uid from groups before deleting user itself;
+  Session.ModifySet(Format(sMY_GROUP,[uid]), Session.Base, LDAP_SCOPE_SUBTREE,
+                                             'memberUid', uid, '', LDAP_MOD_DELETE);  
   inherited;
 end;
 

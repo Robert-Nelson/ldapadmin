@@ -135,6 +135,7 @@ begin
   pbDelete.enabled := Enable;
   pbProperties.Enabled := Enable;
   pbRename.Enabled := Enable;
+  pbCopy.Enabled := Enable;
 end;
 
 procedure TConnListFrm.pbPropertiesClick(Sender: TObject);
@@ -191,7 +192,6 @@ begin
   OkBtn.Default := false;
 end;
 
-
 procedure TConnListFrm.ListViewEdited(Sender: TObject; Item: TListItem; var S: String);
 var
   Reg: TRegistry;
@@ -221,20 +221,20 @@ var
   s: string;
   ListItem: TListItem;
 begin
-  s := InputBox(cRename, cNewName, '');
-  if s <> '' then
+  s := InputBox(Format(cCopyTo, [ListView.Selected.Caption]), cNewName, '');
+  if (s <> '') and (AnsiCompareText(s, ListView.Selected.Caption) <> 0)  then
   with
     TAccountEntry.Create(ListView.Selected.Caption) do
   try
     Name := s;
     Write;
+    ListItem := ListView.Items.Add;
+    ListItem.Caption := s;
+    ListItem.ImageIndex := 1;
+    ListView.Selected := ListItem;
   finally
     Free;
   end;
-  ListItem := ListView.Items.Add;
-  ListItem.Caption := s;
-  ListItem.ImageIndex := 1;
-  ListView.Selected := ListItem;
 end;
 
 end.

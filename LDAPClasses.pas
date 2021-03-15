@@ -72,6 +72,10 @@ type
     function GetRDN(const dn: string): string;
     function Search(const Filter, dn: string; const Scope: Cardinal): TStringList;
     procedure Move(const SourceDN, ParentDN, RDN: string);
+    procedure ModifySet(const Filter, Base: string;
+                        const Scope: Cardinal;
+                        const AttrName, AttrValue, NewValue:
+                        string; const ModOp: Cardinal);
   end;
 
 
@@ -97,7 +101,6 @@ type
     procedure New; virtual;
     procedure Modify; virtual;
     procedure Delete; virtual;
-    procedure ToLDIF(var F: TextFile; const Wrap: Integer);
     property Items: TStringList read fItems;
   end;
 
@@ -266,6 +269,64 @@ begin
                                PChar(RDN),
                                PChar(ParentDN),
                                0, sc, cc ));
+end;
+
+{ Modify one attribute in every entry in set returned by search filter }
+procedure TLDAPSession.ModifySet(const Filter, Base: string;
+                                 const Scope: Cardinal;
+                                 const AttrName, AttrValue, NewValue: string;
+                                 const ModOp: Cardinal);
+var
+  plmSearch, plmEntry: PLDAPMessage;
+  ppcVals: PPChar;
+  attrs: PCharArray;
+  Entry: TLDAPEntry;
+  i: Integer;
+begin
+
+  SetLength(attrs, 2);
+  attrs[0] := PChar(AttrName);
+  attrs[1] := nil;
+
+  LdapCheck(ldap_search_s(pld, PChar(Base), Scope,
+                               PChar(Filter), PChar(attrs), 0, plmSearch));
+  try
+    plmEntry := ldap_first_entry(pld, plmSearch);
+    while Assigned(plmEntry) do
+    begin
+      ppcVals := ldap_get_values(pld, plmEntry, attrs[0]);
+      if Assigned(ppcVals) then
+      try
+        Entry := TLDAPEntry.Create(Self, ldap_get_dn(pld, plmEntry));
+        try
+          case ModOp of
+            LDAP_MOD_REPLACE: begin
+                                i := 0;
+                                while Assigned(PCharArray(ppcVals)[i]) do
+                                begin
+                                  if PCharArray(ppcVals)[i] = AttrValue then
+                                    Entry.AddAttr(AttrName, NewValue, LDAP_MOD_REPLACE)
+                                  else
+                                    Entry.AddAttr(AttrName, PCharArray(ppcVals)[i], LDAP_MOD_REPLACE);
+                                  inc(i);
+                                end;
+                              end;
+            LDAP_MOD_DELETE:  Entry.AddAttr(AttrName, AttrValue, LDAP_MOD_DELETE);
+          else
+            raise Exception.Create(stInvalidLdapOp);
+          end;
+          Entry.Modify;
+        finally
+          Entry.Free;
+        end;
+      finally
+        LDAPCheck(ldap_value_free(ppcVals));
+      end;
+      plmEntry := ldap_next_entry(pld, plmEntry);
+    end;
+  finally
+    LDAPCheck(ldap_msgfree(plmSearch));
+  end;
 end;
 
 { Get random free uidNumber from the pool of available numbers, return -1 if
@@ -667,113 +728,6 @@ end;
 procedure TLDAPEntry.Delete;
 begin
   LdapCheck(ldap_delete_s(fSession.pld, fdn));
-end;
-
-procedure TLDAPEntry.ToLDIF(var F: TextFile; const Wrap: Integer);
-const
-  SafeChar:     set of Char = [#$01..#09, #$0B..#$0C, #$0E..#$7F];
-  SafeInitChar: set of Char = [#$01..#09, #$0B..#$0C, #$0E..#$1F, #$21..#$39, #$3B, #$3D..#$7F];
-var
-  i: Integer;
-
-  { Tests whether string contains only safe chars }
-  function IsSafe(const s: string): Boolean;
-  var
-    p: PChar;
-  begin
-    Result := true;
-    p := PChar(s);
-    if not (p^ in SafeInitChar) then
-    begin
-      Result := false;
-      exit;
-    end;
-    while (p^ <> #0) do
-    begin
-      if not (p^ in SafeChar) then
-      begin
-        Result := false;
-        break;
-      end;
-      p := CharNext(p);
-    end;
-  end;
-
-  { Converts string to UTF8 format }
-  function StringToUTF8(const src: string): string;
-  var
-    Dest, UTF8: array [0..1] of WideChar;
-    p: PChar;
-    c: string;
-  begin
-    Result := '';
-    p := PChar(src);
-    while (p^ <> #0) do
-    begin
-      if p^ < #128 then
-        Result := Result + p^
-      else
-      begin
-        c := p^;
-        StringToWideChar(c, @Dest, SizeOf(Dest));
-        WideCharToMultiByte(CP_UTF8, 0, @Dest, 1, LPSTR(@Utf8), SizeOf(UTF8), nil, nil);
-        Result := Result + Char(Lo(Integer(UTF8))) + Char(Hi(Integer(UTF8)));
-      end;
-      p := CharNext(p);
-    end;
-  end;
-
-  { If neccessary converts value to base64 coding and dumps the string to file
-    wrapping the line so that max length doesn't exceed Wrap count of chars }
-  procedure PutLine(var F: Text; const attrib, value: string; const Wrap: Integer);
-  var
-    p1, len: Integer;
-    line, utfstr, s: string;
-  begin
-
-    line := attrib + ':';
-
-    if value <> '' then
-    begin
-      // Check if we need to encode to base64
-      if IsSafe(value) then
-        line := line + ' ' + value
-      else
-      begin
-        utfstr := StringToUTF8(value);
-        SetLength(s, Base64Size(Length(utfstr)*SizeOf(Char)));
-        Base64Encode(utfstr[1], Length(utfstr)*SizeOf(Char), s[1]);
-        line := line + ': ' + s;
-      end;
-    end;
-
-    len := Length(line);
-    p1 := 1;
-    while p1 < len do
-    begin
-      if p1 = 1 then
-      begin
-        WriteLn(F, System.Copy(line, p1, wrap));
-        inc(p1, wrap);
-      end
-      else begin
-        WriteLn(F, ' ' + System.Copy(line, P1, wrap - 1));
-        inc(p1, wrap - 1);
-      end;
-    end;
-  end;
-
-begin
-  // Dump this entry to LDIF record
-  try
-    PutLine(F, 'dn', fdn, Wrap);
-    for i := 0 to Items.Count - 1 do
-      PutLine(F, Items[i], PChar(Items.Objects[i]), Wrap);
-    WriteLn(F);
-  except
-    RaiseLastWin32Error;
-  end;
-
 end;
 
 end.

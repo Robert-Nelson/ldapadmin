@@ -174,8 +174,6 @@ type
     SambaVersion: Integer;
     DomList: TDomainList;
     function IsSambaObject: Boolean;
-    function FormatMemoInput(const Text: string): string;
-    function FormatMemoOutput(const Text: string): string;
     function FormatString(const Src : string) : string;
     procedure GetInput(Page: TWinControl; EMode: TEditMode);
     procedure PosixPreset;
@@ -205,7 +203,7 @@ var
 
 implementation
 
-uses Pickup, Input;
+uses Pickup, Input, Misc;
 
 {$R *.DFM}
 
@@ -214,42 +212,6 @@ uses Pickup, Input;
 function TUserDlg.IsSambaObject: Boolean;
 begin
   Result := SambaVersion <> 0;
-end;
-
-{ Address fields take $ sign as newline tag so we have to convert this to LF/CR }
-
-function TUserDlg.FormatMemoInput(const Text: string): string;
-var
-  p: PChar;
-begin
-  Result := '';
-  p := PChar(Text);
-  while p^ <> #0 do begin
-    if p^ = '$' then
-      Result := Result + #$D#$A
-    else
-      Result := Result + p^;
-    p := CharNext(p);
-  end;
-end;
-
-function TUserDlg.FormatMemoOutput(const Text: string): string;
-var
-  p, p1: PChar;
-begin
-  Result := '';
-  p := PChar(Text);
-  while p^ <> #0 do begin
-    p1 := CharNext(p);
-    if (p^ = #$D) and (p1^ = #$A) then
-    begin
-      Result := Result + '$';
-      p1 := CharNext(p1);
-    end
-    else
-      Result := Result + p^;
-    p := p1;
-  end;
 end;
 
 function TUserDlg.FormatString(const Src : string) : string;

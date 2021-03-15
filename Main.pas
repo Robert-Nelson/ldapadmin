@@ -29,28 +29,7 @@ uses
   LDAPClasses, RegAccnt;
 
 const
-  bmRoot           =  0;
-  bmRootSel        =  1;
-  bmEntry          =  2;
-  bmEntrySel       =  3;
-  bmPosixUser      =  4;
-  bmPosixUserSel   =  4;
-  bmSamba3User     =  5;
-  bmSamba3UserSel  =  5;
-  bmGroup          =  6;
-  bmGroupSel       =  6;
-  bmComputer       =  7;
-  bmComputerSel    =  7;
-  bmMailGroup      =  9;
-  bmMailGroupSel   =  9;
-  bmOu             = 13;
-  bmOuSel          = 13;
-  bmTransport      = 15;
-  bmTransportSel   = 15;
-  bmSamba2User     = 19;
-  bmSamba2UserSel  = 19;
-  ncDummyNode      = -1;
-
+  ScrollAccMargin  = 40;
 
 type
   TMainFrm = class(TForm)
@@ -113,7 +92,7 @@ type
     mbImport: TMenuItem;
     N7: TMenuItem;
     mbSearch: TMenuItem;
-    Organizationalunit1: TMenuItem;
+    mbNewOu: TMenuItem;
     N8: TMenuItem;
     mbInfo: TMenuItem;
     N9: TMenuItem;
@@ -124,6 +103,11 @@ type
     pbMove: TMenuItem;
     N10: TMenuItem;
     N11: TMenuItem;
+    mbNewHost: TMenuItem;
+    mbNewLocality: TMenuItem;
+    Host1: TMenuItem;
+    pbLocality: TMenuItem;
+    ScrollTimer: TTimer;
     procedure FormCreate(Sender: TObject);
     procedure mbConnectClick(Sender: TObject);
     procedure mbDisconnectClick(Sender: TObject);
@@ -146,18 +130,27 @@ type
     procedure mbExportClick(Sender: TObject);
     procedure mbPreferencesClick(Sender: TObject);
     procedure mbInfoClick(Sender: TObject);
-    procedure mbCopyClick(Sender: TObject);
-    procedure mbMoveClick(Sender: TObject);
+    procedure mbCopyMoveClick(Sender: TObject);
+    //procedure mbMoveClick(Sender: TObject);
     procedure LDAPTreeEdited(Sender: TObject; Node: TTreeNode;
       var S: String);
+    procedure mbImportClick(Sender: TObject);
+    procedure LDAPTreeDragOver(Sender, Source: TObject; X, Y: Integer;
+      State: TDragState; var Accept: Boolean);
+    procedure LDAPTreeDragDrop(Sender, Source: TObject; X, Y: Integer);
+    procedure LDAPTreeStartDrag(Sender: TObject;
+      var DragObject: TDragObject);
+    procedure LDAPTreeEndDrag(Sender, Target: TObject; X, Y: Integer);
+    procedure ScrollTimerTimer(Sender: TObject);
   private
     Root: TTreeNode;
     regAccount: TAccountEntry;
     ldapSession: TLDAPSession;
-    procedure ExpandNode(Node: TTreeNode);
+    procedure ExpandNode(Node: TTreeNode; Session: TLDAPSession);
     procedure RefreshTree;
   public
     function PickEntry(const ACaption: string): string;
+    function LocateEntry(const dn: string; const Select: Boolean): TTreeNode;
   end;
 
 var
@@ -166,7 +159,8 @@ var
 implementation
 
 uses EditEntry, Group, User, Computer, PassDlg, ConnList, Transport, Search, Ou,
-     LdapOp, Constant, Export, Prefs, About;
+     Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs,
+     LdapCopy, About;
 
 {$R *.DFM}
 
@@ -231,7 +225,7 @@ begin
     Position := poMainFormCenter;
     ddRoot := ddTree.Items.Add(nil, ldapSession.Base);
     ddRoot.Data := Pointer(StrNew(PChar(ldapSession.Base)));
-    ExpandNode(ddRoot);
+    ExpandNode(ddRoot, ldapSession);
     ddRoot.ImageIndex := bmRoot;
     ddRoot.SelectedIndex := bmRootSel;
     //ddTree.Alphasort;
@@ -247,7 +241,47 @@ begin
 
 end;
 
-procedure TMainFrm.ExpandNode(Node: TTreeNode);
+function TMainFrm.LocateEntry(const dn: string; const Select: Boolean): TTreeNode;
+var
+  sdn: string;
+  comp: PPChar;
+  i: Integer;
+  Parent: TTreeNode;
+begin
+  Result := nil;
+  sdn := System.Copy(dn, 1, Length(dn) - Length(LdapSession.Base));
+  comp := ldap_explode_dn(PChar(sdn), 0);
+  try
+    if Assigned(comp) then
+    begin
+      Parent := Root;
+      Parent.Expand(false);
+      i := 0;
+      while PCharArray(comp)[i] <> nil do inc(i);
+      while (i > 0) do
+      begin
+        dec(i);
+        Result := Parent.GetFirstChild;
+        while Assigned(Result) do
+        begin
+          if AnsiStrIComp(PChar(Result.Text), PCharArray(comp)[i]) = 0 then
+          begin
+            Parent := Result;
+            Result.Expand(false);
+            break;
+          end;
+          Result := LDAPTree.Selected.GetNextChild(Result);
+        end;
+      end;
+    end;
+    if Select then
+      Result.Selected := true;
+  finally
+    ldap_value_free(comp);
+  end;
+end;
+
+procedure TMainFrm.ExpandNode(Node: TTreeNode; Session: TLDAPSession);
 var
   CNode: TTreeNode;
   plmSearch, plmEntry: PLDAPMessage;
@@ -261,7 +295,7 @@ var
 
 begin
 
-  pld := ldapSession.pld;
+  pld := Session.pld;
 
   // set result to objectclass only
   SetLength(attrs, 2);
@@ -279,7 +313,7 @@ begin
 
       if Assigned(pszdn) then
       try
-        rdn := ldapSession.GetRdn(pszdn);
+        rdn := Session.GetRdn(pszdn);
         CNode := LDAPTree.Items.AddChildObject(Node, rdn, Pointer(StrNew(pszdn)));
         //CNode := LDAPTree.Items.AddChildObject(Node, rdn, TLDAPEntry.Create);
 
@@ -350,7 +384,37 @@ begin
               CNode.ImageIndex := bmTransport;
               CNode.SelectedIndex := bmTransport;
               Container := false;
+            end
+            else if s = 'sudorole' then
+            begin
+              CNode.ImageIndex := bmSudoer;
+              CNode.SelectedIndex := bmSudoerSel;
+              Container := false;
+            end
+            else if s = 'iphost' then
+            begin
+              CNode.ImageIndex := bmHost;
+              CNode.SelectedIndex := bmHostSel;
+              Container := false;
+            end
+            else if s = 'locality' then
+            begin
+              CNode.ImageIndex := bmLocality;
+              CNode.SelectedIndex := bmLocalitySel;
+            end
+            else if s = 'sambadomain' then
+            begin
+              CNode.ImageIndex := bmSambaDomain;
+              CNode.SelectedIndex := bmSambaDomainSel;
+              Container := false;
+            end
+            else if s = 'sambaunixidpool' then
+            begin
+              CNode.ImageIndex := bmIdPool;
+              CNode.SelectedIndex := bmIdPoolSel;
+              Container := false;
             end;
+
 
             Inc(I);
           end;
@@ -384,9 +448,9 @@ begin
   LDAPTree.Items.BeginUpdate;
   try
     LDAPTree.Items.Clear;
-    Root := LDAPTree.Items.Add(nil, ldapSession.Base);
+    Root := LDAPTree.Items.Add(nil, Format('%s [%s]', [ldapSession.Base, ldapSession.Server]));
     Root.Data := Pointer(StrNew(PChar(ldapSession.Base)));
-    ExpandNode(Root);
+    ExpandNode(Root, ldapSession);
 
     Root.ImageIndex := bmRoot;
     Root.SelectedIndex := bmRootSel;
@@ -432,6 +496,7 @@ begin
       mbEdit.Visible := true;
       mbTools.Visible := true;
       LDAPTree.PopupMenu := MainFrm.PopupMenu;
+      MainFrm.Caption := cAppName + ': ' + ListView.Selected.Caption;
       RefreshTree;
     finally
       Screen.Cursor := crDefault;
@@ -450,6 +515,7 @@ begin
   mbEdit.Visible := false;
   mbTools.Visible := false;
   LDAPTree.PopupMenu := nil;
+  MainFrm.Caption := cAppName;
   LDAPTree.Items.BeginUpdate;
   LDAPTree.Items.Clear;
   LDAPTree.Items.EndUpdate;
@@ -468,7 +534,7 @@ begin
   try
     Items.BeginUpdate;
     Node.Item[0].Delete;
-    ExpandNode(Node);
+    ExpandNode(Node, ldapSession);
     //Alphasort;
     CustomSort(@CustomSortProc, 0);
   finally
@@ -521,9 +587,11 @@ begin
     2: TUserDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_ADD).ShowModal;
     3: TComputerDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_ADD).ShowModal;
     4: TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_ADD).ShowModal;
-    //5: TMailGroupDlg
+    5: TMailGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_ADD).ShowModal;
     6: TTransportDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
     7: TOuDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
+    8: THostDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
+    9: TLocalityDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
   else
     Exit;
   end;
@@ -542,6 +610,7 @@ begin
       LdapTree.Selected.Delete;
     except
       pbRefreshClick(nil);
+      raise;
     end;
   finally
     Free;
@@ -554,7 +623,7 @@ begin
   try
     LdapTree.Items.BeginUpdate;
     LdapTree.Selected.DeleteChildren;
-    ExpandNode(LDAPTree.Selected);
+    ExpandNode(LDAPTree.Selected, ldapSession);
     LDAPTree.Selected.Expand(false);
     //LDAPTree.Alphasort;
     LDAPTree.CustomSort(@CustomSortProc, 0);
@@ -620,11 +689,14 @@ begin
     case LDAPTree.Selected.ImageIndex of
       bmSamba2User,
       bmSamba3User,
-      bmPosixUser: TUserDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
-      bmGroup:     TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
-      bmComputer:  TComputerDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
-      bmTransport: TTransportDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_MODIFY).ShowModal;
-      bmOu:        TOuDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_MODIFY).ShowModal;
+      bmPosixUser:   TUserDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
+      bmGroup:       TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
+      bmMailGroup:   TMailGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
+      bmComputer:    TComputerDlg.Create(Self, PChar(LDAPTree.Selected.Data), regAccount, ldapSession, EM_MODIFY).ShowModal;
+      bmTransport:   TTransportDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_MODIFY).ShowModal;
+      bmOu:          TOuDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_MODIFY).ShowModal;
+      bmLocality:    TLocalityDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_MODIFY).ShowModal;
+      bmHost:        THostDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_MODIFY).ShowModal;
     end;
     LDAPTreeChange(nil, LDAPTree.Selected);
   end;
@@ -632,12 +704,14 @@ end;
 
 procedure TMainFrm.LDAPTreeDblClick(Sender: TObject);
 begin
-  if Assigned(LDAPTree.Selected) and (LDAPTree.Selected.ImageIndex <> bmOu) then
+  if Assigned(LDAPTree.Selected) and
+     (LDAPTree.Selected.ImageIndex <> bmOu) and (LDAPTree.Selected.ImageIndex <> bmLocality) then
     pbPropertiesClick(Sender)
 end;
 
 procedure TMainFrm.pbSearchClick(Sender: TObject);
 begin
+  if LDAPTree.Selected = nil then LDAPTree.Selected := LDAPTree.TopItem;
   TSearchFrm.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession).Show;
 end;
 
@@ -656,35 +730,45 @@ begin
   TAboutDlg.Create(Self).ShowModal;
 end;
 
-procedure TMainFrm.mbCopyClick(Sender: TObject);
+procedure TMainFrm.mbCopyMoveClick(Sender: TObject);
 var
-  pdn: string;
+  Node: TTreeNode;
 begin
   if Assigned(LDAPTree.Selected.Data) then
   begin
-    pdn := PickEntry(Format(cCopyTo, [ldapSession.GetNameFromDN(PChar(LDAPTree.Selected.Data))]));
-    if (pdn <> '') then
-    with TLdapOpDlg.Create(Self, ldapSession) do
+    with TCopyDlg.Create(Self, PChar(LDAPTree.Selected.Data), RegAccount.Name, ldapSession, ImageList, ExpandNode, @CustomSortProc) do
     try
-      CopyTree(PChar(LDAPTree.Selected.Data),pdn, '');
-    finally
-      Free;
-    end;
-  end;
-end;
-
-procedure TMainFrm.mbMoveClick(Sender: TObject);
-var
-  pdn: string;
-begin
-  if Assigned(LDAPTree.Selected.Data) then
-  begin
-    pdn := PickEntry(Format(cMoveTo, [ldapSession.GetNameFromDN(PChar(LDAPTree.Selected.Data))]));
-    if (pdn <> '') then
-    with TLdapOpDlg.Create(Self, ldapSession) do
-    try
-     MoveTree(PChar(LDAPTree.Selected.Data),pdn, '');
-     LdapTree.Selected.Delete;
+      Caption := Format(cCopyTo, [PChar(LDAPTree.Selected.Data)]);
+      ShowModal;
+      if ModalResult = mrOk then with TLdapOpDlg.Create(Self, ldapSession) do
+      try
+        DestSession := TargetSession;
+        if (Sender = pbCopy) or (Sender = mbCopy) then
+          CopyTree(PChar(LDAPTree.Selected.Data),TargetDn, TargetRdn)
+        else
+        begin
+          MoveTree(PChar(LDAPTree.Selected.Data),TargetDn, TargetRdn);
+          LDAPTree.Selected.Delete;
+        end;
+        if TargetSession = ldapSession then
+        begin
+          Node := LocateEntry(TargetDn, false);
+          if Assigned(Node) then
+          begin
+            LDAPTree.Items.BeginUpdate;
+            try
+              Node.DeleteChildren;
+              ExpandNode(Node, ldapSession);
+              Node.Expand(false);
+              LDAPTree.CustomSort(@CustomSortProc, 0);
+            finally
+              LDAPTree.Items.EndUpdate;
+            end;
+          end;
+        end;
+      finally
+        Free;
+      end;
     finally
       Free;
     end;
@@ -705,6 +789,93 @@ begin
   finally
     Free;
   end;
+end;
+
+procedure TMainFrm.mbImportClick(Sender: TObject);
+begin
+  TImportDlg.Create(Self, ldapSession).ShowModal;
+end;
+
+procedure TMainFrm.LDAPTreeDragOver(Sender, Source: TObject; X, Y: Integer;
+  State: TDragState; var Accept: Boolean);
+begin
+  Accept := Accept and (LDAPTree.DropTarget = LDAPTree.GetNodeAt(X, Y)) and
+    (LDAPTree.DropTarget <> LDAPTree.Selected) and
+    (LDAPTree.DropTarget.ImageIndex in [bmOu, bmLocality, bmEntry, bmRoot]) and
+    (Pos(PChar(LDAPTree.Selected.Data),PChar(LDAPTree.DropTarget.Data)) = 0);
+end;
+
+procedure TMainFrm.LDAPTreeDragDrop(Sender, Source: TObject; X, Y: Integer);
+var
+  msg: String;
+  cpy: boolean;
+begin
+  cpy := GetKeyState(VK_CONTROL) < 0;
+  if cpy then
+    msg := stAskTreeCopy
+  else
+    msg := stAskTreeMove;
+
+  if Assigned(LDAPTree.Selected.Data) and Assigned(LDAPTree.DropTarget.Data) and
+    (MessageDlg(Format(msg, [LDAPTree.Selected.Text, LDAPTree.DropTarget.Text]), mtConfirmation, [mbOk, mbCancel], 0) = mrOk) then
+  begin
+    with TLdapOpDlg.Create(Self, ldapSession) do
+    try
+      if cpy then
+        CopyTree(PChar(LDAPTree.Selected.Data),PChar(LDAPTree.DropTarget.Data), '')
+      else
+      begin
+        MoveTree(PChar(LDAPTree.Selected.Data),PChar(LDAPTree.DropTarget.Data), '');
+        LdapTree.Selected.Delete;
+      end;
+      if LDAPTree.DropTarget.Expanded then
+      begin
+        LDAPTree.Items.BeginUpdate;
+        try
+          LDAPTree.DropTarget.DeleteChildren;
+          ExpandNode(LDAPTree.DropTarget, ldapSession);
+          LDAPTree.DropTarget.Expand(false);
+          LDAPTree.CustomSort(@CustomSortProc, 0);
+        finally
+          LDAPTree.Items.EndUpdate;
+        end;
+      end;
+    finally
+      Free;
+    end;
+  end;
+end;
+
+procedure TMainFrm.LDAPTreeStartDrag(Sender: TObject; var DragObject: TDragObject);
+begin
+  ScrollTimer.Enabled := True;
+end;
+
+procedure TMainFrm.LDAPTreeEndDrag(Sender, Target: TObject; X, Y: Integer);
+begin
+  ScrollTimer.Enabled := False;
+end;
+
+procedure TMainFrm.ScrollTimerTimer(Sender: TObject);
+var
+  Pt: TPoint;
+begin
+  GetCursorPos(pt);
+  pt := LDAPTree.ScreenToClient (pt);
+  if (pt.y < -ScrollAccMargin) or (pt.y > LDAPTree.ClientHeight + ScrollAccMargin) then
+  begin
+    if ScrollTimer.Interval <> 10 then
+      ScrollTimer.Interval := 10 // accelerate
+  end
+  else begin
+    if ScrollTimer.Interval <> 100 then
+      ScrollTimer.Interval := 100 // deccelerate
+  end;
+  if pt.y < 0 then
+    SendMessage(LdapTree.Handle, WM_VSCROLL, SB_LINEUP, 0)
+  else
+  if pt.y > LDAPTree.ClientHeight then
+    SendMessage(LdapTree.Handle, WM_VSCROLL, SB_LINEDOWN, 0);
 end;
 
 end.

@@ -26,9 +26,6 @@ interface
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, Dialogs, WinLdap, LDAPClasses, ComCtrls;
 
-const
-  C_WRAP = 80;
-
 type
   TExportDlg = class(TForm)
     OKBtn: TButton;
@@ -63,7 +60,7 @@ var
 
 implementation
 
-uses Constant;
+uses LDIF, Constant;
 
 {$R *.DFM}
 
@@ -108,16 +105,11 @@ var
   attrs: PCharArray;
   pszdn: PChar;
   Entry: TLDAPEntry;
-  F: TextFile;
+  ldif: TLDIFFile;
 
 begin
 
-  AssignFile(F, edFileName.Text);
-  try
-    Rewrite(F);
-  except
-    RaiseLastWin32Error;
-  end;
+  ldif := TLDIFFile.Create(edFileName.Text, fmWrite);
 
   try
 
@@ -145,7 +137,8 @@ begin
         Entry := TLDAPEntry.Create(Session, pszdn);
         try
           Entry.Read;
-          Entry.ToLdif(F, C_WRAP);
+          ldif.dn := Entry.dn;
+          ldif.WriteRecord(Entry.Items);
         finally
           Entry.Free;
         end;
@@ -165,7 +158,7 @@ begin
   end;
 
   finally
-    CloseFile(F);
+    ldif.Free;
   end;
 
 end;

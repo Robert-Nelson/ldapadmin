@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  ComCtrls, StdCtrls, LDAPClasses;
+  ComCtrls, StdCtrls, LDAPClasses, Menus;
 
 type
   TSearchFrm = class(TForm)
@@ -45,6 +45,8 @@ type
     ListView: TListView;
     Label4: TLabel;
     StatusBar: TStatusBar;
+    PopupMenu: TPopupMenu;
+    pbGoto: TMenuItem;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure CloseBtnClick(Sender: TObject);
     procedure StartBtnClick(Sender: TObject);
@@ -52,6 +54,8 @@ type
       Data: Integer; var Compare: Integer);
     procedure ListViewColumnClick(Sender: TObject; Column: TListColumn);
     procedure SearchBtnClick(Sender: TObject);
+    procedure PopupMenuPopup(Sender: TObject);
+    procedure ListViewDblClick(Sender: TObject);
   private
     Session: TLDAPSession;
     //dn: string;
@@ -193,6 +197,17 @@ begin
   s := MainFrm.PickEntry('Search base');
   if s <> '' then
     SBCombo.Text := s;
+end;
+
+procedure TSearchFrm.PopupMenuPopup(Sender: TObject);
+begin
+  pbGoto.Enabled := Assigned(ListView.Selected);
+end;
+
+procedure TSearchFrm.ListViewDblClick(Sender: TObject);
+begin
+  if Assigned(ListView.Selected) then
+    MainFrm.LocateEntry(ListView.Selected.Caption, true);
 end;
 
 end.

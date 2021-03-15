@@ -1,7 +1,7 @@
-  {      LDAPAdmin - Ou.pas
+  {      LDAPAdmin - Locality.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
-  *      Author: Tihomir Karlovic
+  *      Author: Simon Zsolt
   *
   *
   * This file is free software; you can redistribute it and/or modify
@@ -19,7 +19,7 @@
   * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
   }
 
-unit Ou;
+unit Locality;
 
 interface
 
@@ -28,18 +28,14 @@ uses
   StdCtrls, LDAPClasses, Constant;
 
 type
-  TOuDlg = class(TForm)
+  TLocalityDlg = class(TForm)
     NameLabel: TLabel;
-    ou: TEdit;
+    l: TEdit;
     GroupBox1: TGroupBox;
     Label18: TLabel;
     Label19: TLabel;
-    Label24: TLabel;
-    Label31: TLabel;
-    postalAddress: TMemo;
+    street: TMemo;
     st: TEdit;
-    postalCode: TEdit;
-    l: TEdit;
     Label1: TLabel;
     description: TEdit;
     OKBtn: TButton;
@@ -56,31 +52,31 @@ type
   end;
 
 var
-  OuDlg: TOuDlg;
+  LocalityDlg: TLocalityDlg;
 
 implementation
 
-uses WinLDAP, Misc;
+uses Misc, WinLDAP;
 
 {$R *.DFM}
 
-procedure TOuDlg.Save;
+procedure TLocalityDlg.Save;
 var
   C, Mode: Integer;
   Component: TComponent;
   s: string;
 begin
 
-  if ou.Text = '' then
+  if l.Text = '' then
     raise Exception.Create(Format(stReqNoEmpty, [NameLabel.Caption]));
 
   try
     if EditMode = EM_ADD then
     begin
-      Entry := TLDAPEntry.Create(Session, 'ou=' + ou.Text + ',' + dn);
+      Entry := TLDAPEntry.Create(Session, 'l=' + l.Text + ',' + dn);
       Entry.AddAttr('objectclass', 'top', LDAP_MOD_ADD);
-      Entry.AddAttr('objectclass', 'organizationalUnit', LDAP_MOD_ADD);
-      Entry.AddAttr('ou', ou.Text, LDAP_MOD_ADD);
+      Entry.AddAttr('objectclass', 'locality', LDAP_MOD_ADD);
+      Entry.AddAttr('l', l.Text, LDAP_MOD_ADD);
     end;
 
     for C := 0 to GroupBox1.ControlCount - 1 do
@@ -119,7 +115,7 @@ begin
 end;
 
 
-constructor TOuDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
+constructor TLocalityDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
 var
   I, C: Integer;
   attrName, attrValue: string;
@@ -130,9 +126,9 @@ begin
   EditMode := Mode;
   if EditMode = EM_MODIFY then
   begin
-    ou.Enabled := False;
-    ou.text := Session.GetNameFromDN(dn);
-    Caption := Format(cPropertiesOf, [ou.Text]);
+    l.Enabled := False;
+    l.text := Session.GetNameFromDN(dn);
+    Caption := Format(cPropertiesOf, [l.Text]);
     Entry := TLDAPEntry.Create(Session, dn);
     Entry.Read;
 
@@ -156,7 +152,7 @@ begin
 
 end;
 
-procedure TOuDlg.FormClose(Sender: TObject; var Action: TCloseAction);
+procedure TLocalityDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   if ModalResult = mrOK then
     Save;

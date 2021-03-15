@@ -551,7 +551,7 @@ begin
     if StrToInt(Value) = SHADOW_MAX_DATE then
       Properties[eSambaKickoffTime] := ''
     else
-      Properties[eSambaKickoffTime] := Value;
+      Properties[eSambaKickoffTime] := IntToStr(StrToInt(Value)*24*60*60);
   end;
 end;
 

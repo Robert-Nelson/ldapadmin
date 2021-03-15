@@ -27,7 +27,15 @@ uses
   Posix in 'Posix.pas',
   PrefWiz in 'PrefWiz.pas' {PrefWizDlg},
   About in 'About.pas' {AboutDlg},
-  LdapOp in 'LdapOp.pas' {LdapOpDlg};
+  LdapOp in 'LdapOp.pas' {LdapOpDlg},
+  Import in 'Import.pas' {ImportDlg},
+  Ldif in 'Ldif.pas',
+  Misc in 'Misc.pas',
+  Postfix in 'Postfix.pas',
+  MailGroup in 'MailGroup.pas' {MailGroupDlg},
+  Host in 'Host.pas' {HostDlg},
+  Locality in 'Locality.pas' {LocalityDlg},
+  LdapCopy in 'LdapCopy.pas' {CopyDlg};
 
 {$R *.RES}
 

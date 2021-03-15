@@ -33,8 +33,10 @@ type
     Message: TLabel;
     Exporting: TLabel;
   private
-    Session: TLDAPSession;
+    fSrcSession: TLDAPSession;
+    fDstSession: TLDAPSession;
     Running: Boolean;
+    function GetDstSession: TLDAPSession;
     procedure DeleteLeaf(const dn: PChar; const pld: PLDAP; const plmEntry: PLDAPMessage);
     procedure DeleteChildren(const dn: string; Children: Boolean);
     procedure Copy(const dn, pdn, rdn: string; Move: Boolean);
@@ -43,6 +45,8 @@ type
     procedure CopyTree(const dn, pdn, rdn: string);
     procedure MoveTree(const dn, pdn, rdn: string);
     procedure DeleteTree(const adn: string);
+    property SourceSession: TLDAPSession read fSrcSession;
+    property DestSession: TLDAPSession read GetDstSession write fDstSession;
   end;
 
 var
@@ -54,12 +58,20 @@ implementation
 
 uses Constant;
 
+function TLdapOpDlg.GetDstSession: TLDAPSession;
+begin
+  if Assigned(fDstSession) then
+    Result := fDstSession
+  else
+    Result := fSrcSession
+end;
+
 { This procedure copies entire subtree to a different location (dn). If Move is
   set to true then the source entries are deleted, effectivly moving the tree }
 
 procedure TLdapOpDlg.Copy(const dn, pdn, rdn: string; Move: Boolean);
 var
-  Entry: TLDAPEntry;
+  srcEntry, dstEntry: TLDAPEntry;
   srdn: string;
   plmSearch, plmEntry: PLDAPMessage;
   pld: PLDAP;
@@ -71,7 +83,7 @@ begin
   SetLength(attrs, 2);
   attrs[0] := 'objectclass';
   attrs[1] := nil;
-  pld := Session.pld;
+  pld := SourceSession.pld;
   LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_ONELEVEL, PChar(sANYCLASS), PChar(attrs), 0, plmSearch));
 
   if not Visible and (ldap_count_entries(pld, plmSearch) > 0) then
@@ -80,19 +92,37 @@ begin
   try
     //Copy entry
     if rdn = '' then
-      srdn := Session.GetRDN(dn)
+      srdn := SourceSession.GetRDN(dn)
     else
       srdn := rdn;
-    Entry := TLDAPEntry.Create(Session, dn);
-    with Entry do
+    srcEntry := TLDAPEntry.Create(SourceSession, dn);
+    if SourceSession <> DestSession then
+      dstEntry := TLDAPEntry.Create(DestSession, dn)
+    else
+      dstEntry := srcEntry;
+    with srcEntry do
     try
       Read;
-      dn := PChar(srdn + ',' + pdn);
+      dstEntry.dn := PChar(srdn + ',' + pdn);
       for i := 0 to Items.Count - 1 do
-        AddAttr(Entry.Items[i],PChar(Entry.Items.Objects[i]), LDAP_MOD_ADD);
-      New;
+        dstEntry.AddAttr(Items[i],PChar(Items.Objects[i]), LDAP_MOD_ADD);
+      dstEntry.New;
     finally
+      if dstEntry <> srcEntry then
+        dstEntry.Free;
       Free;
+    end;
+
+    if Move then
+        begin
+          if SourceSession = DestSession then
+            // Adjust mailgroup references to new dn
+            SourceSession.ModifySet(PChar(Format(sMY_MAILGROUP,[dn])), SourceSession.Base, LDAP_SCOPE_SUBTREE,
+                                    'member', dn, PChar(srdn + ',' + pdn), LDAP_MOD_REPLACE)
+          else
+            // Remove mailgroup references
+            SourceSession.ModifySet(PChar(Format(sMY_MAILGROUP,[dn])),
+                                     SourceSession.Base, LDAP_SCOPE_SUBTREE, 'member', dn, '', LDAP_MOD_DELETE);
     end;
 
     plmEntry := ldap_first_entry(pld, plmSearch);
@@ -145,7 +175,7 @@ begin
       s := lowercase(PCharArray(ppcVals)[I]);
       if (s = 'posixaccount') or (s = 'sambaaccount') or (s = 'sambasamaccount') then
       begin
-        Entry := TPosixAccount.Create(Session, dn);
+        Entry := TPosixAccount.Create(SourceSession, dn);
         break;
       end;
       Inc(I);
@@ -179,7 +209,7 @@ begin
   SetLength(attrs, 2);
   attrs[0] := 'objectclass';
   attrs[1] := nil;
-  pld := Session.pld;
+  pld := SourceSession.pld;
   LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_ONELEVEL, PChar(sANYCLASS), PChar(attrs), 0, plmSearch));
 
   if not Children and (ldap_count_entries(pld, plmSearch) > 0) then
@@ -221,7 +251,7 @@ end;
 constructor TLdapOpDlg.Create(AOwner: TComponent; ASession: TLDAPSession);
 begin
   inherited Create(AOwner);
-  Session := ASession;
+  fSrcSession := ASession;
 end;
 
 procedure TLdapOpDlg.CopyTree(const dn, pdn, rdn: string);
@@ -241,7 +271,7 @@ begin
   Running := true;
   Copy(dn, pdn, rdn, true);
   if Running then // if not interrupted by user
-    LdapCheck(ldap_delete_s(Session.pld, PChar(dn)));
+    LdapCheck(ldap_delete_s(SourceSession.pld, PChar(dn)));
 end;
 
 procedure TLdapOpDlg.DeleteTree(const adn: string);
@@ -257,8 +287,8 @@ begin
     SetLength(attrs, 2);
     attrs[0] := 'objectclass';
     attrs[1] := nil;
-    LdapCheck(ldap_search_s(Session.pld, PChar(adn), LDAP_SCOPE_BASE, PChar(sANYCLASS), PChar(attrs), 0, plmEntry));
-    DeleteLeaf(PChar(adn), Session.pld, plmEntry);
+    LdapCheck(ldap_search_s(SourceSession.pld, PChar(adn), LDAP_SCOPE_BASE, PChar(sANYCLASS), PChar(attrs), 0, plmEntry));
+    DeleteLeaf(PChar(adn), SourceSession.pld, plmEntry);
   end;
 end;
 
