@@ -43,12 +43,12 @@ const
   sfUserName        = '%s.%s';
   sfDisplayName     = '%s, %s';
   sfHomeDir         = '/home/%s';
-  sfsmbHome         = '\\SRV-K-FS01\homes';
-  sfProfilePath     = '\\SRV-K-FS01\profiles\%s';
+  sfsmbHome         = '\\SERVER\homes';
+  sfProfilePath     = '\\SERVER\profiles\%s';
   //sfScriptPath      = '%s.cmd';
   sfScriptPath      = 'common.cmd';
-  sfMail            = '%s@brandi-igh.de';
-  sfMaildrop        = '%s@srv-k-fs01.koeln.home.igh.com';
+  sfMail            = '%s@mydomain.com';
+  sfMaildrop        = '%s@server.mydomain.com';
 
 type
   TUserDlg = class(TForm)

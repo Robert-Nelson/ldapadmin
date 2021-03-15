@@ -119,26 +119,31 @@ object EditEntryFrm: TEditEntryFrm
       Left = 110
       Top = 0
       ImageIndex = 5
+      OnClick = ToolBtnClick
     end
     object CutBtn: TToolButton
       Left = 140
       Top = 0
       ImageIndex = 7
+      OnClick = ToolBtnClick
     end
     object CopyBtn: TToolButton
       Left = 170
       Top = 0
       ImageIndex = 6
+      OnClick = ToolBtnClick
     end
     object PasteBtn: TToolButton
       Left = 200
       Top = 0
       ImageIndex = 8
+      OnClick = ToolBtnClick
     end
     object DeleteBtn: TToolButton
       Left = 230
       Top = 0
       ImageIndex = 4
+      OnClick = ToolBtnClick
     end
     object ToolButton8: TToolButton
       Left = 260

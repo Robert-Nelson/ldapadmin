@@ -35,6 +35,8 @@ resourcestring
   cDescription  = 'Description';
   cPickGroups   = 'Choose Groups';
   cPickAccounts = 'Choose Accounts';
+  cNewEntry     = 'New Entry';
+  cEditEntry    = 'Edit entry: %s';
   cNewResource  = 'New Resource';
   cEditResource = 'Edit Resource';
   cResource     = 'Resource:';

@@ -1,3 +1,24 @@
+  {      LDAPAdmin - Connprop.pas
+  *      Copyright (C) 2003 Tihomir Karlovic
+  *
+  *      Author: Tihomir Karlovic
+  *
+  *
+  * This file is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This file is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+  }
+
 unit RegAccnt;
 
 interface
@@ -16,6 +37,7 @@ type
     Password: string;
     Port: Integer;
     UseSSL: Boolean;
+    LdapVersion: Integer;
   public
     constructor Create(AccName: string);
     procedure Read;
@@ -30,10 +52,14 @@ constructor TAccountEntry.Create(AccName: string);
 begin
   inherited Create;
   Name := AccName;
+
   if Name <> '' then
     Read
   else
+  begin { defaults }
     Port := LDAP_PORT;
+    LdapVersion := LDAP_VERSION3;
+  end;
 end;
 
 procedure TAccountEntry.Read;
@@ -75,6 +101,12 @@ begin
         inc(Offset, SizeOf(Integer));
         pBool := @Buffer[Offset];
         UseSSL := pBool^;
+        inc(Offset, SizeOf(Boolean));
+        pint := @Buffer[Offset];
+        if (pInt^ <> LDAP_VERSION2) and (pInt^ <> LDAP_VERSION3) then
+          LdapVersion := LDAP_VERSION3
+        else
+          LdapVersion := pInt^;
       end
       else begin
         Server := '';
@@ -134,6 +166,9 @@ begin
       inc(Offset,SizeOf(Integer));
       pBool := @Buffer[Offset];
       pBool^ := UseSSL;
+      inc(Offset,SizeOf(Boolean));
+      pInt := @Buffer[Offset];
+      pInt^ := LdapVersion;
       Reg.WriteBinaryData(Name, Buffer^, DataSize);
     end;
   finally

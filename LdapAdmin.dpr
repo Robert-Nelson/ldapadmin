@@ -20,7 +20,8 @@ uses
   Transport in 'Transport.pas' {TransportDlg},
   Search in 'Search.pas' {SearchFrm},
   Ou in 'Ou.pas' {OuDlg},
-  Export in 'Export.pas' {ExportDlg};
+  Export in 'Export.pas' {ExportDlg},
+  RegAccnt in 'RegAccnt.pas';
 
 {$R *.RES}
 

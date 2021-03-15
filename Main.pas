@@ -159,6 +159,7 @@ begin
     Result := -1
   else
     Result := AnsiStrIComp(PChar(Node1.Text), PChar(Node2.Text));
+    //Result := AnsiStrIComp(PChar(Copy(Node1.Text, Pos('=', Node1.Text), 32275)), PChar(Copy(Node2.Text, Pos('=', Node2.Text), 32275)));
 end;
 
 function TMainFrm.GetRdn(dn: string): string;
@@ -206,6 +207,7 @@ begin
       try
         rdn := GetRdn(pszdn);
         CNode := LDAPTree.Items.AddChildObject(Node, rdn, Pointer(StrNew(pszdn)));
+        //CNode := LDAPTree.Items.AddChildObject(Node, rdn, TLDAPEntry.Create);
 
         Container := true;
         CNode.ImageIndex := bmEntry;
@@ -325,11 +327,11 @@ procedure TMainFrm.FormCreate(Sender: TObject);
 begin
   // Set deafult values for LDAP conection
   lSession := TLDAPSession.Create;
-  with lSession do begin
+  {with lSession do begin
     Port := LDAP_PORT;
     SSL := false;
     Version := LDAP_VERSION3;
-  end;
+  end;}
 end;
 
 procedure TMainFrm.mbConnectClick(Sender: TObject);
@@ -346,10 +348,6 @@ begin
       DisconnectBtn.Enabled := true;
       mbEdit.Visible := true;
       mbTools.Visible := true;
-      EditBtn.Enabled := true;
-      PropertiesBtn.Enabled := true;
-      DeleteBtn.Enabled := true;
-      RefreshBtn.Enabled := true;
       LDAPTree.PopupMenu := MainFrm.PopupMenu;
       RefreshTree;
     finally
@@ -368,10 +366,6 @@ begin
   DisconnectBtn.Enabled := false;
   mbEdit.Visible := false;
   mbTools.Visible := false;
-  EditBtn.Enabled := false;
-  PropertiesBtn.Enabled := false;
-  DeleteBtn.Enabled := false;
-  RefreshBtn.Enabled := false;
   LDAPTree.PopupMenu := nil;
   LDAPTree.Items.BeginUpdate;
   LDAPTree.Items.Clear;
@@ -405,6 +399,7 @@ procedure TMainFrm.LDAPTreeDeletion(Sender: TObject; Node: TTreeNode);
 begin
   if (Node.Data <> nil) and (Integer(Node.Data) <> ncDummyNode) then
     StrDispose(Node.Data);
+    //TLDAPEntry(Node.Data).Destroy;
 end;
 
 procedure TMainFrm.LDAPTreeChange(Sender: TObject; Node: TTreeNode);
@@ -435,27 +430,23 @@ begin
       Entry.Free;
     end;
 
+    mbExport.Enabled := LDAPTree.Selected <> nil;
+
 end;
 
 procedure TMainFrm.pbNewClick(Sender: TObject);
 begin
-  if Sender = pbNewEntry then
-    TEditEntryFrm.Create(Self, PChar(LDAPTree.Selected.Data), lSession.pld, EM_ADD).ShowModal
+  case (Sender as TComponent).Tag of
+    1: TEditEntryFrm.Create(Self, PChar(LDAPTree.Selected.Data), lSession.pld, EM_ADD).ShowModal;
+    2: TUserDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal;
+    3: TComputerDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal;
+    4: TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal;
+    //5: TMailGroupDlg
+    6: TTransportDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal;
+    7: TOuDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal;
   else
-  if Sender = pbNewUser then
-    TUserDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal
-  else
-  if Sender = pbNewGroup then
-    TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal
-  else
-  if Sender = pbNewComputer then
-    TComputerDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal
-  else
-  if Sender = pbNewTransportTable then
-    TTransportDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal
-  else
-  if Sender = pbNewOu then
-    TOuDlg.Create(Self, PChar(LDAPTree.Selected.Data), lSession, EM_ADD).ShowModal;
+    Exit;
+  end;
   pbRefreshClick(nil);
 end;
 
@@ -502,13 +493,16 @@ procedure TMainFrm.pbDeleteClick(Sender: TObject);
   end;
 
 begin
-  if Application.MessageBox(PChar(Format(stConfirmDel,
-      [PChar(LDAPTree.Selected.Data)])), PChar(cConfirmDel), MB_YESNO) = IDYES then
+  if Assigned(LDAPTree.Selected) then
   begin
-    if (LDAPTree.Selected.ImageIndex = bmUser) or (LDAPTree.Selected.ImageIndex = bmPosixUser) then
-      RemoveUserRefs(lSession.GetNameFromDN(PChar(LDAPTree.Selected.Data)));
-    LdapCheck(ldap_delete_s(lSession.pld, PChar(LDAPTree.Selected.Data)));
-    LdapTree.Selected.Delete;
+    if Application.MessageBox(PChar(Format(stConfirmDel,
+        [PChar(LDAPTree.Selected.Data)])), PChar(cConfirmDel), MB_YESNO) = IDYES then
+    begin
+      if (LDAPTree.Selected.ImageIndex = bmUser) or (LDAPTree.Selected.ImageIndex = bmPosixUser) then
+        RemoveUserRefs(lSession.GetNameFromDN(PChar(LDAPTree.Selected.Data)));
+      LdapCheck(ldap_delete_s(lSession.pld, PChar(LDAPTree.Selected.Data)));
+      LdapTree.Selected.Delete;
+    end;
   end;
 end;
 
@@ -565,6 +559,7 @@ begin
       finally
         Entry.Destroy;
       end;
+      //ShowMessage(MD5Password);
     end;
   finally
     Destroy;
@@ -594,7 +589,7 @@ end;
 
 procedure TMainFrm.LDAPTreeDblClick(Sender: TObject);
 begin
-  if Assigned(LDAPTree.Selected) and (LDAPTree.Selected.ImageIndex <> bmOu) then
+  if LDAPTree.Selected.ImageIndex <> bmOu then
     pbPropertiesClick(Sender)
 end;
 

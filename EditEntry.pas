@@ -54,6 +54,7 @@ type
     procedure mbInsertRowClick(Sender: TObject);
     procedure mbDeleteRowClick(Sender: TObject);
     procedure PushShortCutClick(Sender: TObject);
+    procedure ToolBtnClick(Sender: TObject);
   private
     Entry: TLDAPEntry;
     dn: string;
@@ -158,14 +159,15 @@ begin
   EditMode := Mode;
   if Mode = EM_MODIFY then
   begin
-    Caption := 'Eintrag Bearbeiten: ' + dn;
+    Caption := Format(cEditEntry, [dn]);
     EditDN.Enabled := false;
     EditDN.Text := dn;
     Load;
   end
   else begin
-    Caption := 'Neue Eintrag';
+    Caption := cNewEntry;
     EditDN.Text := ',' + dn;
+    //StringGrid.Cells[0,1] := 'dn';
   end;
   with StringGrid do
   begin
@@ -263,6 +265,8 @@ procedure TEditEntryFrm.mbSaveClick(Sender: TObject);
 var
   i: Integer;
 begin
+  {Close;
+  ModalResult := mrOk;}
   if EditMode = EM_ADD then
   begin
     Entry := TLDAPEntry.Create(pld, EditDN.Text);
@@ -293,6 +297,24 @@ end;
 procedure TEditEntryFrm.PushShortCutClick(Sender: TObject);
 begin
   PushShortCut(Sender as TMenuItem);
+end;
+
+procedure TEditEntryFrm.ToolBtnClick(Sender: TObject);
+begin
+  if Sender = UndoBtn then
+    PushShortcut(mbRestore)
+  else
+  if Sender = CutBtn then
+    PushShortcut(mbCut)
+  else
+  if Sender = CopyBtn then
+    PushShortcut(mbCopy)
+  else
+  if Sender = PasteBtn then
+    PushShortcut(mbPaste)
+  else
+  if Sender = DeleteBtn then
+    PushShortcut(mbDelete)
 end;
 
 end.

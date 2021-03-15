@@ -35,20 +35,16 @@ object MainFrm: TMainFrm
     Flat = True
     Images = ImageList
     Indent = 4
-    ParentShowHint = False
-    ShowHint = True
     TabOrder = 0
     object ConnectBtn: TToolButton
       Left = 4
       Top = 0
-      Hint = 'Connect'
       ImageIndex = 10
       OnClick = mbConnectClick
     end
     object DisconnectBtn: TToolButton
       Left = 36
       Top = 0
-      Hint = 'Disconnect'
       Enabled = False
       ImageIndex = 11
       OnClick = mbDisconnectClick
@@ -64,32 +60,24 @@ object MainFrm: TMainFrm
     object EditBtn: TToolButton
       Left = 76
       Top = 0
-      Hint = 'Edit'
-      Enabled = False
       ImageIndex = 14
       OnClick = pbEditClick
     end
     object PropertiesBtn: TToolButton
       Left = 108
       Top = 0
-      Hint = 'Properties'
-      Enabled = False
       ImageIndex = 16
       OnClick = pbPropertiesClick
     end
     object DeleteBtn: TToolButton
       Left = 140
       Top = 0
-      Hint = 'Delete'
-      Enabled = False
       ImageIndex = 12
       OnClick = pbDeleteClick
     end
     object RefreshBtn: TToolButton
       Left = 172
       Top = 0
-      Hint = 'Refresh'
-      Enabled = False
       ImageIndex = 17
       OnClick = pbRefreshClick
     end
@@ -104,7 +92,6 @@ object MainFrm: TMainFrm
     object ExitBtn: TToolButton
       Left = 212
       Top = 0
-      Hint = 'Exit'
       ImageIndex = 18
       OnClick = mbExitClick
     end
@@ -960,6 +947,7 @@ object MainFrm: TMainFrm
     Top = 536
     object mbStart: TMenuItem
       Caption = '&Start'
+      ImageIndex = 10
       object mbConnect: TMenuItem
         Caption = '&Conect...'
         ImageIndex = 10
@@ -975,7 +963,7 @@ object MainFrm: TMainFrm
         Caption = '-'
       end
       object mbExit: TMenuItem
-        Caption = '&Beenden'
+        Caption = '&Exit'
         OnClick = mbExitClick
       end
     end
@@ -992,33 +980,41 @@ object MainFrm: TMainFrm
       object mbNew: TMenuItem
         Caption = '&New'
         object mbNewEntry: TMenuItem
+          Tag = 1
           Caption = '&Entry...'
           OnClick = pbNewClick
         end
         object mbNewUser: TMenuItem
+          Tag = 2
           Caption = '&User...'
           ImageIndex = 5
           OnClick = pbNewClick
         end
         object mbNewComputer: TMenuItem
+          Tag = 3
           Caption = '&Computer...'
           OnClick = pbNewClick
         end
         object mbNewGroup: TMenuItem
+          Tag = 4
           Caption = '&Group...'
           ImageIndex = 6
           OnClick = pbNewClick
         end
         object mbNewVerteiler: TMenuItem
+          Tag = 5
           Caption = '&Mailing list...'
           OnClick = pbNewClick
         end
         object mbNewTransporttable: TMenuItem
+          Tag = 6
           Caption = '&Transport table...'
           OnClick = pbNewClick
         end
         object Organizationalunit1: TMenuItem
+          Tag = 7
           Caption = '&Organizational unit...'
+          OnClick = pbNewClick
         end
       end
       object mbEditEntry: TMenuItem
@@ -1055,6 +1051,7 @@ object MainFrm: TMainFrm
       Visible = False
       object mbExport: TMenuItem
         Caption = '&Export...'
+        Enabled = False
         OnClick = mbExportClick
       end
       object mbImport: TMenuItem
@@ -1082,32 +1079,39 @@ object MainFrm: TMainFrm
     object pbNew: TMenuItem
       Caption = '&New'
       object pbNewEntry: TMenuItem
+        Tag = 1
         Caption = '&Entry...'
         OnClick = pbNewClick
       end
       object pbNewUser: TMenuItem
+        Tag = 2
         Caption = '&User...'
         ImageIndex = 5
         OnClick = pbNewClick
       end
       object pbNewComputer: TMenuItem
+        Tag = 3
         Caption = '&Computer...'
         OnClick = pbNewClick
       end
       object pbNewGroup: TMenuItem
+        Tag = 4
         Caption = '&Group...'
         ImageIndex = 6
         OnClick = pbNewClick
       end
       object pbNewVerteiler: TMenuItem
+        Tag = 5
         Caption = '&Mailing list...'
         OnClick = pbNewClick
       end
       object pbNewTransporttable: TMenuItem
+        Tag = 6
         Caption = '&Transport table...'
         OnClick = pbNewClick
       end
       object pbNewOu: TMenuItem
+        Tag = 7
         Caption = '&Organizational unit...'
         OnClick = pbNewClick
       end

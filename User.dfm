@@ -212,7 +212,7 @@ object UserDlg: TUserDlg
         Top = 88
         Width = 353
         Height = 21
-        TabOrder = 0
+        TabOrder = 2
       end
       object homeDrive: TComboBox
         Left = 312
@@ -254,14 +254,14 @@ object UserDlg: TUserDlg
         Top = 144
         Width = 353
         Height = 21
-        TabOrder = 2
+        TabOrder = 3
       end
       object smbHome: TEdit
         Left = 16
         Top = 40
         Width = 289
         Height = 21
-        TabOrder = 3
+        TabOrder = 0
       end
       object description: TMemo
         Left = 16
@@ -453,21 +453,21 @@ object UserDlg: TUserDlg
         Top = 232
         Width = 161
         Height = 21
-        TabOrder = 0
+        TabOrder = 10
       end
       object URL: TEdit
         Left = 16
         Top = 328
         Width = 353
         Height = 21
-        TabOrder = 1
+        TabOrder = 12
       end
       object postalAddress: TMemo
         Left = 16
         Top = 88
         Width = 177
         Height = 73
-        TabOrder = 2
+        TabOrder = 1
       end
       object st: TEdit
         Left = 16
@@ -481,21 +481,21 @@ object UserDlg: TUserDlg
         Top = 280
         Width = 161
         Height = 21
-        TabOrder = 4
+        TabOrder = 11
       end
       object telephoneNumber: TEdit
         Left = 208
         Top = 136
         Width = 161
         Height = 21
-        TabOrder = 5
+        TabOrder = 8
       end
       object postalCode: TEdit
         Left = 112
         Top = 232
         Width = 81
         Height = 21
-        TabOrder = 6
+        TabOrder = 4
       end
       object physicalDeliveryOfficeName: TEdit
         Left = 208
@@ -509,8 +509,8 @@ object UserDlg: TUserDlg
         Top = 40
         Width = 161
         Height = 21
-        ItemHeight = 0
-        TabOrder = 8
+        ItemHeight = 13
+        TabOrder = 6
         OnChange = ComboChange
       end
       object o: TEdit
@@ -518,28 +518,28 @@ object UserDlg: TUserDlg
         Top = 40
         Width = 177
         Height = 21
-        TabOrder = 9
+        TabOrder = 0
       end
       object facsimileTelephoneNumber: TEdit
         Left = 208
         Top = 184
         Width = 161
         Height = 21
-        TabOrder = 10
+        TabOrder = 9
       end
       object l: TEdit
         Left = 16
         Top = 184
         Width = 177
         Height = 21
-        TabOrder = 11
+        TabOrder = 2
       end
       object c: TEdit
         Left = 16
         Top = 280
         Width = 177
         Height = 21
-        TabOrder = 12
+        TabOrder = 5
       end
     end
     object PrivateSheet: TTabSheet
@@ -585,14 +585,14 @@ object UserDlg: TUserDlg
         Top = 208
         Width = 185
         Height = 21
-        TabOrder = 1
+        TabOrder = 2
       end
       object homePhone: TEdit
         Left = 24
         Top = 160
         Width = 185
         Height = 21
-        TabOrder = 2
+        TabOrder = 1
       end
       object mobile: TEdit
         Left = 24
@@ -634,7 +634,7 @@ object UserDlg: TUserDlg
             Width = 250
           end>
         HideSelection = False
-        TabOrder = 0
+        TabOrder = 2
         ViewStyle = vsReport
         OnColumnClick = ListViewColumnClick
         OnCompare = ListViewCompare
@@ -646,7 +646,7 @@ object UserDlg: TUserDlg
         Width = 75
         Height = 25
         Caption = '&Add'
-        TabOrder = 1
+        TabOrder = 3
         OnClick = AddGroupBtnClick
       end
       object RemoveGroupBtn: TButton
@@ -654,9 +654,9 @@ object UserDlg: TUserDlg
         Top = 336
         Width = 75
         Height = 25
-        Caption = '&Cancel'
+        Caption = '&Remove'
         Enabled = False
-        TabOrder = 2
+        TabOrder = 4
         OnClick = RemoveGroupBtnClick
       end
       object PrimaryGroupBtn: TButton
@@ -665,7 +665,7 @@ object UserDlg: TUserDlg
         Width = 59
         Height = 25
         Caption = '&Set...'
-        TabOrder = 3
+        TabOrder = 1
         OnClick = PrimaryGroupBtnClick
       end
       object gidNumber: TEdit
@@ -674,7 +674,7 @@ object UserDlg: TUserDlg
         Width = 289
         Height = 21
         Enabled = False
-        TabOrder = 4
+        TabOrder = 0
       end
     end
   end
