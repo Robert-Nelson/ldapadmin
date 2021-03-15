@@ -22,14 +22,14 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 313
     Top = 0
     Width = 11
-    Height = 456
+    Height = 448
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 0
   end
   object Panel3: TPanel
     Left = 0
-    Top = 456
+    Top = 448
     Width = 687
     Height = 46
     Align = alBottom
@@ -60,7 +60,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 681
     Top = 0
     Width = 6
-    Height = 456
+    Height = 448
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 2
@@ -69,7 +69,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 0
     Top = 0
     Width = 6
-    Height = 456
+    Height = 448
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 3
@@ -78,7 +78,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 324
     Top = 0
     Width = 357
-    Height = 456
+    Height = 448
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 4
@@ -86,7 +86,7 @@ object CustomMenuDlg: TCustomMenuDlg
       Left = 0
       Top = 0
       Width = 357
-      Height = 456
+      Height = 448
       Align = alClient
       BevelInner = bvLowered
       BevelOuter = bvNone
@@ -242,7 +242,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 6
     Top = 0
     Width = 307
-    Height = 456
+    Height = 448
     Align = alClient
     DragCursor = crDefault
     DragMode = dmAutomatic

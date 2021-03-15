@@ -235,6 +235,8 @@ const
   cNewValue         = 'New value';
   cObjectclass      = 'Objectclass';
   cNew              = '<<new>>';
+  cNewItem          = 'New item';
+  cNewSubmenu       = 'New submenu';
   cSetPassword      = 'Set password...';
   cRegistryCfgName  = 'Private';
   sConnectSuccess   = 'Connection is successful.';
@@ -257,6 +259,7 @@ const
   cMore             = 'More...';
   cOk               = '&OK';
   cCancel           = '&Cancel';
+  cEnterRDN         = 'Enter rdn:';
 
 // Menu captions
 
@@ -375,6 +378,7 @@ const
   stMenuAssignTempl = 'A template name must not be empty!';
   stDuplicateSC     = 'Shortcut ''%s'' is already assigned to ''%s'' menu item!';
   stErrExtMethName  = 'Error extracting method name!';
+  stPropReadOnly    = 'Property is read only!';
 
 implementation
 

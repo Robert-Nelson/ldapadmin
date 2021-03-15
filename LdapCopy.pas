@@ -32,11 +32,14 @@ type
   TExpandNodeProc = procedure (Node: TTreeNode; Session: TLDAPSession) of object;
 
   TCopyDlg = class(TForm)
+    Panel1: TPanel;
     OKBtn: TButton;
     CancelBtn: TButton;
+    Panel2: TPanel;
+    Panel3: TPanel;
     Label1: TLabel;
-    TreeView: TTreeView;
     Label2: TLabel;
+    TreeView: TTreeView;
     edName: TEdit;
     procedure cbConnectionsChange(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -46,6 +49,7 @@ type
     procedure cbConnectionsDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
     procedure TreeViewDeletion(Sender: TObject; Node: TTreeNode);
+    procedure FormResize(Sender: TObject);
   private
     cbConnections: TLAComboBox;
     RdnAttribute: string;
@@ -119,17 +123,20 @@ var
   i,j: integer;
 begin
   inherited Create(AOwner);
-  TSizeGrip.Create(Self);
+  TSizeGrip.Create(Panel1);
   OkBtn.Enabled := false;
   cbConnections := TLAComboBox.Create(Self);
   with cbConnections do begin
-    Parent := Self;
-    Left := 80;
+    //Parent := Self;
+    Parent := Panel3;
+    //Left := 80;
+    Left := edName.Left;
     Top := 8;
-    Width := 305;
+    //Width := 305;
+    Width := edName.Width;
     Height := 22;
     Style := csOwnerDrawFixed;
-    Anchors := [akLeft, akTop, akRight];
+    //Anchors := [akLeft, akTop, akRight];
     ItemHeight := 16;
     TabOrder := 0;
     OnChange := cbConnectionsChange;
@@ -257,6 +264,17 @@ procedure TCopyDlg.TreeViewDeletion(Sender: TObject; Node: TTreeNode);
 begin
   if (Node.Data <> nil) and (Integer(Node.Data) <> ncDummyNode) then
     TObjectInfo(Node.Data).Free;
+end;
+
+procedure TCopyDlg.FormResize(Sender: TObject);
+begin
+  edName.Width := Panel3.Width - edName.Left;
+  //cbConnections.Width := Panel3.Width - cbConnections.Left;
+  cbConnections.Width := edName.Width;
+  TreeView.Width := Panel3.Width - TreeView.Left;
+  TreeView.Height := Panel3.Height - TreeView.Top;
+  CancelBtn.Left := Panel3.Width - CancelBtn.Width;
+  OkBtn.Left := CancelBtn.Left - OkBtn.Width - 5;
 end;
 
 end.

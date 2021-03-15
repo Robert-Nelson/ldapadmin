@@ -1,5 +1,5 @@
   {      LDAPAdmin - EditEntry.pas
-  *      Copyright (C) 2003-2012 Tihomir Karlovic
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -428,7 +428,6 @@ function TEditEntryFrm.NewInplaceControl(InplaceClass: TInplaceClass; StringGrid
 begin
   Result := InplaceClass.Create(StringGrid, AValue);
   with Result do begin
-    Parent := StringGrid.Parent;
     Required := IsRequired;
     PopupMenu := PopupMenu1;
     OnExit := InplaceControlExit;
@@ -441,6 +440,7 @@ var
   i, j: integer;
 begin
   inherited Create(AOwner);
+  attrStringGrid.Doublebuffered := true;
   fConnection := AConnection;
   SchemaCheckBtn.Down := AConnection.Account.ReadBool(rEditorSchemaHelp, true);
   fSchema := AConnection.Schema;
@@ -448,6 +448,7 @@ begin
   fBold.Assign(Font);
   fBold.Style := fBold.Style + [fsBold];
   ObjectCombo := NewInplaceControl(TInplaceComboBox, objStringGrid, nil, false) as TInplaceComboBox;
+  ObjectCombo.Parent := OCSheet;
   objStringGrid.Objects[0, 1] := ObjectCombo;
   with ObjectCombo do begin
     //Control.Color := $00F0F0F0;
@@ -463,6 +464,7 @@ begin
         Control.Items.Add(Name[j]);
   end;
   AttributeCombo := NewInplaceControl(TInplaceComboBox, attrStringGrid, nil, false) as TInplaceComboBox;
+  AttributeCombo.Parent := OCSheet;
   attrStringGrid.Objects[0, 1] := AttributeCombo;
   with AttributeCombo do begin
     OnEnter := KeyComboEnter;

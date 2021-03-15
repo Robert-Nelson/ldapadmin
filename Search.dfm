@@ -24,7 +24,7 @@ object SearchFrm: TSearchFrm
   TextHeight = 13
   object StatusBar: TStatusBar
     Left = 0
-    Top = 491
+    Top = 484
     Width = 722
     Height = 19
     Panels = <
@@ -155,6 +155,7 @@ object SearchFrm: TSearchFrm
             object TabSheet2: TTabSheet
               Caption = '&Custom'
               ImageIndex = 1
+              OnResize = TabSheet2Resize
               object Label1: TLabel
                 Left = 8
                 Top = 8
@@ -167,7 +168,6 @@ object SearchFrm: TSearchFrm
                 Top = 8
                 Width = 563
                 Height = 41
-                Anchors = [akLeft, akTop, akRight]
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWindowText
                 Font.Height = -12
@@ -181,7 +181,6 @@ object SearchFrm: TSearchFrm
                 Top = 52
                 Width = 426
                 Height = 21
-                Anchors = [akLeft, akTop, akRight]
                 ItemHeight = 0
                 TabOrder = 1
                 OnChange = cbFiltersChange
@@ -192,7 +191,7 @@ object SearchFrm: TSearchFrm
                 Top = 52
                 Width = 65
                 Height = 23
-                Anchors = [akTop, akRight]
+                Anchors = []
                 Caption = 'Sa&ve'
                 Enabled = False
                 TabOrder = 2
@@ -203,7 +202,7 @@ object SearchFrm: TSearchFrm
                 Top = 52
                 Width = 65
                 Height = 23
-                Anchors = [akTop, akRight]
+                Anchors = []
                 Caption = '&Delete'
                 Enabled = False
                 TabOrder = 3
@@ -213,6 +212,7 @@ object SearchFrm: TSearchFrm
             object TabSheet3: TTabSheet
               Caption = '&Options'
               ImageIndex = 2
+              OnResize = TabSheet3Resize
               object Label4: TLabel
                 Left = 20
                 Top = 12
@@ -248,7 +248,7 @@ object SearchFrm: TSearchFrm
                 Top = 8
                 Width = 67
                 Height = 23
-                Anchors = [akTop, akRight]
+                Anchors = [akTop]
                 Caption = 'Edit...'
                 TabOrder = 1
                 OnClick = edAttrBtnClick
@@ -356,7 +356,7 @@ object SearchFrm: TSearchFrm
     Left = 0
     Top = 193
     Width = 722
-    Height = 298
+    Height = 291
     Align = alClient
     BorderWidth = 3
     TabOrder = 2

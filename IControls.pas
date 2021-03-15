@@ -1,5 +1,5 @@
   {      LDAPAdmin - IControls.pas
-  *      Copyright (C) 2006 Tihomir Karlovic
+  *      Copyright (C) 2006-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -240,6 +240,8 @@ begin
   if not (Enabled and Assigned(fControl)) then Exit;
 
   StringGrid := Owner as TStringGrid;
+  Parent := StringGrid.Parent;
+  
   { In case it's triggerd by mouse down event we simulate mouse up
     because string grid is about to lose the focus to inplace control }
   mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);

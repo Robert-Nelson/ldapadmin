@@ -863,10 +863,11 @@ begin
       ValueListView.Items.Clear;
       ShowAttrs(Attributes);
       ShowAttrs(OperationalAttributes);
-      RefreshStatusBar;
+      //RefreshStatusBar;
     finally
       ValueListView.Items.EndUpdate;
     end;
+    RefreshStatusBar;
   end;
 end;
 
@@ -898,6 +899,9 @@ end;
 
 procedure TMainFrm.FormCreate(Sender: TObject);
 begin
+  LdapTree.DoubleBuffered := true;
+  ValueListView.DoubleBuffered := true;
+  EntryListView.DoubleBuffered := true;
   fDisabledImages := TBetaDisabledImageList.Create(self);
   fDisabledImages.MasterImages := ImageList;
   ToolBar.DisabledImages := fDisabledImages;

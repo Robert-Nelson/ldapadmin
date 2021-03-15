@@ -511,14 +511,17 @@ end;
 
 procedure TCustomMenuDlg.mbAddItemClick(Sender: TObject);
 begin
-  AddItem(aidTemplate, 'New item');
+  if rbTemplate.Enabled then
+    AddItem(aidTemplate, cNewItem)
+  else
+    AddItem(aidEntry, cNewItem);
   fActMenu.AssignItems(mbTest);
   AlignMenu;
 end;
 
 procedure TCustomMenuDlg.mbAddSubmenuClick(Sender: TObject);
 begin
-  AddItem(aidNodeItem, 'New submenu');
+  AddItem(aidNodeItem, cNewSubmenu);
   fActMenu.AssignItems(mbTest);
   AlignMenu;
 end;

@@ -61,7 +61,7 @@ object EditEntryFrm: TEditEntryFrm
   end
   object StatusBar: TStatusBar
     Left = 0
-    Top = 509
+    Top = 501
     Width = 779
     Height = 22
     Panels = <
@@ -175,7 +175,7 @@ object EditEntryFrm: TEditEntryFrm
     Left = 0
     Top = 72
     Width = 779
-    Height = 437
+    Height = 429
     ActivePage = OcSheet
     Align = alClient
     TabOrder = 3
@@ -186,7 +186,7 @@ object EditEntryFrm: TEditEntryFrm
         Left = 185
         Top = 0
         Width = 3
-        Height = 409
+        Height = 401
         Cursor = crHSplit
         OnMoved = Splitter1Moved
       end
@@ -194,7 +194,7 @@ object EditEntryFrm: TEditEntryFrm
         Left = 188
         Top = 0
         Width = 583
-        Height = 409
+        Height = 401
         Align = alClient
         ColCount = 2
         DefaultRowHeight = 18
@@ -220,7 +220,7 @@ object EditEntryFrm: TEditEntryFrm
         Left = 0
         Top = 0
         Width = 185
-        Height = 409
+        Height = 401
         Align = alLeft
         Color = clAppWorkSpace
         ColCount = 1
@@ -256,7 +256,7 @@ object EditEntryFrm: TEditEntryFrm
         Left = 129
         Top = 0
         Width = 3
-        Height = 409
+        Height = 401
         Cursor = crHSplit
         OnMoved = Splitter1Moved
       end
@@ -264,7 +264,7 @@ object EditEntryFrm: TEditEntryFrm
         Left = 0
         Top = 0
         Width = 129
-        Height = 409
+        Height = 401
         Align = alLeft
         BevelOuter = bvNone
         Caption = 'Panel1'
@@ -273,7 +273,7 @@ object EditEntryFrm: TEditEntryFrm
           Left = 0
           Top = 0
           Width = 129
-          Height = 387
+          Height = 379
           Align = alClient
           Color = clAppWorkSpace
           Font.Charset = DEFAULT_CHARSET
@@ -292,7 +292,7 @@ object EditEntryFrm: TEditEntryFrm
         end
         object ToolBar2: TToolBar
           Left = 0
-          Top = 387
+          Top = 379
           Width = 129
           Height = 22
           Align = alBottom

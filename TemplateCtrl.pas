@@ -796,7 +796,7 @@ begin
         if S.Count = 1 then
           ardn := S[0]
         else
-          if ComboMessageDlg('Enter rdn:', S.CommaText, ardn) <> mrOk then
+          if ComboMessageDlg(cEnterRDN, S.CommaText, ardn) <> mrOk then
             Abort;
         fEntry.Dn := ardn + ',' + fRdn;
       finally

@@ -21,9 +21,12 @@
 
 unit Search;
 
+{$I VER.INC}
+
 interface
 
 uses
+  {$IFDEF VER_D7H}Themes,{$ENDIF}
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, StdCtrls, LDAPClasses, Menus, ExtCtrls, Sorter, WinLdap, ToolWin,
   ImgList, ActnList, Buttons, Schema, Contnrs, Connection;
@@ -208,6 +211,8 @@ type
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure btnSearchModifyClick(Sender: TObject);
     procedure ActClearAllExecute(Sender: TObject);
+    procedure TabSheet2Resize(Sender: TObject);
+    procedure TabSheet3Resize(Sender: TObject);
   private
     Connection: TConnection;
     ResultPages: TResultPageControl;
@@ -821,6 +826,15 @@ end;
 constructor TSearchFrm.Create(AOwner: TComponent; const dn: string; AConnection: TConnection);
 begin
   inherited Create(AOwner);
+
+  {$IFDEF VER_D7H}
+  if ThemeServices.ThemesEnabled then
+  begin
+    TabSheet2Resize(nil);
+    TabSheet3Resize(nil);
+  end;
+  {$ENDIF}
+
   Connection := AConnection;
   if dn <> '' then
     cbBasePath.Text := dn
@@ -1195,6 +1209,23 @@ begin
   finally
     LockControl(ResultPages, false);
   end;
+end;
+
+procedure TSearchFrm.TabSheet2Resize(Sender: TObject);
+begin
+  with TabSheet2 do begin
+    Memo1.Width := Width - 46;
+    DeleteFilterBtn.Left := Width - DeleteFilterBtn.Width - 6;
+    SaveFilterBtn.Left := DeleteFilterBtn.Left - SaveFilterBtn.Width - 4;
+    cbFilters.Width := SaveFilterBtn.Left - 44;
+  end;
+end;
+
+procedure TSearchFrm.TabSheet3Resize(Sender: TObject);
+begin
+  edAttrBtn.Left := TabSheet3.Width - edAttrBtn.Width - 6;
+  cbAttributes.Width := edAttrBtn.Left - cbAttributes.Left - 6;
+  cbDerefAliases.Width := cbAttributes.Left + cbAttributes.Width - cbDerefAliases.Left;
 end;
 
 end.

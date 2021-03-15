@@ -1,5 +1,5 @@
   {      LDAPAdmin - Sorter.pas
-  *      Copyright (C) 2011 Tihomir Karlovic
+  *      Copyright (C) 2011-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -51,8 +51,6 @@ type
     property        SortAsc: boolean read FSortAsc;
     property        OnSort: TLVSorterOnSort read FOnSort write FOnSort;
   end;
-
-  TMoveSG = class(TCustomGrid); // reveals protected MoveRow procedure
 
   TSGSorterOnSort = procedure(SortColumn:  Integer; SortAsc: boolean) of object;
 
@@ -212,7 +210,7 @@ begin
   SendMessage(hHeader, HDM_SETITEM, Column.Index, Integer(@HD));
 end;
 
-{TStringGridSorter}
+{ TStringGridSorter }
 
 constructor TStringGridSorter.Create;
 begin
@@ -396,24 +394,44 @@ begin
 end;
 
 procedure TStringGridSorter.SortGrid;
-var
-  i, c:   Integer;
-  Sorted: Boolean;
-begin
-  repeat
-    Sorted := true;
-    with StringGrid do
-      for i := FixedRows + fTopFix to RowCount - fBottomFix - 2 do
+
+  procedure QuickSort(Left, Right: Integer; S: TStrings);
+   var
+    i, j, n: Integer;
+    Pivot: string;
+
+    function SCompare(const S1, S2: string): Integer;
+    begin
+      Result := AnsiCompareStr(S1, S2);
+      if not fSortAsc then Result := -Result;
+    end;
+
+  begin
+    i := Left;
+    j := Right;
+    Pivot := S[(i + j) shr 1];
+    repeat
+      while SCompare(S[i], Pivot) < 0 do Inc(i);
+      while SCompare(S[j], Pivot) > 0 do Dec(j);
+      if i <= j then
       begin
-        c := AnsiCompareStr(Cols[fSortColumn][i], Cols[fSortColumn][i + 1]);
-        if (fSortAsc and (c > 0)) or (not fSortAsc and (c < 0)) then
-        begin
-          TMoveSG(StringGrid).MoveRow(i + 1, i);
-          Sorted := False;
-        end;
+        with StringGrid do
+          for n := 0 to ColCount - 1 do
+            Cols[n].Exchange(i, j);
+        Inc(i);
+        Dec(j);
       end;
-  until Sorted;
-  StringGrid.Repaint;
+    until i > j;
+    if j > Left then QuickSort(Left, j, S);
+    if i < Right then QuickSort(i, Right, S);
+  end;
+
+begin
+  with StringGrid do
+  begin
+    QuickSort(FixedRows + fTopFix, RowCount - fBottomFix - 1, Cols[fSortColumn]);
+    Repaint;
+  end;
 end;
 
 end.

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Group.pas
-  *      Copyright (C) 2003-2012 Tihomir Karlovic
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -89,6 +89,7 @@ type
     procedure TemplateCbxClick(Sender: TObject);
   public
     constructor Create(AOwner: TComponent; dn: string; Connection: TConnection; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0); reintroduce;
+    procedure InitiateAction; override;
   end;
 
 var
@@ -154,8 +155,6 @@ begin
     begin
       ListItem := UserList.Items.Add;
       ListItem.Caption := PosixGroup.Members[i];
-      ListItem.Data := StrNew(PChar(Connection.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
-      ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
     end;
   if UserList.Items.Count > 0 then
     RemoveUserBtn.Enabled := true;
@@ -256,6 +255,25 @@ begin
           OnClick := TemplateCbxClick;
           Checked := Assigned(Oc) and TTemplatePanel(TabSheet.Tag).Template.Matches(Oc);
         end;
+      end;
+  end;
+end;
+
+procedure TGroupDlg.InitiateAction;
+var
+  i: Integer;
+  mc: Integer;
+begin
+  inherited;
+  with UserList do if Assigned(TopItem) then
+  begin
+    mc := TopItem.Index + VisibleRowCount;
+    if mc > Items.Count then mc := Items.Count;
+    for i := TopItem.Index to mc - 1 do
+      if not Assigned(Items[i].Data) then
+      begin
+        Items[i].Data := StrNew(PChar(Connection.GetDN(Format(sACCNTBYUID, [Items[i].Caption]))));
+        Items[i].SubItems.Add(CanonicalName(GetDirFromDN(PChar(Items[i].Data))));
       end;
   end;
 end;
@@ -365,28 +383,36 @@ var
   UserItem: TListItem;
   i: integer;
 begin
-  with TPickupDlg.Create(self) do begin
+  with TPickupDlg.Create(self) do
+  try
     Caption := cPickAccounts;
     ColumnNames := 'Name,DN';
     Populate(Connection, sUSERS, ['uid', PSEUDOATTR_PATH]);
-    ShowModal;
+    if ShowModal = mrOk then
+    try
+      UserList.Items.BeginUpdate;
+      for i:=0 to SelCount-1 do begin
+        if FindDataString(PChar(Selected[i].dn)) then continue;
 
-    for i:=0 to SelCount-1 do  begin
-      if FindDataString(PChar(Selected[i].dn)) then continue;
-
-      UserItem := UserList.Items.Add;
-      UserItem.Data := StrNew(pchar(Selected[i].DN));
-      UserItem.SubItems.Add(CanonicalName(GetDirFromDN(Selected[i].DN)));
-      if Assigned(GroupOfUniqueNames) then
-      begin
-        GroupOfUniqueNames.AddMember(Selected[i].DN);
-        UserItem.Caption := selected[i].DN;
-      end
-      else begin
-        PosixGroup.AddMember(GetNameFromDN(Selected[i].DN));
-        UserItem.Caption := selected[i].AttributesByName['uid'].AsString;
+        UserItem := UserList.Items.Add;
+        UserItem.Data := StrNew(pchar(Selected[i].DN));
+        UserItem.SubItems.Add(CanonicalName(GetDirFromDN(Selected[i].DN)));
+        if Assigned(GroupOfUniqueNames) then
+        begin
+          GroupOfUniqueNames.AddMember(Selected[i].DN);
+          UserItem.Caption := selected[i].DN;
+        end
+        else begin
+          PosixGroup.AddMember(GetNameFromDN(Selected[i].DN));
+          UserItem.Caption := selected[i].AttributesByName['uid'].AsString;
+        end;
       end;
+    finally
+      UserList.Items.EndUpdate;
+      if UserList.Items.Count > 0 then
+        RemoveUserBtn.Enabled := true;
     end;
+  finally
     Free;
   end;
 end;
@@ -394,23 +420,35 @@ end;
 procedure TGroupDlg.RemoveUserBtnClick(Sender: TObject);
 var
   idx: Integer;
+  Item, Item2: TListItem;
 begin
   with UserList do
-  If Assigned(Selected) then
   begin
-    idx := Selected.Index;
-    if Assigned(GroupOfUniqueNames) then
-      GroupOfUniqueNames.RemoveMember(Selected.Caption)
-    else
-      PosixGroup.RemoveMember(Selected.Caption);
-    Selected.Delete;
-    OkBtn.Enabled := true;
-    if idx = Items.Count then
-      Dec(idx);
-    if idx > -1 then
-      Items[idx].Selected := true
-    else
-      RemoveUserBtn.Enabled := false;
+    if Assigned(Selected) then
+    try
+      UserList.Items.BeginUpdate;
+      Item := Selected;
+      repeat
+        idx := Item.Index;
+        if Assigned(GroupOfUniqueNames) then
+          GroupOfUniqueNames.RemoveMember(Item.Caption)
+        else
+          PosixGroup.RemoveMember(Item.Caption);
+        Item2 := GetNextItem(Item, sdAll, [isSelected]);
+        Item.Delete;
+        Item := Item2;
+      until Item = nil;
+
+      OkBtn.Enabled := true;
+      if idx >= Items.Count then
+        idx := Items.Count - 1;
+      if idx > -1 then
+        Items[idx].Selected := true
+      else
+        RemoveUserBtn.Enabled := false;
+    finally
+      UserList.Items.EndUpdate;
+    end;
   end;
 end;
 

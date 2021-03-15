@@ -24,7 +24,7 @@ object MainFrm: TMainFrm
     Left = 257
     Top = 34
     Width = 3
-    Height = 527
+    Height = 519
     Cursor = crHSplit
     Beveled = True
   end
@@ -138,7 +138,7 @@ object MainFrm: TMainFrm
   end
   object StatusBar: TStatusBar
     Left = 0
-    Top = 577
+    Top = 569
     Width = 863
     Height = 19
     Panels = <
@@ -164,7 +164,7 @@ object MainFrm: TMainFrm
     Left = 260
     Top = 34
     Width = 603
-    Height = 527
+    Height = 519
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 2
@@ -214,7 +214,7 @@ object MainFrm: TMainFrm
       Left = 0
       Top = 185
       Width = 603
-      Height = 342
+      Height = 334
       Align = alClient
       Columns = <>
       DragMode = dmAutomatic
@@ -234,7 +234,7 @@ object MainFrm: TMainFrm
     Left = 0
     Top = 34
     Width = 257
-    Height = 527
+    Height = 519
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 3
@@ -242,7 +242,7 @@ object MainFrm: TMainFrm
       Left = 0
       Top = 0
       Width = 257
-      Height = 488
+      Height = 480
       Align = alClient
       DragCursor = crDefault
       DragMode = dmAutomatic
@@ -263,7 +263,7 @@ object MainFrm: TMainFrm
     end
     object SearchPanel: TPanel
       Left = 0
-      Top = 488
+      Top = 480
       Width = 257
       Height = 39
       Align = alBottom
@@ -292,7 +292,7 @@ object MainFrm: TMainFrm
   end
   object TabSet1: TTabSet
     Left = 0
-    Top = 561
+    Top = 553
     Width = 863
     Height = 16
     Align = alBottom

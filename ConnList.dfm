@@ -18,7 +18,7 @@ object ConnListFrm: TConnListFrm
   TextHeight = 13
   object Panel1: TPanel
     Left = 0
-    Top = 318
+    Top = 311
     Width = 577
     Height = 42
     Align = alBottom
@@ -118,7 +118,7 @@ object ConnListFrm: TConnListFrm
     Left = 0
     Top = 30
     Width = 577
-    Height = 288
+    Height = 281
     Align = alClient
     BevelOuter = bvNone
     BorderWidth = 1
@@ -128,7 +128,7 @@ object ConnListFrm: TConnListFrm
       Left = 122
       Top = 1
       Width = 3
-      Height = 286
+      Height = 279
       Cursor = crHSplit
       OnMoved = Splitter1Moved
     end
@@ -136,7 +136,7 @@ object ConnListFrm: TConnListFrm
       Left = 125
       Top = 1
       Width = 451
-      Height = 286
+      Height = 279
       Align = alClient
       Columns = <
         item
@@ -178,7 +178,7 @@ object ConnListFrm: TConnListFrm
       Left = 1
       Top = 1
       Width = 121
-      Height = 286
+      Height = 279
       Align = alLeft
       BorderStyle = bsNone
       Color = clAppWorkSpace

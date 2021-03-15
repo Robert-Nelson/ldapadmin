@@ -1,5 +1,5 @@
   {      LDAPAdmin - Script.pas
-  *      Copyright (C) 2012 Tihomir Karlovic
+  *      Copyright (C) 2012-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -1640,8 +1640,8 @@ end;
 constructor TWinControlScriptlet.Create(Script: TCustomScript; Control: TWinControl);
 begin
   inherited Create(Script, Control);
-  Methods.Add('InsertControl');
-  Methods.Add('SetFocus');
+  Methods.Add('insertControl');
+  Methods.Add('setFocus');
 end;
 
 { TStringsScriptlet }
@@ -1732,7 +1732,7 @@ begin
   if IsNumber(PropName) then
     FStrings[StrToInt(PropName)] := Value
   else
-    raise EIntScriptException.Create(DISP_E_EXCEPTION, 'Property is read only!');  
+    raise EIntScriptException.Create(DISP_E_EXCEPTION, stPropReadOnly);  
 end;
 
 function TStringsScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
@@ -1758,7 +1758,7 @@ begin
   inherited Create(Script, Strings);
   FStrings := Strings;
   Methods.Add('add');
-  Methods.Add('delete');
+  Methods.Add('deleteAt');
   Methods.Add('insert');
   Methods.Add('indexOf');
   Methods.Add('indexOfName');
@@ -1956,9 +1956,9 @@ end;
 constructor TLdapEntryScriptlet.Create(Script: TCustomScript; Entry: TLdapEntry);
 begin
   inherited Create(Script, Entry);
-  Methods.Add('Read');
-  Methods.Add('Write');
-  Methods.Add('Delete');
+  Methods.Add('read');
+  Methods.Add('write');
+  Methods.Add('deleteEntry');
 end;
 
 { TLdapSessionScriptlet }

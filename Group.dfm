@@ -91,6 +91,9 @@ object GroupDlg: TGroupDlg
             Caption = 'Path'
             Width = 220
           end>
+        HideSelection = False
+        MultiSelect = True
+        RowSelect = True
         TabOrder = 0
         ViewStyle = vsReport
         OnColumnClick = ListViewColumnClick
