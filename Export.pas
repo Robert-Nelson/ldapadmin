@@ -1,5 +1,5 @@
   {      LDAPAdmin - Export.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2006 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -49,6 +49,7 @@ type
     procedure edFileNameChange(Sender: TObject);
     procedure OKBtnClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure SubDirsCbkClick(Sender: TObject);
   private
     dn:           string;
     FAttributes:  array of string;
@@ -97,6 +98,7 @@ var
   i: integer;
 begin
   inherited Create(nil);
+
   dn := adn;
   Session := ASession;
   ExportingLabel.Caption := TrimPath(dn, 40);
@@ -104,7 +106,8 @@ begin
   Label4.Hint := dn;
 
   SubDirsCbk.Checked:=CanSubDirs;
-  SubDirsCbk.Enabled:=CanSubDirs;
+  SubDirsCbk.Visible:=CanSubDirs;
+  SubDirsCbkClick(nil);
 
   setlength(FAttributes, length(Attributes));
   for i:=0 to length(Attributes)-1 do FAttributes[i]:=Attributes[i];
@@ -170,6 +173,14 @@ end;
 procedure TExportDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Action:=CaFree;
+end;
+
+procedure TExportDlg.SubDirsCbkClick(Sender: TObject);
+begin
+  if SubDirsCbk.Checked then
+    FScope := LDAP_SCOPE_SUBTREE
+  else
+    FScope := LDAP_SCOPE_BASE;
 end;
 
 end.

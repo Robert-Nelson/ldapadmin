@@ -212,6 +212,15 @@ var
   Attr: TLdapAttribute;
   j: integer;
   s: string;
+
+  function IsComputer(const s: string): Boolean;
+  var
+    i: Integer;
+  begin
+    i := Pos(',', s);
+    Result := (i > 1) and (s[i - 1] = '$');
+  end;
+
 begin
   Container := true;
   ImageIndex := bmEntry;
@@ -232,7 +241,7 @@ begin
     end
     else if s = 'sambasamaccount' then
     begin
-      if Entry.dn[Length(Entry.dn)] = '$' then // it's samba computer account
+      if IsComputer(Entry.dn) then             // it's samba computer account
         ImageIndex := bmComputer               // else
       else                                     // it's samba user account
         ImageIndex := bmSamba3User;

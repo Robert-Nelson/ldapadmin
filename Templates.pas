@@ -24,7 +24,7 @@ unit Templates;
 interface
 
 uses LdapClasses, Classes, Contnrs, Controls, StdCtrls, ExtCtrls, Xml, Windows,
-     Forms, jpeg, Grids, Messages;
+     Forms, jpeg, Grids, Messages, Dialogs;
 
 const
   TEMPLATE_EXT   = 'ltf';
@@ -1182,7 +1182,10 @@ initialization
   try
     TemplateParser.Paths := GlobalConfig.ReadString('TemplateDir');
     TemplateParser.AddTemplatePath(ExtractFileDir(application.ExeName) + '\*.' + TEMPLATE_EXT);
-  except end;
+  except
+    on E: Exception do
+      MessageDlg(E.Message, mtError, [mbOK], 0);
+  end;
 
 finalization
 
