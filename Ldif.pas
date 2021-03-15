@@ -414,7 +414,7 @@ var
 begin
   if FGenerateComments then
     WriteLine('# dn: ' + EncodeLdapString(Entry.dn));
-  PutLine('dn', @Entry.utf8dn[1], Length(Entry.utf8dn));
+  PutLine('dn', PBytes(@Entry.utf8dn[1]), Length(Entry.utf8dn));
   for i := 0 to Entry.Attributes.Count - 1 do with Entry.Attributes[i] do
     for j := 0 to ValueCount - 1 do with Values[j] do
       PutLine(Name, Data, DataSize);
