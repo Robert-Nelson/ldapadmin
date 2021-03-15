@@ -1,3 +1,24 @@
+  {      LDAPAdmin - EditEntry.pas
+  *      Copyright (C) 2003 Tihomir Karlovic
+  *
+  *      Author: Tihomir Karlovic
+  *
+  *
+  * This file is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This file is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+  }
+
 unit EditEntry;
 
 interface
@@ -105,7 +126,7 @@ begin
 
   Command.ShortCut := 0;                                    // deaktivate accelerator
   Application.ProcessMessages;
-  Command.ShortCut := ShortCut(Word(vKey), ShiftState);      // reaktivate accelerator
+  Command.ShortCut := ShortCut(Word(vKey), ShiftState);     // reaktivate accelerator
 end;
 
 procedure TEditEntryFrm.AddRow;
@@ -160,14 +181,13 @@ begin
   if Mode = EM_MODIFY then
   begin
     Caption := Format(cEditEntry, [dn]);
-    EditDN.Enabled := false;
+    EditDN.ReadOnly := true;
     EditDN.Text := dn;
     Load;
   end
   else begin
     Caption := cNewEntry;
     EditDN.Text := ',' + dn;
-    //StringGrid.Cells[0,1] := 'dn';
   end;
   with StringGrid do
   begin
@@ -226,30 +246,37 @@ begin
   with StringGrid do
   begin
     Entry.ClearAttrs;
+    // First pass: handle replaced or deleted attribute/value pairs
     idx := 0;
     for i := 1 to RowCount - 1 do
     begin
-      if Objects[0, i] = cNewRow then
-        Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_ADD)
-      else
+      if (Objects[0, i] <> cNewRow) and (Cells[0, i] <> '') then
       begin
-
         while (Integer(Objects[0, i]) <> idx) and (idx < Entry.Items.Count - 1) do
         begin
           Entry.AddAttr(Entry.Items[idx], PChar(Entry.Items.Objects[idx]), LDAP_MOD_DELETE);
-          inc(idx)
+          inc(idx);
+          Objects[0, i] := Pointer(idx);
         end;
-
-        if (AnsiStrIComp(PChar(Cells[0, i]), PChar(Entry.Items[idx])) = 0) then
-          Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_REPLACE)
-        else begin
+        if AnsiStrIComp(PChar(Cells[0, i]), PChar(Entry.Items[idx])) <> 0 then
+        begin
           Entry.AddAttr(Entry.Items[idx], PChar(Entry.Items.Objects[idx]), LDAP_MOD_DELETE);
           Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_ADD);
         end;
-
-        inc(idx);
+        inc(idx)
       end;
     end;
+    // Second pass: handle modified attributes
+    for i := 1 to RowCount - 1 do
+    begin
+      if (Objects[0, i] <> cNewRow) and (Cells[0, i] <> '') then
+        Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_REPLACE)
+    end;
+    // Third pass: handle added attributes
+    for i := 1 to RowCount - 1 do
+      if (Objects[0, i] = cNewRow) and (Cells[0, i] <> '') then
+        Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_ADD);
+
     Entry.Modify;
   end;
 
@@ -265,14 +292,12 @@ procedure TEditEntryFrm.mbSaveClick(Sender: TObject);
 var
   i: Integer;
 begin
-  {Close;
-  ModalResult := mrOk;}
   if EditMode = EM_ADD then
   begin
     Entry := TLDAPEntry.Create(pld, EditDN.Text);
     for i := 1 to StringGrid.RowCount - 1 do
       Entry.AddAttr(StringGrid.Cells[0, i], StringGrid.Cells[1, i], LDAP_MOD_ADD);
-    Entry.Add;
+    Entry.New;
   end
   else
     Modify;

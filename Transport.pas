@@ -64,6 +64,7 @@ begin
   begin
     cn.Enabled := False;
     cn.text := ldSession.GetNameFromDN(dn);
+    Caption := Format(cPropertiesOf, [cn.text]);
     //TODO: LookupList: func gets attrs list returns list or array of results
     //cn.text := ldSession.Lookup(dn, sANYCLASS, 'cn', LDAP_SCOPE_BASE);
     transport.text := ldSession.Lookup(dn, sANYCLASS, 'transport', LDAP_SCOPE_BASE);
@@ -92,7 +93,7 @@ begin
         AddAttr('objectclass', 'transportTable', LDAP_MOD_ADD);
         AddAttr('cn', cn.Text, LDAP_MOD_ADD);
         AddAttr('transport', transport.Text, LDAP_MOD_ADD);
-        Add;
+        New;
       end
       else begin
         AddAttr('transport', transport.Text, LDAP_MOD_REPLACE);

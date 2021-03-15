@@ -4,16 +4,24 @@ interface
 
 const
 
-// Edit Modes
+// Registry strings
 
-  //EM_ADD            = 1;
-  //EM_MODIFY         = 2;
+  REG_KEY = 'Software\LdapAdmin\';
+  REG_ACCOUNT = 'Accounts';
 
 // System
 
+  SAMBA_VERSION2 = 2;
+  SAMBA_VERSION3 = 3;
+  FIRST_UID      = 1000;
+  LAST_UID       = 65534;
+  FIRST_GID      = 1000;
+  LAST_GID       = 65534;
+
   START_UID         = 1000;
   START_GID         = 1000;
-  COMPUTER_GROUP    = 65534; // nogroup
+  NO_GROUP          = 65534;
+  COMPUTER_GROUP    = NO_GROUP; // nogroup
 
 type
   TEditMode = (EM_ADD, EM_MODIFY);
@@ -27,7 +35,8 @@ resourcestring
   sPOSIXACCNT   = '(objectclass=posixAccount)';
   sGROUPS       = '(objectclass=posixGroup)';
   sMY_GROUP     = '(&(objectclass=posixGroup)(memberUid=%s))';
-  sGROUPBYsGID  = '(&(objectclass=posixGroup)(gidNumber=%s))';
+  sGROUPBYGID  = '(&(objectclass=posixGroup)(gidNumber=%d))';
+  //sGROUPBYsGID  = '(&(objectclass=posixGroup)(gidNumber=%s))';
   sACCNTBYUID   = '(&(objectclass=posixAccount)(uid=%s))';
 
 // Captions
@@ -35,8 +44,6 @@ resourcestring
   cDescription  = 'Description';
   cPickGroups   = 'Choose Groups';
   cPickAccounts = 'Choose Accounts';
-  cNewEntry     = 'New Entry';
-  cEditEntry    = 'Edit entry: %s';
   cNewResource  = 'New Resource';
   cEditResource = 'Edit Resource';
   cResource     = 'Resource:';
@@ -45,17 +52,29 @@ resourcestring
   cEditAddress  = 'Edit Address';
   cSmtpAddress  = 'SMTP Address:';
   cConfirmDel   = 'Confirm';
+  cEditEntry    = 'Edit entry:';
+  cNewEntry     = 'New entry';
+  cSurname      = 'Second name';
+  cHomeDir      = 'Home Directory';
+  cMaildrop     = 'Maildrop';
+  cSamba2Accnt  = '-Samba2 Account-';
+  cAddConn      = 'New connection';
 
 // Messages
 
   stReqAttr      = 'Attribute %s may not be empty!';
   stReqNoEmpty   = '%s must have a value!';
   stReqMail      = 'At least one E-Mail address must be defined!';
-  sPassDiff      = 'Passwords do not match!';
-  sAccntNameReq  = 'Enter a name for this connection!';
+  stPassDiff     = 'Passwords do not match!';
+  stAccntNameReq = 'Enter a name for this connection!';
   stGroupNameReq = 'Enter a name for this group!';
   stConfirmDel   = 'Do you want to delete entry "%s"?';
   stCntObjects   = '%d object(s) found.';
+  stRegAccntErr  = 'Could not read account data!';
+  stNoMoreNums   = 'No more available numbers for %s!';
+  stUnclosedStr  = 'Unclosed string!';
+  stObjnRetrvd   = 'Object not yet retrieved!';
+  stSmbDomainReq = 'You have to select samba domain to which this group should be mapped!';
 
 {// Captions
 

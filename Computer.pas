@@ -23,27 +23,31 @@ unit Computer;
 
 interface
 
-uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls, 
-  Buttons, ExtCtrls, LDAPClasses, Constant;
+uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
+  Buttons, ExtCtrls, LDAPClasses, Samba, Posix, RegAccnt, Constant;
 
 type
   TComputerDlg = class(TForm)
     OKBtn: TButton;
     CancelBtn: TButton;
     Bevel1: TBevel;
-    Computername: TEdit;
+    edComputername: TEdit;
     Label1: TLabel;
-    Description: TEdit;
+    edDescription: TEdit;
     Label2: TLabel;
-    procedure ComputernameChange(Sender: TObject);
+    cbDomain: TComboBox;
+    Label3: TLabel;
+    procedure edComputernameChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
     dn: string;
     ldSession: TLDAPSession;
+    RegAccount: TAccountEntry;
+    DomList: TDomainList;
     EditMode: TEditMode;
-    function NextUID: Integer;
+    Account: TPosixAccount;
   public
-    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
 
 var
@@ -55,100 +59,115 @@ uses WinLDAP;
 
 {$R *.DFM}
 
-constructor TComputerDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
+constructor TComputerDlg.Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode);
+var
+  i: Integer;
 begin
   inherited Create(AOwner);
   Self.dn := dn;
   ldSession := Session;
+  Self.RegAccount := RegAccount;
   EditMode := Mode;
+
   if EditMode = EM_MODIFY then
   begin
-    Computername.Enabled := False;
-    Computername.Text := ldSession.GetNameFromDN(dn);
-    Caption := Format(cPropertiesOf, [Computername.Text]);
-    //TODO: LookupList: func gets attrs list returns list or array of results
-    //Computername.text := ldSession.Lookup(dn, sANYCLASS, 'uid', LDAP_SCOPE_BASE);
-    Description.text := ldSession.Lookup(dn, sANYCLASS, 'description', LDAP_SCOPE_BASE);
+    edComputername.Enabled := False;
+    edComputername.Text := ldSession.GetNameFromDN(dn);
+    Caption := Format(cPropertiesOf, [edComputername.Text]);
+    Account := TSamba3Account.Create(ldSession.pld, dn);
+    with TSamba3Account(Account) do
+    begin
+      Account.Read;
+      if DomainName <> '' then
+        cbDomain.Items.Add(DomainName)
+      else
+        cbDomain.Items.Add(cSamba2Accnt);
+      cbDomain.ItemIndex := 0;
+      cbDomain.Enabled := false;
+      edDescription.text := Description;
+    end;
+  end
+  else begin
+    DomList := TDomainList.Create(ldSession);
+    with cbDomain do
+    begin
+      Items.Add(cSamba2Accnt);
+      for i := 0 to DomList.Count - 1 do
+        Items.Add(DomList.Items[i].DomainName);
+      ItemIndex := Items.IndexOf(RegAccount.SambaDomainName);
+      if ItemIndex = -1 then
+        ItemIndex := 0;
+    end;
   end;
 end;
 
-
-procedure TComputerDlg.ComputernameChange(Sender: TObject);
+procedure TComputerDlg.edComputernameChange(Sender: TObject);
 begin
-  OKBtn.Enabled := Computername.Text <> '';
-end;
-
-function TComputerDlg.NextUID: Integer;
-begin
-  Result := ldSession.Max(sSAMBAACCNT, 'uidNumber') + 1;
-  if Result < START_UID then
-    Result := START_UID;
+  OKBtn.Enabled := edComputername.Text <> '';
 end;
 
 procedure TComputerDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 var
-  Entry: TLDAPEntry;
-  uidnr, gidnr, rid, grouprid: Integer;
-  nbName, mPass: string;
+  uidnr, gidnr: Integer;
+  nbName: string;
+  pDom: PDomainRec;
 begin
   if ModalResult = mrOk then
   begin
     if EditMode = EM_ADD then
     begin
-      // Aquire next available uidNumber and calculate related SAMBA attributes
-      uidnr := NextUID;
-      gidnr := COMPUTER_GROUP;
-      rid := 2*uidnr + 1000;
-      grouprid := 2*gidnr + 1001;
-      // Machine account password is lowercase name
-      mPass := lowercase(Computername.Text);
-      nbName := uppercase(Computername.Text) + '$';
 
-      Entry := TLDAPEntry.Create(ldSession.pld, 'uid=' + nbName + ',' + dn);
-      with Entry do
+      // Aquire next available uidNumber and calculate related SAMBA attributes
+      uidnr := ldSession.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
+      gidnr := COMPUTER_GROUP;
+
+      nbName := uppercase(edComputername.Text) + '$';
+
+      if cbDomain.ItemIndex = 0 then
+      with TSambaAccount(Account) do
+        Account := TSambaAccount.Create(ldSession.pld, 'uid=' + nbName + ',' + dn)
+      else
+        Account := TSamba3Account.Create(ldSession.pld, 'uid=' + nbName + ',' + dn);
+
+      with Account do
       try
-        AddAttr('objectclass', 'top', LDAP_MOD_ADD);
-        AddAttr('objectclass', 'account', LDAP_MOD_ADD);
-        AddAttr('objectclass', 'posixAccount', LDAP_MOD_ADD);
-        AddAttr('objectclass', 'shadowAccount', LDAP_MOD_ADD);
-        AddAttr('objectclass', 'sambaAccount', LDAP_MOD_ADD);
-        // Posix Stuff
-        AddAttr('uidNumber', IntToStr(uidnr), LDAP_MOD_ADD);
-        AddAttr('gidNumber', IntToStr(gidnr), LDAP_MOD_ADD);
-        AddAttr('cn', nbName, LDAP_MOD_ADD); // set cn to be equal to uid
-        AddAttr('uid', nbName, LDAP_MOD_ADD);
-        if Description.Text <> '' then
-          AddAttr('description', Description.Text, LDAP_MOD_ADD);
-        //AddAttr('displayName', uppercase(Computername.Text), LDAP_MOD_ADD);
-        AddAttr('homeDirectory', '/dev/null', LDAP_MOD_ADD);
-        AddAttr('loginShell', '/bin/false', LDAP_MOD_ADD);
-        // Samba Stuff
-        AddAttr('rid', IntToStr(rid), LDAP_MOD_ADD);
-        AddAttr('primaryGroupID', IntToStr(grouprid), LDAP_MOD_ADD);
-        AddAttr('pwdMustChange', '2147483647', LDAP_MOD_ADD);
-        AddAttr('pwdCanChange', '0', LDAP_MOD_ADD);
-        AddAttr('pwdLastSet', '0', LDAP_MOD_ADD);
-        AddAttr('kickoffTime', '2147483647', LDAP_MOD_ADD);
-        AddAttr('logOnTime', '2147483647', LDAP_MOD_ADD);
-        AddAttr('logoffTime', '0', LDAP_MOD_ADD);
-        AddAttr('acctFlags', '[W          ]', LDAP_MOD_ADD);
-        AddAttr('ntPassword', mPass, LDAP_MOD_ADD);
-        //AddAttr('lmPassword', mPass, LDAP_MOD_ADD);
-        Add;
+        UidNumber := uidnr;
+        GidNumber := gidnr;
+        Cn := nbName;                        // set cn to be equal to uid
+        Uid := nbName;
+        LoginShell := '/bin/false';
+        HomeDirectory := '/dev/null';
+
+        if Account is TSambaAccount then with TSambaAccount(Account) do
+        begin
+          rid := 2 * uidnr + 1000;
+          PrimaryGroupID := 2 * gidnr + 1001;
+          acctFlags := '[W          ]';
+          Description := Self.edDescription.Text;
+        end
+        else with TSamba3Account(Account) do
+        begin
+          pDom := DomList.Items[cbDomain.ItemIndex - 1];
+          DomainName := pDom.DomainName;
+          SID := Format('%s-%d', [pDom.SID, pDom.AlgorithmicRIDBase + 2 * UidNumber]);
+          GroupSID := Format('%s-%d', [pDom.SID, 2 * gidnr + 1001]);
+          acctFlags := '[W          ]';
+          Description := Self.edDescription.Text;
+        end;
+        New;
       finally
-        Entry.Free;
+        Free;
       end;
     end
-    else
-    if Description.Modified then
+    else // Modify
+    if edDescription.Modified then
     begin
-      Entry := TLDAPEntry.Create(ldSession.pld, dn);
-      with Entry do
+      with Account do
       try
-        AddAttr('description', Description.Text, LDAP_MOD_REPLACE);
+        Description := Self.edDescription.Text;
         Modify;
       finally
-        Entry.Free;
+        Free;
       end;
     end;
   end;

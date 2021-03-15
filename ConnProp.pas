@@ -68,13 +68,13 @@ begin
   inherited Create(AOwner);
   AccountEntry := TAccountEntry.Create(Account);
   Name.Text := Account;
-  Server.Text := AccountEntry.Server;
-  Base.Text := AccountEntry.Base;
-  User.Text := AccountEntry.User;
-  Password.Text := AccountEntry.Password;
-  cbSSL.Checked := AccountEntry.UseSSL;
-  Port.Text := IntToStr(AccountEntry.Port);
-  VersionCombo.ItemIndex := AccountEntry.LdapVersion - 2;
+  Server.Text := AccountEntry.ldapServer;
+  Base.Text := AccountEntry.ldapBase;
+  User.Text := AccountEntry.ldapUser;
+  Password.Text := AccountEntry.ldapPassword;
+  cbSSL.Checked := AccountEntry.ldapUseSSL;
+  Port.Text := IntToStr(AccountEntry.ldapPort);
+  VersionCombo.ItemIndex := AccountEntry.ldapVersion - 2;
 end;
 
 procedure TConnPropDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -82,15 +82,15 @@ begin
   if ModalResult = mrOk then
   begin
     if Name.Text = '' then
-      raise Exception.Create(sAccntNameReq);
+      raise Exception.Create(stAccntNameReq);
     AccountEntry.Name := Name.Text;
-    AccountEntry.Server := Server.Text;
-    AccountEntry.Base := Base.Text;
-    AccountEntry.User := User.Text;
-    AccountEntry.Password := Password.Text;
-    AccountEntry.Port := StrToInt(Port.Text);
-    AccountEntry.UseSSL := cbSSL.Checked;
-    AccountEntry.LdapVersion := StrToInt(VersionCombo.Text);
+    AccountEntry.ldapServer := Server.Text;
+    AccountEntry.ldapBase := Base.Text;
+    AccountEntry.ldapUser := User.Text;
+    AccountEntry.ldapPassword := Password.Text;
+    AccountEntry.ldapPort := StrToInt(Port.Text);
+    AccountEntry.ldapUseSSL := cbSSL.Checked;
+    AccountEntry.ldapVersion := StrToInt(VersionCombo.Text);
     AccountEntry.Write;
   end;
   Action := caFree;

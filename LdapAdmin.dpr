@@ -21,7 +21,12 @@ uses
   Search in 'Search.pas' {SearchFrm},
   Ou in 'Ou.pas' {OuDlg},
   Export in 'Export.pas' {ExportDlg},
-  RegAccnt in 'RegAccnt.pas';
+  RegAccnt in 'RegAccnt.pas',
+  Prefs in 'Prefs.pas' {PrefDlg},
+  Samba in 'Samba.pas',
+  Posix in 'Posix.pas',
+  PrefWiz in 'PrefWiz.pas' {PrefWizDlg},
+  About in 'About.pas' {AboutDlg};
 
 {$R *.RES}
 

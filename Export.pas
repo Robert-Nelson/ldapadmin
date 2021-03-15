@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Main.pas
+  {      LDAPAdmin - Export.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic

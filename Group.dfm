@@ -29,21 +29,21 @@ object GroupDlg: TGroupDlg
     Height = 13
     Caption = '&Description:'
   end
-  object Name: TEdit
+  object edName: TEdit
     Left = 16
     Top = 32
     Width = 377
     Height = 21
     TabOrder = 0
-    OnChange = NameChange
+    OnChange = edNameChange
   end
-  object Description: TEdit
+  object edDescription: TEdit
     Left = 16
     Top = 80
     Width = 377
     Height = 21
     TabOrder = 1
-    OnChange = DescriptionChange
+    OnChange = edDescriptionChange
   end
   object OkBtn: TButton
     Left = 248
@@ -71,8 +71,9 @@ object GroupDlg: TGroupDlg
     Height = 305
     ActivePage = TabSheet1
     TabOrder = 4
+    OnChange = PageControl1Change
     object TabSheet1: TTabSheet
-      Caption = '&Members:'
+      Caption = '&Members'
       object UserList: TListView
         Left = 8
         Top = 8
@@ -114,6 +115,87 @@ object GroupDlg: TGroupDlg
       end
     end
     object TabSheet2: TTabSheet
+      Caption = '&Advanced'
+      ImageIndex = 2
+      object Label3: TLabel
+        Left = 24
+        Top = 72
+        Width = 73
+        Height = 13
+        Caption = 'Samba domain:'
+      end
+      object Label4: TLabel
+        Left = 272
+        Top = 72
+        Width = 37
+        Height = 13
+        Caption = 'NT-Rid:'
+      end
+      object Bevel1: TBevel
+        Left = 24
+        Top = 48
+        Width = 337
+        Height = 9
+        Shape = bsBottomLine
+      end
+      object cbSambaDomain: TComboBox
+        Left = 24
+        Top = 88
+        Width = 233
+        Height = 21
+        Style = csDropDownList
+        ItemHeight = 0
+        TabOrder = 1
+        OnChange = cbSambaDomainChange
+      end
+      object RadioGroup1: TRadioGroup
+        Left = 24
+        Top = 128
+        Width = 337
+        Height = 113
+        Caption = 'Group type:'
+        ItemIndex = 0
+        Items.Strings = (
+          'Domain group'
+          'Local group'
+          'Built-in group:')
+        TabOrder = 3
+        OnClick = RadioGroup1Click
+      end
+      object cbBuiltin: TComboBox
+        Left = 128
+        Top = 208
+        Width = 209
+        Height = 21
+        Style = csDropDownList
+        Color = clBtnFace
+        Enabled = False
+        ItemHeight = 13
+        TabOrder = 4
+        OnChange = cbBuiltinChange
+        Items.Strings = (
+          'Domain Admins'
+          'Domain Users'
+          'Domain Guests')
+      end
+      object edRid: TEdit
+        Left = 272
+        Top = 88
+        Width = 89
+        Height = 21
+        TabOrder = 2
+      end
+      object cbSambaGroup: TCheckBox
+        Left = 24
+        Top = 24
+        Width = 153
+        Height = 17
+        Caption = 'Samba domain mapping'
+        TabOrder = 0
+        OnClick = cbSambaGroupClick
+      end
+    end
+    object TabSheet3: TTabSheet
       Caption = '&Resources'
       ImageIndex = 1
       object AddResBtn: TButton

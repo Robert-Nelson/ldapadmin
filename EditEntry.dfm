@@ -12,6 +12,7 @@ object EditEntryFrm: TEditEntryFrm
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
+  Position = poDefault
   PixelsPerInch = 96
   TextHeight = 13
   object StringGrid: TStringGrid
@@ -118,30 +119,35 @@ object EditEntryFrm: TEditEntryFrm
     object UndoBtn: TToolButton
       Left = 110
       Top = 0
+      Hint = 'Undo edit'
       ImageIndex = 5
       OnClick = ToolBtnClick
     end
     object CutBtn: TToolButton
       Left = 140
       Top = 0
+      Hint = 'Cut to clipboard'
       ImageIndex = 7
       OnClick = ToolBtnClick
     end
     object CopyBtn: TToolButton
       Left = 170
       Top = 0
+      Hint = 'Copy to clipboard'
       ImageIndex = 6
       OnClick = ToolBtnClick
     end
     object PasteBtn: TToolButton
       Left = 200
       Top = 0
+      Hint = 'Paste from clipboard'
       ImageIndex = 8
       OnClick = ToolBtnClick
     end
     object DeleteBtn: TToolButton
       Left = 230
       Top = 0
+      Hint = 'Delete'
       ImageIndex = 4
       OnClick = ToolBtnClick
     end

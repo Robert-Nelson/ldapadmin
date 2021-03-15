@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Main.pas
+  {      LDAPAdmin - LDAPClasses.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
@@ -23,7 +23,7 @@ unit LDAPClasses;
 
 interface
 
-uses Windows, Sysutils, WinLDAP, Classes;
+uses Windows, Sysutils, WinLDAP, Classes, Constant;
 
 type
   ErrLDAP = class(Exception);
@@ -63,37 +63,39 @@ type
     function CanonicalName(dn: string): string;
     function Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
     function GetDN(sFilter: string): string;
-    function Max(sFilter, sResult: string): Integer;
+    function GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+    function GetFreeUidNumber(const MinUid, MaxUID: Integer): Integer;
+    function GetFreeGidNumber(const MinGid, MaxGID: Integer): Integer;
     function GetNameFromDN(dn: string): string;
     function GetDirFromDN(dn: string): string;
+    function Search(const Filter, dn: string; const Scope: Cardinal): TStringList;
   end;
 
 
   TLDAPEntry = class
   private
-    pld: PLDAP;
-    dn: PChar;
+    lpld: PLDAP;
+    ldn: PChar;
     Count: Integer;
     attrs: PPLdapMod;
     fItems: TStringList;
     function IndexOf(entryName: string; Mode: ULONG): Integer;
+  protected
+    procedure SetDn(const Dn: PChar);
   public
-    constructor Create(apld: PLDAP; adn: string);
+    property dn: PChar read ldn write SetDn;
+    constructor Create(apld: PLDAP; adn: string); virtual;
+    constructor Copy(const CEntry: TLdapEntry); virtual;
     destructor Destroy; override;
-    procedure Read;
+    procedure Read; virtual;
     procedure AddAttr(attrName, attrValue: string; Mode: ULONG);
     procedure ClearAttrs;
-    procedure Add;
-    procedure Modify;
+    procedure New; virtual;
+    procedure Modify; virtual;
     procedure ToLDIF(var F: TextFile; const Wrap: Integer);
     property Items: TStringList read fItems;
   end;
 
-
-(*type
-  TPosixAccount = class(LDAPEntry)
-  TSambaAccount = class (TPosixAccount)
-  TMailAccount = class (TPosixAccount);*)
 
 procedure LDAPCheck(err: ULONG);
 
@@ -135,7 +137,7 @@ begin
     attrs[1] := nil;
     Result := '';
     // perform search
-    LdapCheck(ldap_search_s(pld, PChar(ldapBase), LDAP_SCOPE_SUBTREE, PChar(sFilter), PChar(attrs), 0, plmSearch));
+    LdapCheck(ldap_search_s(pld, PChar(ldapBase), LDAP_SCOPE_SUBTREE, PChar(sFilter), PChar(attrs), 1, plmSearch));
     try
       plmEntry := ldap_first_entry(pld, plmSearch);
       if Assigned(plmEntry) then
@@ -177,47 +179,85 @@ begin
   Result := p;
 end;
 
-// This is a slow way of finding some maximal number, AND it may not work if
-// number of entries exceeds max results server will return. Server controls may
-// be better (request descending sorted result and limit result set to one) or
-// even special entry like cn=nextUidNumber,ou=System to hold next available value
-
-function TLDAPSession.Max(sFilter, sResult: string): Integer;
+function TLDAPSession.Search(const Filter, dn: string; const Scope: Cardinal): TStringList;
 var
   plmSearch, plmEntry: PLDAPMessage;
-  ppcVals: PPCHAR;
   attrs: PCharArray;
-  val: Integer;
+  pszdn: PChar;
 begin
-    Result := -1;
-    // set result to one attribute only
-    SetLEngth(attrs, 2);
-    attrs[0] := PChar(sResult);
-    attrs[1] := nil;
-    // perform search
-    LdapCheck(ldap_search_s(pld, PChar(Base), LDAP_SCOPE_SUBTREE, PChar(sFilter), PChar(attrs), 0, plmSearch));
-    try
-      // loop thru entries
-      plmEntry := ldap_first_entry(pld, plmSearch);
-      while Assigned(plmEntry) do
-      begin
-        ppcVals := ldap_get_values(pld, plmEntry, PChar(sResult));
-        if Assigned(ppcVals) then
-        try
-           val := StrToInt(pchararray(ppcVals)[0]);
-          if Result < val then
-            Result := val;
-        finally
-          LDAPCheck(ldap_value_free(ppcVals));
-        end;
-        plmEntry := ldap_next_entry(pld, plmEntry);
+
+  Result := TStringList.Create;
+  // set result to objectclass only
+  SetLength(attrs, 2);
+  attrs[0] := 'objectclass';
+  attrs[1] := nil;
+  LdapCheck(ldap_search_s(pld, PChar(dn), Scope, PChar(Filter), PChar(attrs), 1, plmSearch));
+
+  try
+
+    plmEntry := ldap_first_entry(pld, plmSearch);
+
+    while Assigned(plmEntry) do
+    begin
+
+      pszdn := ldap_get_dn(pld, plmEntry);
+
+      if Assigned(pszdn) then
+      try
+        Result.Add(pszdn);
+      finally
+        ldap_memfree(pszdn);
       end;
-    finally
-      // free search results
-      LDAPCheck(ldap_msgfree(plmSearch));
+
+      plmEntry := ldap_next_entry(pld, plmEntry);
+
     end;
+  finally
+    // free search results
+    LDAPCheck(ldap_msgfree(plmSearch));
+  end;
+
 end;
 
+{ Get random free uidNumber from the pool of available numbers, return -1 if
+  no more free numbers available }
+function TLDAPSession.GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+var
+  i: Integer;
+  uidpool: array of Word;
+  r, N: Word;
+begin
+  N := Max - Min + 1;
+  SetLength(uidpool, N);
+  { Initialize the array }
+  for i := 0 to N - 1 do
+    uidpool[i] := i;
+  Randomize;
+  while N > 0 do
+  begin
+    r := Random(N);
+    Result := Min + uidpool[r];
+    if Lookup(Base, Format('(&(objectclass=%s)(%s=%d))', [Objectclass, id, Result]), 'objectclass', LDAP_SCOPE_SUBTREE) = '' then
+      exit;
+    uidpool[r] := uidpool[N - 1];
+    dec(N);
+  end;
+  Result := -1;
+end;
+
+function TLDAPSession.GetFreeUidNumber(const MinUid, MaxUID: Integer): Integer;
+begin
+  Result := GetFreeNumber(MinUid, MaxUid, 'posixAccount', 'uidNumber');
+  if Result = -1 then
+    raise Exception.Create(Format(stNoMoreNums, ['uidNumber']));
+end;
+
+function TLDAPSession.GetFreeGidNumber(const MinGid, MaxGid: Integer): Integer;
+begin
+  Result := GetFreeNumber(MinGid, MaxGid, 'posixGroup', 'gidNumber');
+  if Result = -1 then
+    raise Exception.Create(Format(stNoMoreNums, ['gidNumber']));
+end;
 
 function TLDAPSession.Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
 var
@@ -325,12 +365,61 @@ end;
 
 { TLDAPEntry }
 
+procedure TLDAPEntry.SetDn(const Dn: PChar);
+begin
+  ldn := Dn;
+end;
+
 constructor TLDAPEntry.Create(apld: PLDAP; adn: string);
 begin
   inherited Create;
-  dn := PChar(adn);
-  pld := apld;
+  ldn := PChar(adn);
+  lpld := apld;
   SetLength(attrs, 10);
+end;
+
+constructor TLDAPEntry.Copy(const CEntry: TLdapEntry);
+var
+  i, j, h: Integer;
+  cMod: PLdapMod;
+begin
+  inherited Create;
+  lpld := CEntry.lpld;
+  ldn := CEntry.ldn;
+  Count := CEntry.Count;
+  SetLength(attrs, High(Centry.Attrs));
+
+  i := 0;
+  while CEntry.Attrs[i] <> nil do
+  begin
+    cMod := CEntry.Attrs[i];
+    GetMem(attrs[i], SizeOf(LDAPMod));
+    with attrs[i]^ do
+    begin
+      mod_op := cMod.mod_op;
+      mod_type := cMod.mod_type;
+      if cMod.modv_strvals <> nil then
+      begin
+        h := High(PCharArray(cMod.modv_strvals));
+        modv_strvals := nil; // Prepare for SetLength
+        SetLength(PCharArray(modv_strvals), h + 1);
+        for j := 0 to h - 1 do
+          PCharArray(modv_strvals)[j] := StrNew(PCharArray(cMod.modv_strvals)[j]);
+        PCharArray(modv_strvals)[h] := nil;   // trailing NULL
+      end;
+    end;
+    inc(i);
+  end;
+
+  if Assigned(CEntry.Items) then
+  begin
+    fItems := TStringList.Create;
+    for i := 0 to CEntry.Items.Count - 1 do
+    begin
+      fItems.Add(CEntry.Items[i]);
+      fItems.Objects[i] := Pointer(StrNew(PChar(CEntry.Items.Objects[i])));
+    end;
+  end;
 end;
 
 destructor TLDAPEntry.Destroy;
@@ -359,24 +448,31 @@ var
   I, idx: Integer;
 begin
 
-  fItems := TStringList.Create;
+  if not Assigned(fItems) then
+    fItems := TStringList.Create
+  else
+  begin
+    for i := 0 to fItems.Count - 1 do
+      StrDispose(PChar(fItems.Objects[i]));
+    fItems.Clear;
+  end;
 
-  LdapCheck(ldap_search_s(pld, dn, LDAP_SCOPE_BASE, '(objectclass=*)', nil, 0, plmSearch));
+  LdapCheck(ldap_search_s(lpld, ldn, LDAP_SCOPE_BASE, '(objectclass=*)', nil, 0, plmSearch));
 
   try
 
     // loop thru entries
-    plmEntry := ldap_first_entry(pld, plmSearch);
+    plmEntry := ldap_first_entry(lpld, plmSearch);
     while Assigned(plmEntry) do
     begin
 
       // loop thru attributes
-      pszAttr := ldap_first_attribute(pld, plmEntry, pbe);
+      pszAttr := ldap_first_attribute(lpld, plmEntry, pbe);
       while Assigned(pszAttr) do
       begin
 
         // get value
-        ppcVals := ldap_get_values(pld, plmEntry, pszAttr);
+        ppcVals := ldap_get_values(lpld, plmEntry, pszAttr);
         if Assigned(ppcVals) then
         try
 
@@ -393,10 +489,10 @@ begin
         end;
 
         ber_free(pbe, 0);
-        pszAttr := ldap_next_attribute(pld, plmEntry, pbe);
+        pszAttr := ldap_next_attribute(lpld, plmEntry, pbe);
       end;
 
-      plmEntry := ldap_next_entry(pld, plmEntry);
+      plmEntry := ldap_next_entry(lpld, plmEntry);
     end;
 
   finally
@@ -436,8 +532,7 @@ begin
       begin
         mod_op := Mode;
         mod_type := PChar(attrName);
-        modv_strvals := nil;        // MUST be nil before call to SetLength!?
-        //if Mode <> LDAP_MOD_DELETE then
+        modv_strvals := nil;        // MUST be nil before call to SetLength!
         if attrValue <> '' then
         begin
           SetLength(PCharArray(modv_strvals), 2);
@@ -482,16 +577,16 @@ begin
   end;
 end;
 
-procedure TLDAPEntry.Add;
+procedure TLDAPEntry.New;
 begin
   if Count > 0 then
-    LdapCheck(ldap_add_s(pld, dn, PLDAPMod(attrs)));
+    LdapCheck(ldap_add_s(lpld, ldn, PLDAPMod(attrs)));
 end;
 
 procedure TLDAPEntry.Modify;
 begin
   if Count > 0 then
-    LdapCheck(ldap_modify_s(pld, dn, PLDAPMod(attrs)));
+    LdapCheck(ldap_modify_s(lpld, ldn, PLDAPMod(attrs)));
 end;
 
 procedure TLDAPEntry.ToLDIF(var F: TextFile; const Wrap: Integer);
@@ -578,11 +673,11 @@ var
     begin
       if p1 = 1 then
       begin
-        WriteLn(F, Copy(line, p1, wrap));
+        WriteLn(F, System.Copy(line, p1, wrap));
         inc(p1, wrap);
       end
       else begin
-        WriteLn(F, ' ' + Copy(line, P1, wrap - 1));
+        WriteLn(F, ' ' + System.Copy(line, P1, wrap - 1));
         inc(p1, wrap - 1);
       end;
     end;
@@ -591,7 +686,7 @@ var
 begin
   // Dump this entry to LDIF record
   try
-    PutLine(F, 'dn', dn, Wrap);
+    PutLine(F, 'dn', ldn, Wrap);
     for i := 0 to Items.Count - 1 do
       PutLine(F, Items[i], PChar(Items.Objects[i]), Wrap);
     WriteLn(F);

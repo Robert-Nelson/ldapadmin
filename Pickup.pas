@@ -1,3 +1,24 @@
+  {      LDAPAdmin - Pickup.pas
+  *      Copyright (C) 2003 Tihomir Karlovic
+  *
+  *      Author: Tihomir Karlovic
+  *
+  *
+  * This file is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This file is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+  }
+
 unit Pickup;
 
 interface
@@ -25,6 +46,7 @@ type
     procedure ListViewColumnClick(Sender: TObject; Column: TListColumn);
     procedure ListViewCompare(Sender: TObject; Item1, Item2: TListItem;
       Data: Integer; var Compare: Integer);
+    procedure ListViewClick(Sender: TObject);
   private
     ColumnToSort: Integer;
     Descending: Boolean;
@@ -127,7 +149,7 @@ procedure TPickupDlg.PopulateGroups(Session: TLDAPSession);
 var
   attrs: PCharArray;
 begin
-  // set result to Result only
+  // set result fields
   SetLength(attrs, 3);
   attrs[0] := 'cn';
   attrs[1] := 'description';
@@ -195,6 +217,11 @@ begin
   end;
   if Descending then
     Compare := - Compare;
+end;
+
+procedure TPickupDlg.ListViewClick(Sender: TObject);
+begin
+  OkBtn.Enabled := Assigned(ListView.Selected);
 end;
 
 end.

@@ -66,58 +66,29 @@ var
 
 implementation
 
-uses WinLDAP, Constant;
+uses Winldap, Constant;
 
 {$R *.DFM}
 
 procedure TSearchFrm.Search(const Filter: string);
 var
+  RList: TStringList;
   ListItem: TListItem;
-  plmSearch, plmEntry: PLDAPMessage;
-  attrs: PCharArray;
-  pszdn: PChar;
-  pld: PLDAP;
-  cnt: Integer;
-
+  i: Integer;
 begin
-  pld := Session.pld;
 
-  // set result to objectclass only
-  SetLength(attrs, 2);
-  attrs[0] := 'objectclass';
-  attrs[1] := nil;
-  LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_SUBTREE, PChar(Filter), PChar(attrs), 0, plmSearch));
+  RList := Session.Search(Filter, dn, LDAP_SCOPE_SUBTREE);
 
-  try
-
-    cnt := 0;
-    plmEntry := ldap_first_entry(pld, plmSearch);
-
-    while Assigned(plmEntry) do
+  if Assigned(RList) then
+  begin
+    for i := 0 to RList.Count - 1 do
     begin
-
-      pszdn := ldap_get_dn(pld, plmEntry);
-
-      if Assigned(pszdn) then
-      try
-        ListItem := ListView.Items.Add;
-        ListItem.Caption := pszdn;
-        {ListItem.Caption := Session.GetNameFromDN(pszdn);
-        ListItem.SubItems.Add(Session.CanonicalNAme(pszdn));}
-
-      finally
-        ldap_memfree(pszdn);
-      end;
-
-      inc(cnt);
-      plmEntry := ldap_next_entry(pld, plmEntry);
-
+      ListItem := ListView.Items.Add;
+      ListItem.Caption := RList[i];
     end;
-  finally
-    // free search results
-    LDAPCheck(ldap_msgfree(plmSearch));
+    StatusBar.SimpleText := Format(stCntObjects, [RList.Count]);
+    RList.Free;
   end;
-  StatusBar.SimpleText := Format(stCntObjects, [cnt]);
 end;
 
 constructor TSearchFrm.Create(AOwner: TComponent; const dn: string; const Session: TLDAPSession);
@@ -144,6 +115,21 @@ end;
 procedure TSearchFrm.StartBtnClick(Sender: TObject);
 var
   s: string;
+
+  function Prepare(const Filter: string): string;
+  var
+    len: Integer;
+  begin
+    Result := Trim(Filter);
+    if Result[1] = '''' then
+    begin
+     len := Length(Result);
+      if Result[len] <> '''' then
+        raise Exception.Create(stUnclosedStr);
+      Result := Copy(Result, 2, len - 2);
+    end;
+  end;
+
 begin
   ListView.Items.Clear;
   if PageControl1.ActivePage = TabSheet1 then
@@ -152,7 +138,6 @@ begin
     if edName.Text <> '' then
       s := Format('(|(uid=*%s*)(displayName=*%s*))', [edName.Text, edName.Text]);
     if edEmail.Text <> '' then
-      //s := s + '(mail=' + edEmail.Text + ')';
       s := Format('%s(mail=*%s*)', [s, edEMail.Text]);
     if s = '' then
       s := sANYCLASS
@@ -161,7 +146,7 @@ begin
     Search(s);
   end
   else
-    Search(Memo1.Text);
+    Search(Prepare(Memo1.Text));
 end;
 
 procedure TSearchFrm.ListViewCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);

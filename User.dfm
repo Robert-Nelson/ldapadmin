@@ -1,6 +1,7 @@
 object UserDlg: TUserDlg
   Left = 423
   Top = 181
+  ActiveControl = givenName
   BorderStyle = bsDialog
   Caption = 'User Properties'
   ClientHeight = 463
@@ -12,6 +13,7 @@ object UserDlg: TUserDlg
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
+  Position = poDesktopCenter
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnDestroy = FormDestroy
@@ -85,10 +87,10 @@ object UserDlg: TUserDlg
         Caption = '&Login shell:'
       end
       object GroupBox1: TGroupBox
-        Left = 16
-        Top = 272
-        Width = 353
-        Height = 73
+        Left = 200
+        Top = 264
+        Width = 169
+        Height = 89
         Caption = 'Account properties'
         TabOrder = 10
       end
@@ -151,8 +153,8 @@ object UserDlg: TUserDlg
         TabOrder = 5
       end
       object cbSamba: TCheckBox
-        Left = 56
-        Top = 304
+        Left = 232
+        Top = 288
         Width = 97
         Height = 17
         Caption = 'Samba Account'
@@ -160,13 +162,42 @@ object UserDlg: TUserDlg
         OnClick = cbSambaClick
       end
       object cbMail: TCheckBox
-        Left = 216
-        Top = 304
+        Left = 232
+        Top = 320
         Width = 97
         Height = 17
         Caption = 'Mail account'
         TabOrder = 9
         OnClick = cbMailClick
+      end
+      object RadioGroup1: TRadioGroup
+        Left = 16
+        Top = 264
+        Width = 169
+        Height = 89
+        Caption = '&Account expires'
+        ItemIndex = 0
+        Items.Strings = (
+          'Never'
+          'On:')
+        TabOrder = 11
+        OnClick = RadioGroup1Click
+      end
+      object DateTimePicker: TDateTimePicker
+        Left = 72
+        Top = 320
+        Width = 97
+        Height = 21
+        CalAlignment = dtaLeft
+        Date = 38076.7716250926
+        Time = 38076.7716250926
+        Color = clBtnFace
+        DateFormat = dfShort
+        DateMode = dmComboBox
+        Enabled = False
+        Kind = dtkDate
+        ParseInput = False
+        TabOrder = 12
       end
     end
     object SambaSheet: TTabSheet
@@ -174,54 +205,61 @@ object UserDlg: TUserDlg
       ImageIndex = 5
       object Label6: TLabel
         Left = 16
-        Top = 72
+        Top = 120
         Width = 30
         Height = 13
         Caption = 'S&cript:'
       end
       object Label7: TLabel
         Left = 312
-        Top = 24
+        Top = 72
         Width = 59
         Height = 13
         Caption = 'H&ome Drive:'
       end
       object Label8: TLabel
         Left = 16
-        Top = 128
+        Top = 168
         Width = 56
         Height = 13
         Caption = '&Profile path:'
       end
       object Label13: TLabel
         Left = 16
-        Top = 24
+        Top = 72
         Width = 62
         Height = 13
         Caption = '&Home Share:'
       end
       object Label21: TLabel
         Left = 16
-        Top = 184
+        Top = 216
         Width = 56
         Height = 13
-        Caption = '&Description:'
+        Caption = 'D&escription:'
+      end
+      object Label36: TLabel
+        Left = 16
+        Top = 24
+        Width = 39
+        Height = 13
+        Caption = '&Domain:'
       end
       object scriptPath: TEdit
         Left = 16
-        Top = 88
+        Top = 136
         Width = 353
         Height = 21
-        TabOrder = 2
+        TabOrder = 3
       end
       object homeDrive: TComboBox
         Left = 312
-        Top = 40
+        Top = 88
         Width = 57
         Height = 21
         Style = csDropDownList
         ItemHeight = 13
-        TabOrder = 1
+        TabOrder = 2
         OnChange = ComboChange
         Items.Strings = (
           'C:'
@@ -251,24 +289,60 @@ object UserDlg: TUserDlg
       end
       object profilePath: TEdit
         Left = 16
-        Top = 144
+        Top = 184
         Width = 353
         Height = 21
-        TabOrder = 3
+        TabOrder = 4
       end
       object smbHome: TEdit
         Left = 16
-        Top = 40
+        Top = 88
         Width = 289
         Height = 21
-        TabOrder = 0
+        TabOrder = 1
       end
       object description: TMemo
         Left = 16
-        Top = 200
+        Top = 232
         Width = 353
-        Height = 89
-        TabOrder = 4
+        Height = 65
+        TabOrder = 5
+      end
+      object cbDomain: TComboBox
+        Left = 16
+        Top = 40
+        Width = 353
+        Height = 21
+        Style = csDropDownList
+        ItemHeight = 0
+        TabOrder = 0
+      end
+      object cbPwdMustChange: TCheckBox
+        Left = 24
+        Top = 336
+        Width = 249
+        Height = 17
+        Caption = 'User &must change the password on next logon'
+        TabOrder = 7
+        OnClick = cbPwdMustChangeClick
+      end
+      object cbPwdCantChange: TCheckBox
+        Left = 24
+        Top = 312
+        Width = 193
+        Height = 17
+        Caption = 'User can &not change the password'
+        TabOrder = 6
+        OnClick = cbPwdCantChangeClick
+      end
+      object BtnAdvanced: TButton
+        Left = 296
+        Top = 304
+        Width = 75
+        Height = 25
+        Caption = '&Advanced...'
+        Enabled = False
+        TabOrder = 8
       end
     end
     object MailSheet: TTabSheet
@@ -460,6 +534,8 @@ object UserDlg: TUserDlg
         Top = 328
         Width = 353
         Height = 21
+        Color = clBtnFace
+        Enabled = False
         TabOrder = 12
       end
       object postalAddress: TMemo
@@ -481,6 +557,8 @@ object UserDlg: TUserDlg
         Top = 280
         Width = 161
         Height = 21
+        Color = clBtnFace
+        Enabled = False
         TabOrder = 11
       end
       object telephoneNumber: TEdit
@@ -509,7 +587,7 @@ object UserDlg: TUserDlg
         Top = 40
         Width = 161
         Height = 21
-        ItemHeight = 13
+        ItemHeight = 0
         TabOrder = 6
         OnChange = ComboChange
       end
@@ -539,6 +617,8 @@ object UserDlg: TUserDlg
         Top = 280
         Width = 177
         Height = 21
+        Color = clBtnFace
+        Enabled = False
         TabOrder = 5
       end
     end
@@ -585,6 +665,8 @@ object UserDlg: TUserDlg
         Top = 208
         Width = 185
         Height = 21
+        Color = clBtnFace
+        Enabled = False
         TabOrder = 2
       end
       object homePhone: TEdit
@@ -615,9 +697,9 @@ object UserDlg: TUserDlg
       object Label33: TLabel
         Left = 16
         Top = 24
-        Width = 70
+        Width = 67
         Height = 13
-        Caption = '&Primary group::'
+        Caption = '&Primary group:'
       end
       object GroupList: TListView
         Left = 16
@@ -668,7 +750,7 @@ object UserDlg: TUserDlg
         TabOrder = 1
         OnClick = PrimaryGroupBtnClick
       end
-      object gidNumber: TEdit
+      object edGidNumber: TEdit
         Left = 16
         Top = 40
         Width = 289
@@ -691,6 +773,7 @@ object UserDlg: TUserDlg
       Width = 75
       Height = 25
       Caption = '&OK'
+      Default = True
       ModalResult = 1
       TabOrder = 0
     end

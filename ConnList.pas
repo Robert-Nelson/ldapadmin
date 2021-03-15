@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Connprop.pas
+  {      LDAPAdmin - Connlist.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  ComCtrls, StdCtrls, Menus, ImgList, LDAPClasses;
+  ComCtrls, StdCtrls, Menus, ImgList, RegAccnt;
 
 type
   TConnListFrm = class(TForm)
@@ -47,10 +47,10 @@ type
     procedure ListViewDblClick(Sender: TObject);
     procedure ListViewClick(Sender: TObject);
   private
-    Session: TLDAPSession;
+    Account: ^TAccountEntry;
     procedure GetAccounts;
   public
-    constructor Create(AOwner: TComponent; lSession: TLDAPSession); reintroduce;
+    constructor Create(AOwner: TComponent; var rAccount: TAccountEntry); reintroduce;
   end;
 
 var
@@ -58,14 +58,14 @@ var
 
 implementation
 
-uses Registry, ConnProp,RegAccnt;
+uses Registry, ConnProp, Constant;
 
 {$R *.DFM}
 
-constructor TConnListFrm.Create(AOwner: TComponent; lSession: TLDAPSession);
+constructor TConnListFrm.Create(AOwner: TComponent; var rAccount: TAccountEntry);
 begin
   inherited Create(AOwner);
-  Session := lSession;
+  Account := @rAccount;
 end;
 
 procedure TConnListFrm.GetAccounts;
@@ -84,11 +84,14 @@ begin
       Reg.GetValueNames(KeyList);
       Reg.CloseKey;
       ListView.Items.Clear;
+      ListItem := ListView.Items.Add;
+      ListItem.Caption := cAddConn;
+      ListItem.ImageIndex := 0;
       for I := 0 to KeyList.Count - 1 do
       begin
         ListItem := ListView.Items.Add;
         ListItem.Caption := KeyList[I];
-        ListItem.ImageIndex := 0;
+        ListItem.ImageIndex := 1;
         //if Reg.OpenKey(KeyList[I], false) then
       end;
     finally
@@ -115,7 +118,7 @@ procedure TConnListFrm.PopupMenuPopup(Sender: TObject);
 var
   Enable: Boolean;
 begin
-  Enable := ListView.Selected <> nil;
+  Enable := (ListView.Selected <> nil) and (ListView.Selected.Index <> 0);
   pbDelete.enabled := Enable;
   pbProperties.Enabled := Enable;
 end;
@@ -145,22 +148,16 @@ begin
 end;
 
 procedure TConnListFrm.FormClose(Sender: TObject; var Action: TCloseAction);
-var
-  AccountEntry: TAccountEntry;
 begin
   if ModalResult = mrOk then
   begin
-    AccountEntry := TAccountEntry.Create(ListView.Selected.Caption);
-    with Session do begin
-      Server := AccountEntry.Server;
-      Base := AccountEntry.Base;
-      User := AccountEntry.User;
-      Password := AccountEntry.Password;
-      SSL := AccountEntry.UseSSL;
-      Port := AccountEntry.Port;
-      Version := AccountEntry.LdapVersion;
-    end;
-    AccountEntry.Destroy;
+    if ListView.Selected.Index = 0 then
+    begin
+      pbNewClick(nil);
+      Abort;
+    end
+    else
+      Account^ := TAccountEntry.Create(ListView.Selected.Caption);
   end;
 end;
 
