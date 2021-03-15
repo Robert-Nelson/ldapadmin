@@ -46,7 +46,7 @@ implementation
 
 {$R *.DFM}
 
-uses md4, md5, smbdes, base64, Constant;
+uses Constant;
 
 procedure TPasswordDlg.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin

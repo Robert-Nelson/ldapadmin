@@ -134,6 +134,7 @@ type
     BtnAdvanced: TButton;
     RadioGroup1: TRadioGroup;
     DateTimePicker: TDateTimePicker;
+    cbAccntDisabled: TCheckBox;
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure ComboChange(Sender: TObject);
     procedure AddMailBtnClick(Sender: TObject);
@@ -373,7 +374,6 @@ begin
       SetText(uid, ConvertUmlauts(s));
       SetText(homeDirectory, FormatString(RegAccount.posixHomeDir));
       SambaPreset;
-      PosixPreset;
     end;
   end;
 end;
@@ -401,11 +401,14 @@ begin
   begin
     if (maildrop.Text = '') and (RegAccount.postfixMaildrop <> '') then
       SetText(maildrop, FormatString(RegAccount.postfixMaildrop));
-    s := FormatString(RegAccount.postfixMailAddress);
-    if mail.Items.IndexOf(s) = -1 then
+    if RegAccount.postfixMailAddress <> '' then
     begin
-      mail.Items.Add(s);
-      mail.Tag := 1; // modified
+      s := FormatString(RegAccount.postfixMailAddress);
+      if mail.Items.IndexOf(s) = -1 then
+      begin
+        mail.Items.Add(s);
+        mail.Tag := 1; // modified
+      end;
     end;
   end;
 end;
@@ -423,8 +426,9 @@ end;
 
 procedure TUserDlg.GetShadowTime;
 begin
-  with Account do
+  if Account.Shadow then
   try
+  with Account do
     if ShadowExpire = SHADOW_MAX_DATE then
       DateTimePicker.DateTime := Date
     else begin
@@ -432,7 +436,9 @@ begin
       DateTimePicker.DateTime := 25569.0 + Account.ShadowExpire;
     end;
   except
-  //TODO
+    on E: Exception do
+    if not (E is EConvertError) then
+      raise;
   end;
 end;
 
@@ -446,12 +452,12 @@ begin
   if cbSamba.Checked then
   begin
     if cbDomain.ItemIndex = 0 then
-      Account := TSambaAccount.Create(ldapSession.pld, NewDN)
+      Account := TSambaAccount.Create(ldapSession, NewDN)
     else
-      Account := TSamba3Account.Create(ldapSession.pld, NewDN)
+      Account := TSamba3Account.Create(ldapSession, NewDN)
   end
   else
-    Account := TPosixAccount.Create(ldapSession.pld, NewDN);
+    Account := TPosixAccount.Create(ldapSession, NewDN);
 
   with Account do
   begin
@@ -480,7 +486,9 @@ begin
       LoginShell:= Self.loginShell.Text;
       ScriptPath:= Self.scriptPath.Text;
       ProfilePath:= Self.profilePath.Text;
-      AcctFlags := '[UX         ]';
+      NoPasswordExpiration := true;
+      UserAccount := true;
+      Disabled := cbAccntDisabled.Checked;
     end
     else
     if Account is TSamba3Account then with TSamba3Account(Account) do
@@ -502,7 +510,8 @@ begin
         PwdCanChange := 2147483647
       else
         PwdCanChange := 0;
-      AcctFlags := '[U          ]';
+      UserAccount := true;
+      Disabled := cbAccntDisabled.Checked;
     end;
 
     GetInput(OfficeSheet, EM_ADD);
@@ -574,13 +583,15 @@ begin
               Add;
               rid := 1000 + 2 * uidNumber;
               primaryGroupID := 2 * gid + 1001;
-              AcctFlags := '[UX         ]';
+              NoPasswordExpiration := true;
+              UserAccount := true;
             end;
             HomeDrive := Self.homeDrive.Text;
             SmbHome:= Self.smbHome.Text;
             ScriptPath:= Self.scriptPath.Text;
             ProfilePath:= Self.profilePath.Text;
             GidNumber := gid;
+            Disabled := cbAccntDisabled.Checked;
           end
           else
             Remove;
@@ -598,7 +609,7 @@ begin
               SID := Format('%s-%d', [pDom.SID, pDom.AlgorithmicRIDBase + 2 * UidNumber]);
               if not edGidNumber.Modified then // avoid calling PrimaryGroupSid twice
                 GroupSID := PrimaryGroupSID;
-              acctFlags := '[U           ]';
+              UserAccount := true;
             end;
             HomeDrive := Self.homeDrive.Text;
             HomePath:= Self.smbHome.Text;
@@ -618,6 +629,7 @@ begin
               GidNumber := gid;
               GroupSID := PrimaryGroupSID;
             end;
+            Disabled := cbAccntDisabled.Checked;
           end
           else
             Remove;
@@ -764,7 +776,7 @@ begin
   else
   begin
     //Fill out the form
-    Account := TPosixAccount.Create(ldapSession.pld, dn);
+    Account := TPosixAccount.Create(ldapSession, dn);
     Account.Read;
     gid := Account.GidNumber;
     GetShadowTime;
@@ -775,7 +787,7 @@ begin
       attrValue := PChar(Account.Items.Objects[i]);
       if attrName = 'objectclass' then
       begin
-        if AnsiStrIComp(PChar(attrValue), 'sambaaccount') = 0 then
+        if (SambaVersion < SAMBA_VERSION2) and (AnsiStrIComp(PChar(attrValue), 'sambaaccount') = 0) then
           SambaVersion := SAMBA_VERSION2
         else
         if AnsiStrIComp(PChar(attrValue), 'sambasamaccount') = 0 then
@@ -783,8 +795,8 @@ begin
         else
         if AnsiStrIComp(PChar(attrValue), 'mailuser') = 0 then
         begin
+          IsMailObject := true;        
           cbMail.Checked := true;
-          IsMailObject := true;
         end;
       end
       else
@@ -811,12 +823,20 @@ begin
     begin
       Temp := Account;
       if (SambaVersion = SAMBA_VERSION2) then
-        Account := TSambaAccount.Copy(Temp)
+      begin
+        Account := TSambaAccount.Copy(Temp);
+        cbAccntDisabled.Checked := TSambaAccount(Account).Disabled;
+      end
       else begin
         Account := TSamba3Account.Copy(Temp);
         with TSamba3Account(Account) do begin
-          cbPwdCantChange.Checked := PwdCanChange = 2147483647;
-          cbPwdMustChange.Checked := PwdMustChange = 0;
+          try
+            cbPwdCantChange.Checked := PwdCanChange = 2147483647;
+          except end; // not critical
+          try
+            cbPwdMustChange.Checked := PwdMustChange = 0;
+          except end; // not critical
+          cbAccntDisabled.Checked := Disabled;
         end;
       end;
       cbSamba.Checked := true;
@@ -1100,7 +1120,7 @@ begin
       modop := Integer(Objects[i]);
       if modop <> 0 then
       begin
-        Entry := TLDAPEntry.Create(ldapSession.pld, origGroups[i]);
+        Entry := TLDAPEntry.Create(ldapSession, origGroups[i]);
         try
           // modify user attributes always must happend before savegroups so we don't get inconsistent here
           if modop > 0 then
@@ -1154,8 +1174,11 @@ end;
 
 procedure TUserDlg.uidExit(Sender: TObject);
 begin
-  SambaPreset;
-  MailPreset;
+  if uid.Modified then
+  begin
+    SambaPreset;
+    MailPreset;
+  end;
 end;
 
 procedure TUserDlg.SetText(Edit: TCustomEdit; Value: string);
@@ -1223,14 +1246,15 @@ begin
         if SambaVersion = SAMBA_VERSION3 then
           i := cbDomain.Items.IndexOf(TSamba3Account(Account).DomainName)
         else
+        begin
           i := cbDomain.Items.IndexOf(RegAccount.SambaDomainName);
-        if i <> -1 then
-          cbDomain.ItemIndex := i
-        else
-          cbDomain.ItemIndex := 0;
+          if i = -1 then i := 0;
+        end;
+        cbDomain.ItemIndex := i;
       end;
     end;
-    SambaPreset;
+    if not ((Account is TSambaAccount) or (Account is TSamba3Account)) then
+      SambaPreset;
   end;
   SambaSheet.TabVisible := cbSamba.Checked;
 end;
@@ -1238,7 +1262,8 @@ end;
 procedure TUserDlg.cbMailClick(Sender: TObject);
 begin
   MailSheet.TabVisible := cbMail.Checked;
-  MailPreset;
+  if not isMailObject then
+    MailPreset;
 end;
 
 procedure TUserDlg.FormDestroy(Sender: TObject);

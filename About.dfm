@@ -62,7 +62,7 @@ object AboutDlg: TAboutDlg
       Top = 24
       Width = 37
       Height = 13
-      Caption = '0.9.51'
+      Caption = '0.9.61'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11

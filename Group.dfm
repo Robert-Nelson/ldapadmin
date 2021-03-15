@@ -3,7 +3,7 @@ object GroupDlg: TGroupDlg
   Top = 179
   BorderStyle = bsDialog
   Caption = 'Create group'
-  ClientHeight = 457
+  ClientHeight = 472
   ClientWidth = 411
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -47,7 +47,7 @@ object GroupDlg: TGroupDlg
   end
   object OkBtn: TButton
     Left = 248
-    Top = 424
+    Top = 440
     Width = 75
     Height = 25
     Caption = '&OK'
@@ -57,7 +57,7 @@ object GroupDlg: TGroupDlg
   end
   object CancelBtn: TButton
     Left = 328
-    Top = 424
+    Top = 440
     Width = 75
     Height = 25
     Caption = '&Cancel'
@@ -68,7 +68,7 @@ object GroupDlg: TGroupDlg
     Left = 8
     Top = 112
     Width = 393
-    Height = 305
+    Height = 321
     ActivePage = TabSheet1
     TabOrder = 4
     OnChange = PageControl1Change
@@ -78,7 +78,7 @@ object GroupDlg: TGroupDlg
         Left = 8
         Top = 8
         Width = 369
-        Height = 233
+        Height = 249
         Columns = <
           item
             Caption = 'Name'
@@ -96,7 +96,7 @@ object GroupDlg: TGroupDlg
       end
       object AddUserBtn: TButton
         Left = 8
-        Top = 248
+        Top = 264
         Width = 75
         Height = 25
         Caption = '&Add'
@@ -105,7 +105,7 @@ object GroupDlg: TGroupDlg
       end
       object RemoveUserBtn: TButton
         Left = 88
-        Top = 248
+        Top = 264
         Width = 75
         Height = 25
         Caption = '&Remove'
@@ -119,38 +119,45 @@ object GroupDlg: TGroupDlg
       ImageIndex = 2
       object Label3: TLabel
         Left = 24
-        Top = 72
+        Top = 112
         Width = 73
         Height = 13
         Caption = 'Samba domain:'
       end
       object Label4: TLabel
         Left = 272
-        Top = 72
+        Top = 112
         Width = 37
         Height = 13
         Caption = 'NT-Rid:'
       end
       object Bevel1: TBevel
         Left = 24
-        Top = 48
+        Top = 40
         Width = 337
         Height = 9
         Shape = bsBottomLine
       end
+      object Label5: TLabel
+        Left = 24
+        Top = 64
+        Width = 66
+        Height = 13
+        Caption = 'Display name:'
+      end
       object cbSambaDomain: TComboBox
         Left = 24
-        Top = 88
+        Top = 128
         Width = 233
         Height = 21
         Style = csDropDownList
         ItemHeight = 0
-        TabOrder = 1
+        TabOrder = 2
         OnChange = cbSambaDomainChange
       end
       object RadioGroup1: TRadioGroup
         Left = 24
-        Top = 128
+        Top = 160
         Width = 337
         Height = 113
         Caption = 'Group type:'
@@ -159,19 +166,19 @@ object GroupDlg: TGroupDlg
           'Domain group'
           'Local group'
           'Built-in group:')
-        TabOrder = 3
+        TabOrder = 4
         OnClick = RadioGroup1Click
       end
       object cbBuiltin: TComboBox
         Left = 128
-        Top = 208
+        Top = 232
         Width = 209
         Height = 21
         Style = csDropDownList
         Color = clBtnFace
         Enabled = False
         ItemHeight = 13
-        TabOrder = 4
+        TabOrder = 5
         OnChange = cbBuiltinChange
         Items.Strings = (
           'Domain Admins'
@@ -180,10 +187,10 @@ object GroupDlg: TGroupDlg
       end
       object edRid: TEdit
         Left = 272
-        Top = 88
+        Top = 128
         Width = 89
         Height = 21
-        TabOrder = 2
+        TabOrder = 3
       end
       object cbSambaGroup: TCheckBox
         Left = 24
@@ -193,6 +200,13 @@ object GroupDlg: TGroupDlg
         Caption = 'Samba domain mapping'
         TabOrder = 0
         OnClick = cbSambaGroupClick
+      end
+      object edDisplayName: TEdit
+        Left = 24
+        Top = 80
+        Width = 337
+        Height = 21
+        TabOrder = 1
       end
     end
     object TabSheet3: TTabSheet

@@ -196,7 +196,7 @@ object PrefDlg: TPrefDlg
         Width = 513
         Height = 185
         Caption = 'Default settings:'
-        TabOrder = 0
+        TabOrder = 1
         object Label8: TLabel
           Left = 72
           Top = 108
@@ -287,7 +287,7 @@ object PrefDlg: TPrefDlg
         Width = 513
         Height = 105
         Caption = 'Server:'
-        TabOrder = 1
+        TabOrder = 0
         object Label7: TLabel
           Left = 24
           Top = 36
@@ -317,7 +317,7 @@ object PrefDlg: TPrefDlg
           Width = 353
           Height = 21
           Style = csDropDownList
-          ItemHeight = 0
+          ItemHeight = 13
           TabOrder = 1
         end
       end

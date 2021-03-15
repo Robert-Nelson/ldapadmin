@@ -51,6 +51,8 @@ object ConnListFrm: TConnListFrm
     TabOrder = 0
     OnClick = ListViewClick
     OnDblClick = ListViewDblClick
+    OnEdited = ListViewEdited
+    OnEditing = ListViewEditing
   end
   object PopupMenu: TPopupMenu
     OnPopup = PopupMenuPopup
@@ -64,6 +66,14 @@ object ConnListFrm: TConnListFrm
       Caption = '&Delete'
       OnClick = pbDeleteClick
     end
+    object pbRename: TMenuItem
+      Caption = '&Rename'
+      OnClick = pbRenameClick
+    end
+    object pbCopy: TMenuItem
+      Caption = 'Copy...'
+      OnClick = pbCopyClick
+    end
     object N1: TMenuItem
       Caption = '-'
     end
@@ -76,7 +86,7 @@ object ConnListFrm: TConnListFrm
     Left = 56
     Top = 272
     Bitmap = {
-      494C010102000400040010001000FFFFFFFFFF00FFFFFFFFFFFFFFFF424D3600
+      494C010102000400040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000001000000001002000000000000010
       000000000000000000000000000000000000000000004FC2FF004FC2FF004FC2
       FF004FC2FF004FC2FF004FC2FF004FC2FF004FC2FF004FC2FF004FC2FF004FC2
@@ -212,6 +222,7 @@ object ConnListFrm: TConnListFrm
       0000801700000000000080010000000000008000000000000000C00000000000
       0000C000000000000000C0000000000000008000000000000000800000000000
       0000800000000000000080000000000000008000000000008000800000000000
-      C000E01F00000000E001FFFF00000000}
+      C000E01F00000000E001FFFF0000000000000000000000000000000000000000
+      000000000000}
   end
 end

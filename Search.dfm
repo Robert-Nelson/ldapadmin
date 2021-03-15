@@ -103,6 +103,7 @@ object SearchFrm: TSearchFrm
     Anchors = [akTop, akRight]
     Caption = '&Browse...'
     TabOrder = 2
+    OnClick = SearchBtnClick
   end
   object StartBtn: TButton
     Left = 376

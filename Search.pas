@@ -51,9 +51,10 @@ type
     procedure ListViewCompare(Sender: TObject; Item1, Item2: TListItem;
       Data: Integer; var Compare: Integer);
     procedure ListViewColumnClick(Sender: TObject; Column: TListColumn);
+    procedure SearchBtnClick(Sender: TObject);
   private
     Session: TLDAPSession;
-    dn: string;
+    //dn: string;
     ColumnToSort: Integer;
     Descending: Boolean;
     procedure Search(const Filter: string);
@@ -66,7 +67,7 @@ var
 
 implementation
 
-uses Winldap, Constant;
+uses Winldap, Constant, Main;
 
 {$R *.DFM}
 
@@ -77,7 +78,7 @@ var
   i: Integer;
 begin
 
-  RList := Session.Search(Filter, dn, LDAP_SCOPE_SUBTREE);
+  RList := Session.Search(Filter, SBCombo.Text{dn}, LDAP_SCOPE_SUBTREE);
 
   if Assigned(RList) then
   begin
@@ -94,7 +95,7 @@ end;
 constructor TSearchFrm.Create(AOwner: TComponent; const dn: string; const Session: TLDAPSession);
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
+  //Self.dn := dn;
   Self.Session := Session;
   if dn <> '' then
     SBCombo.Text := dn
@@ -131,6 +132,9 @@ var
   end;
 
 begin
+  with SBCombo do
+    if Items.IndexOf(Text) = -1 then
+      Items.Add(Text);
   ListView.Items.Clear;
   if PageControl1.ActivePage = TabSheet1 then
   begin
@@ -180,6 +184,15 @@ begin
   else
     Descending := not Descending;
   (Sender as TCustomListView).AlphaSort;
+end;
+
+procedure TSearchFrm.SearchBtnClick(Sender: TObject);
+var
+  s: string;
+begin
+  s := MainFrm.PickEntry('Search base');
+  if s <> '' then
+    SBCombo.Text := s;
 end;
 
 end.

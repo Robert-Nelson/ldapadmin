@@ -75,6 +75,8 @@ begin
   cbSSL.Checked := AccountEntry.ldapUseSSL;
   Port.Text := IntToStr(AccountEntry.ldapPort);
   VersionCombo.ItemIndex := AccountEntry.ldapVersion - 2;
+  if Name.Text <> '' then
+    Name.Enabled := false;
 end;
 
 procedure TConnPropDlg.FormClose(Sender: TObject; var Action: TCloseAction);

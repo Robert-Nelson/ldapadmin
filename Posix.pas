@@ -101,10 +101,11 @@ type
     procedure SyncProperties(var Properties, PropAttrNames: array of string);
     procedure FlushProperties(var Properties, PropAttrNames: array of string);
   public
-    constructor Create(apld: PLDAP; adn: string); override;
+    constructor Create(const ASession: TLDAPSession; const adn: string); override;
     constructor Copy(const CEntry: TLdapEntry); override;
     procedure New; override;
     procedure Modify; override;
+    procedure Delete; override;
     procedure Read; override;
     property Shadow: Boolean read fShadow write SetShadow;
     property InetOrg: Boolean read fInetOrg write SetInetOrg;
@@ -147,12 +148,13 @@ type
     procedure FlushProperty(const attrn, attrv: string);
     procedure FlushProperties; virtual;
   public
-    constructor Create(apld: PLDAP; adn: string); override;
+    constructor Create(const ASession: TLDAPSession; const adn: string); override;
     constructor Copy(const CEntry: TLdapEntry); override;
     procedure AddMember(const AMember: string); virtual;
     procedure RemoveMember(const AMember: string); virtual;
     procedure New; override;
     procedure Modify; override;
+    //procedure Delete; override;
     procedure Read; override;
     property GidNumber: Integer read fGidNumber write fGidNumber;
     property Cn: string read fCn write fCn;
@@ -166,9 +168,10 @@ uses Sysutils, md5, base64, Constant;
 
 procedure TPosixAccount.SetInt(Index: TProperties; Value: Integer);
 begin
-  if not fShadow and (Index >= eShadowFlag) and (Index <= eShadowExpire) then
-    raise Exception.Create('Shadow properties not allowed!');
-  SetProperty(Index, IntToStr(Value), Properties[Index]);
+  {if not fShadow and (Index >= eShadowFlag) and (Index <= eShadowExpire) then
+    raise Exception.Create('Shadow properties not allowed!');}
+  if fShadow or (Index < eShadowFlag) or (Index > eShadowExpire) then
+    SetProperty(Index, IntToStr(Value), Properties[Index]);
 end;
 
 function TPosixAccount.GetInt(Index: TProperties): Integer;
@@ -178,9 +181,8 @@ end;
 
 procedure TPosixAccount.SetInetOrgProp(Index: TProperties; const Value: string);
 begin
-  if not fInetOrg then
-    raise Exception.Create('InetOrg properties not allowed!');
-  Properties[Index] := Value;
+  if fInetOrg then
+    Properties[Index] := Value;
 end;
 
 procedure TPosixAccount.SetProperty(Index: TProperties; Value: string; var AProperty: string);
@@ -239,7 +241,10 @@ var
 begin
   for i := Low(Properties) to High(Properties) do
     if AnsiStrIComp(PChar(PropAttrNames[i]), PChar(AProperty)) = 0 then
+    begin
       Properties[i] := AValue;
+      Break;
+    end;
 end;
 
 procedure TPosixAccount.SyncProperties(var Properties, PropAttrNames: array of string);
@@ -284,7 +289,7 @@ begin
   end;
 end;
 
-constructor TPosixAccount.Create(apld: PLDAP; adn: string);
+constructor TPosixAccount.Create(const ASession: TLDAPSession; const adn: string);
 begin
   inherited;
   { Set defaults, note that we assign values to properties here }
@@ -330,6 +335,52 @@ begin
   if not Assigned(Items) then
     raise Exception.Create(stObjnRetrvd);
   FlushProperties(Properties, PropAttrNames);
+  inherited;
+end;
+
+procedure TPosixAccount.Delete;
+var
+  plmSearch, plmEntry: PLDAPMessage;
+  ppcVals: PPChar;
+  pld: PLDAP;
+  attrs: PCharArray;
+  Entry: TLDAPEntry;
+
+begin
+
+  // Remove any references to uid from groups before deleting user itself;
+  pld := Session.pld;
+  SetLength(attrs, 2);
+  attrs[0] := 'cn';
+  attrs[1] := nil;
+
+  if not Assigned(Items) then
+    uid := Session.GetNameFromDN(dn);
+
+  LdapCheck(ldap_search_s(pld, PChar(Session.Base), LDAP_SCOPE_SUBTREE,
+                               PChar(Format(sMY_GROUP,[uid])), PChar(attrs), 0, plmSearch));
+  try
+    plmEntry := ldap_first_entry(pld, plmSearch);
+    while Assigned(plmEntry) do
+    begin
+      ppcVals := ldap_get_values(pld, plmEntry, attrs[0]);
+      if Assigned(ppcVals) then
+      begin
+        Entry := TLDAPEntry.Create(Session, ldap_get_dn(pld, plmEntry));
+        try
+          Entry.AddAttr('memberUid', uid, LDAP_MOD_DELETE);
+          Entry.Modify;
+        finally
+          LDAPCheck(ldap_value_free(ppcVals));
+          Entry.Free;
+        end;
+      end;
+      plmEntry := ldap_next_entry(pld, plmEntry);
+    end;
+  finally
+    LDAPCheck(ldap_msgfree(plmSearch));
+  end;
+
   inherited;
 end;
 
@@ -435,7 +486,7 @@ begin
   end;
 end;
 
-constructor TPosixGroup.Create(apld: PLDAP; adn: string);
+constructor TPosixGroup.Create(const ASession: TLDAPSession; const adn: string);
 begin
   inherited;
   fMembers := TStringList.Create;

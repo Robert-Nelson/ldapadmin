@@ -148,7 +148,7 @@ begin
     if wedServer.Text <> '' then
     begin
       edNetbios.Text := wedServer.Text;
-      edHomeShare.Text := '\\%n\homes';
+      edHomeShare.Text := '\\%n\%u';
     end;
 
     if wcbDomain.ItemIndex <> -1 then

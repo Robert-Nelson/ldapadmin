@@ -38,6 +38,8 @@ type
     pbDelete: TMenuItem;
     N1: TMenuItem;
     ImageList1: TImageList;
+    pbRename: TMenuItem;
+    pbCopy: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure pbNewClick(Sender: TObject);
     procedure PopupMenuPopup(Sender: TObject);
@@ -46,6 +48,12 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ListViewDblClick(Sender: TObject);
     procedure ListViewClick(Sender: TObject);
+    procedure ListViewEditing(Sender: TObject; Item: TListItem;
+      var AllowEdit: Boolean);
+    procedure ListViewEdited(Sender: TObject; Item: TListItem;
+      var S: String);
+    procedure pbRenameClick(Sender: TObject);
+    procedure pbCopyClick(Sender: TObject);
   private
     Account: ^TAccountEntry;
     procedure GetAccounts;
@@ -75,6 +83,11 @@ var
   KeyList: TStringList;
   ListItem: TListItem;
 begin
+  OkBtn.Enabled := false;
+  ListView.Items.Clear;
+  ListItem := ListView.Items.Add;
+  ListItem.Caption := cAddConn;
+  ListItem.ImageIndex := 0;
   Reg := TRegistry.Create;
   Reg.RootKey := HKEY_CURRENT_USER;
   try
@@ -83,10 +96,10 @@ begin
       KeyList := TStringList.Create;
       Reg.GetValueNames(KeyList);
       Reg.CloseKey;
-      ListView.Items.Clear;
+      {ListView.Items.Clear;
       ListItem := ListView.Items.Add;
       ListItem.Caption := cAddConn;
-      ListItem.ImageIndex := 0;
+      ListItem.ImageIndex := 0;}
       for I := 0 to KeyList.Count - 1 do
       begin
         ListItem := ListView.Items.Add;
@@ -121,6 +134,7 @@ begin
   Enable := (ListView.Selected <> nil) and (ListView.Selected.Index <> 0);
   pbDelete.enabled := Enable;
   pbProperties.Enabled := Enable;
+  pbRename.Enabled := Enable;
 end;
 
 procedure TConnListFrm.pbPropertiesClick(Sender: TObject);
@@ -170,6 +184,57 @@ end;
 procedure TConnListFrm.ListViewClick(Sender: TObject);
 begin
   OkBtn.Enabled := Assigned(ListView.Selected);
+end;
+
+procedure TConnListFrm.ListViewEditing(Sender: TObject; Item: TListItem; var AllowEdit: Boolean);
+begin
+  OkBtn.Default := false;
+end;
+
+
+procedure TConnListFrm.ListViewEdited(Sender: TObject; Item: TListItem; var S: String);
+var
+  Reg: TRegistry;
+begin
+  OkBtn.Default := true;
+  Reg := TRegistry.Create;
+  Reg.RootKey := HKEY_CURRENT_USER;
+  try
+    if Reg.OpenKey(REG_KEY + REG_ACCOUNT, false) then
+    try
+      Reg.RenameValue(ListView.Selected.Caption, S);
+    finally
+      Reg.CloseKey;
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+procedure TConnListFrm.pbRenameClick(Sender: TObject);
+begin
+  ListView.Selected.EditCaption;
+end;
+
+procedure TConnListFrm.pbCopyClick(Sender: TObject);
+var
+  s: string;
+  ListItem: TListItem;
+begin
+  s := InputBox(cRename, cNewName, '');
+  if s <> '' then
+  with
+    TAccountEntry.Create(ListView.Selected.Caption) do
+  try
+    Name := s;
+    Write;
+  finally
+    Free;
+  end;
+  ListItem := ListView.Items.Add;
+  ListItem.Caption := s;
+  ListItem.ImageIndex := 1;
+  ListView.Selected := ListItem;
 end;
 
 end.

@@ -92,9 +92,12 @@ type
     Properties: array[eRid..eProfilePath] of string;
     procedure SetInt(Index: TProperties; Value: Integer);
     function  GetInt(Index: TProperties): Integer;
+    procedure SetFlag(Index: Integer; Value: Boolean);
+    function  GetFlag(Index: Integer): Boolean;
   protected
     procedure SetUserPassword(const Password: string); override;
   public
+    constructor Create(const ASession: TLDAPSession; const adn: string); override;
     constructor Copy(const CEntry: TLdapEntry); override;
     procedure New; override;
     procedure Modify; override;
@@ -104,13 +107,20 @@ type
     property Rid: Integer index eRid read GetInt write SetInt;
     property PrimaryGroupID: Integer index ePrimaryGroupID read GetInt write SetInt;
     property PwdLastSet: Integer index ePwdLastSet read GetInt;
-    property AcctFlags: string read Properties[eAcctFlags] write Properties[eAcctFlags];
+    property AcctFlags: string read Properties[eAcctFlags];// write Properties[eAcctFlags];
     property NTPassword: string read Properties[eNTPassword];
     property LMPassword: string read Properties[eLMPassword];
     property HomeDrive: string read Properties[eHomeDrive] write Properties[eHomeDrive];
     property SmbHome: string read Properties[eSmbHome] write Properties[eSmbHome];
     property ScriptPath: string read Properties[eScriptPath] write Properties[eScriptPath];
     property ProfilePath: string read Properties[eProfilePath] write Properties[eProfilePath];
+    property UserAccount: Boolean Index Ord('U') read GetFlag write SetFlag;
+    property ComputerAccount: Boolean Index Ord('W') read GetFlag write SetFlag;
+    property DomainTrust: Boolean Index Ord('I') read GetFlag write SetFlag;
+    property ServerTrust: Boolean Index Ord('S') read GetFlag write SetFlag;
+    property Disabled: Boolean Index Ord('D') read GetFlag write SetFlag;
+    property RequestHomeDir: Boolean Index Ord('H') read GetFlag write SetFlag;
+    property NoPasswordExpiration: Boolean Index Ord('X') read GetFlag write SetFlag;
   end;
 
 { Samba 3 }
@@ -163,12 +173,16 @@ type
     Properties: array[eSambaSID..eSambaGroupType] of string;
     procedure SetInt(Index: TProperties; Value: Integer);
     function  GetInt(Index: TProperties): Integer;
-    function GetDomainSid: string;
-    function GetRid: string;
+    procedure SetFlag(Index: Integer; Value: Boolean);
+    function  GetFlag(Index: Integer): Boolean;
+    function  GetDomainSid: string;
+    function  GetRid: string;
+    function  GetDomainName: string;
   protected
     procedure SetUserPassword(const Password: string); override;
     procedure SetProperty(Index: TProperties; Value: string; var AProperty: string); override;
   public
+    constructor Create(const ASession: TLDAPSession; const adn: string); override;
     constructor Copy(const CEntry: TLdapEntry); override;
     procedure New; override;
     procedure Modify; override;
@@ -185,7 +199,7 @@ type
     property KickoffTime: Integer index eSambaKickoffTime read GetInt;
     property LogonTime: Integer index eSambaLogonTime read GetInt;
     property LogoffTime: Integer index eSambaLogoffTime read GetInt;
-    property AcctFlags: string read Properties[eSambaAcctFlags] write Properties[eSambaAcctFlags];
+    property AcctFlags: string read Properties[eSambaAcctFlags];// write Properties[eSambaAcctFlags];
     property NTPassword: string read Properties[eSambaNTPassword];
     property LMPassword: string read Properties[eSambaLMPassword];
     property HomeDrive: string read Properties[eSambaHomeDrive] write Properties[eSambaHomeDrive];
@@ -193,8 +207,16 @@ type
     property LogonScript: string read Properties[eSambaLogonScript] write Properties[eSambaLogonScript];
     property ProfilePath: string read Properties[eSambaProfilePath] write Properties[eSambaProfilePath];
     property UserWorkstations: string read Properties[eSambaUserWorkstations] write Properties[eSambaUserWorkstations];
-    property DomainName: string read Properties[eSambaDomainName] write Properties[eSambaDomainName];
+    //property DomainName: string read Properties[eSambaDomainName] write Properties[eSambaDomainName];
+    property DomainName: string read GetDomainName write Properties[eSambaDomainName];
     property GroupType: string read Properties[eSambaGroupType] write Properties[eSambaGroupType];
+    property UserAccount: Boolean Index Ord('U') read GetFlag write SetFlag;
+    property ComputerAccount: Boolean Index Ord('W') read GetFlag write SetFlag;
+    property DomainTrust: Boolean Index Ord('I') read GetFlag write SetFlag;
+    property ServerTrust: Boolean Index Ord('S') read GetFlag write SetFlag;
+    property Disabled: Boolean Index Ord('D') read GetFlag write SetFlag;
+    property RequestHomeDir: Boolean Index Ord('H') read GetFlag write SetFlag;
+    property NoPasswordExpiration: Boolean Index Ord('X') read GetFlag write SetFlag;
   end;
 
 type
@@ -227,7 +249,7 @@ implementation
 
 uses md4, smbdes, Sysutils;
 
-{ This function is ported from mkntpwd.c by Anton Roeckseisen (anton@genua.de) }
+{ This function is ported from mkntpwd.c written by Anton Roeckseisen (anton@genua.de) }
 
 function PutUniCode(var adst; src: PChar): Integer;
 var
@@ -338,6 +360,27 @@ begin
   Result := StrToInt(Properties[Index]);
 end;
 
+function TSambaAccount.GetFlag(Index: Integer): Boolean;
+begin
+  Result := Pos(Char(Index), Properties[eAcctFlags]) <> 0;
+end;
+
+procedure TSambaAccount.SetFlag(Index: Integer; Value: Boolean);
+var
+  i: Integer;
+begin
+  i := Pos(Char(Index), Properties[eAcctFlags]);
+  if Value then // set
+  begin
+    if i = 0 then
+      Insert(Char(Index), Properties[eAcctFlags], 2);
+  end
+  else begin    // unset
+    if i <> 0 then
+      System.Delete(Properties[eAcctFlags], i, 1);
+  end;
+end;
+
 procedure TSambaAccount.SetUserPassword(const Password: string);
 var
   Passwd: array[0..255] of Byte;
@@ -353,6 +396,12 @@ begin
   Properties[eNTPassword] := HashToHex(@Hash, 16);
   { Get Lanman Password }
    Properties[eLMPassword] := HashToHex(PByteArray(e_p16(UpperCase(Password))), 16);
+end;
+
+constructor TSambaAccount.Create(const ASession: TLDAPSession; const adn: string);
+begin
+  inherited;
+  Properties[eAcctFlags] := '[]';
 end;
 
 constructor TSambaAccount.Copy(const CEntry: TLdapEntry);
@@ -418,6 +467,27 @@ begin
   Result := StrToInt(Properties[Index]);
 end;
 
+function TSamba3Account.GetFlag(Index: Integer): Boolean;
+begin
+  Result := Pos(Char(Index), Properties[eSambaAcctFlags]) <> 0;
+end;
+
+procedure TSamba3Account.SetFlag(Index: Integer; Value: Boolean);
+var
+  i: Integer;
+begin
+  i := Pos(Char(Index), Properties[eSambaAcctFlags]);
+  if Value then // set
+  begin
+    if i = 0 then
+      Insert(Char(Index), Properties[eSambaAcctFlags], 2);
+  end
+  else begin    // unset
+    if i <> 0 then
+      System.Delete(Properties[eSambaAcctFlags], i, 1);
+  end;
+end;
+
 function TSamba3Account.GetDomainSid: string;
 var
   p: Integer;
@@ -434,6 +504,25 @@ begin
   Result := PChar(@Sid[p + 1]);
 end;
 
+function TSamba3Account.GetDomainName: string;
+var
+  i: Integer;
+begin
+  if Properties[eSambaDomainName] <> '' then
+    Result := Properties[eSambaDomainName]
+  else // try to get domain name from sid
+  begin
+    with TDomainList.Create(Session) do
+    try
+      for i := 0 to Count - 1 do
+        if Items[i].SID = DomainSID then
+          Result := Items[i].DomainName;
+    finally
+      Free;
+    end;
+  end;
+end;
+
 procedure TSamba3Account.SetUserPassword(const Password: string);
 var
   Passwd: array[0..255] of Byte;
@@ -448,7 +537,10 @@ begin
   mdfour(hash, Passwd, slen);
   Properties[eSambaNTPassword] := HashToHex(@Hash, 16);
   { Get Lanman Password }
-   Properties[eSambaLMPassword] := HashToHex(PByteArray(e_p16(UpperCase(Password))), 16);
+  Properties[eSambaLMPassword] := HashToHex(PByteArray(e_p16(UpperCase(Password))), 16);
+  { Set changetime attribute }
+  //TODO: this should probably be UTC?
+  Properties[eSambaPwdLastSet] := IntToStr(Trunc((Now - 25569.0)*24*60*60));
 end;
 
 procedure TSamba3Account.SetProperty(Index: TProperties; Value: string; var AProperty: string);
@@ -461,6 +553,12 @@ begin
     else
       Properties[eSambaKickoffTime] := Value;
   end;
+end;
+
+constructor TSamba3Account.Create(const ASession: TLDAPSession; const adn: string);
+begin
+  inherited;
+  Properties[eSambaAcctFlags] := '[]';
 end;
 
 constructor TSamba3Account.Copy(const CEntry: TLdapEntry);

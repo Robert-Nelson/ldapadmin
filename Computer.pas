@@ -74,7 +74,7 @@ begin
     edComputername.Enabled := False;
     edComputername.Text := ldSession.GetNameFromDN(dn);
     Caption := Format(cPropertiesOf, [edComputername.Text]);
-    Account := TSamba3Account.Create(ldSession.pld, dn);
+    Account := TSamba3Account.Create(ldSession, dn);
     with TSamba3Account(Account) do
     begin
       Account.Read;
@@ -124,10 +124,9 @@ begin
       nbName := uppercase(edComputername.Text) + '$';
 
       if cbDomain.ItemIndex = 0 then
-      with TSambaAccount(Account) do
-        Account := TSambaAccount.Create(ldSession.pld, 'uid=' + nbName + ',' + dn)
+        Account := TSambaAccount.Create(ldSession, 'uid=' + nbName + ',' + dn)
       else
-        Account := TSamba3Account.Create(ldSession.pld, 'uid=' + nbName + ',' + dn);
+        Account := TSamba3Account.Create(ldSession, 'uid=' + nbName + ',' + dn);
 
       with Account do
       try
@@ -142,7 +141,8 @@ begin
         begin
           rid := 2 * uidnr + 1000;
           PrimaryGroupID := 2 * gidnr + 1001;
-          acctFlags := '[W          ]';
+          //acctFlags := '[W          ]';
+          ComputerAccount := true;
           Description := Self.edDescription.Text;
         end
         else with TSamba3Account(Account) do
@@ -151,7 +151,8 @@ begin
           DomainName := pDom.DomainName;
           SID := Format('%s-%d', [pDom.SID, pDom.AlgorithmicRIDBase + 2 * UidNumber]);
           GroupSID := Format('%s-%d', [pDom.SID, 2 * gidnr + 1001]);
-          acctFlags := '[W          ]';
+          //acctFlags := '[W          ]';
+          ComputerAccount := true;
           Description := Self.edDescription.Text;
         end;
         New;

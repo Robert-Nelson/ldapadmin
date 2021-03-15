@@ -51,7 +51,7 @@ resourcestring
   cAddAddress   = 'Add Address';
   cEditAddress  = 'Edit Address';
   cSmtpAddress  = 'SMTP Address:';
-  cConfirmDel   = 'Confirm';
+  cConfirm      = 'Confirmation';
   cEditEntry    = 'Edit entry:';
   cNewEntry     = 'New entry';
   cSurname      = 'Second name';
@@ -59,6 +59,13 @@ resourcestring
   cMaildrop     = 'Maildrop';
   cSamba2Accnt  = '-Samba2 Account-';
   cAddConn      = 'New connection';
+  cRename       = 'Rename';
+  cNewName      = 'New name:';
+  cDeleting     = 'Deleting:';
+  cCopyTo       = 'Copy %s to...';
+  cMoveTo       = 'Move %s to...';
+  cMoving       = 'Moving...';
+  cCopying      = 'Copying...';
 
 // Messages
 
@@ -68,13 +75,15 @@ resourcestring
   stPassDiff     = 'Passwords do not match!';
   stAccntNameReq = 'Enter a name for this connection!';
   stGroupNameReq = 'Enter a name for this group!';
-  stConfirmDel   = 'Do you want to delete entry "%s"?';
+  stConfirmDel   = 'Delete entry "%s"?';
   stCntObjects   = '%d object(s) found.';
   stRegAccntErr  = 'Could not read account data!';
   stNoMoreNums   = 'No more available numbers for %s!';
   stUnclosedStr  = 'Unclosed string!';
   stObjnRetrvd   = 'Object not yet retrieved!';
   stSmbDomainReq = 'You have to select samba domain to which this group should be mapped!';
+  stDeleteAll    = 'This directory entry is not empty (it contains further leaves). Delete all recursively?';
+  stMoveOverlap  = 'Cannot move: Source and destination paths overlap!';
 
 {// Captions
 

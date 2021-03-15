@@ -26,7 +26,8 @@ uses
   Samba in 'Samba.pas',
   Posix in 'Posix.pas',
   PrefWiz in 'PrefWiz.pas' {PrefWizDlg},
-  About in 'About.pas' {AboutDlg};
+  About in 'About.pas' {AboutDlg},
+  LdapOp in 'LdapOp.pas' {LdapOpDlg};
 
 {$R *.RES}
 

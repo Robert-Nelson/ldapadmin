@@ -108,16 +108,17 @@ object OuDlg: TOuDlg
     end
   end
   object OKBtn: TButton
-    Left = 96
+    Left = 104
     Top = 368
     Width = 75
     Height = 25
     Caption = '&OK'
+    Default = True
     ModalResult = 1
     TabOrder = 2
   end
   object CancelBtn: TButton
-    Left = 192
+    Left = 184
     Top = 368
     Width = 75
     Height = 25

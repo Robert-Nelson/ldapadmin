@@ -84,7 +84,7 @@ begin
   begin
     if EditMode = EM_ADD then
       dn := 'cn=' + cn.Text + ',' + dn;
-    Entry := TLDAPEntry.Create(ldSession.pld, dn);
+    Entry := TLDAPEntry.Create(ldSession, dn);
     with Entry do
     try
       if EditMode = EM_ADD then

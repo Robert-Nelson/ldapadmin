@@ -59,6 +59,8 @@ type
     Label4: TLabel;
     cbSambaGroup: TCheckBox;
     Bevel1: TBevel;
+    edDisplayName: TEdit;
+    Label5: TLabel;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure AddUserBtnClick(Sender: TObject);
     procedure RemoveUserBtnClick(Sender: TObject);
@@ -176,7 +178,7 @@ begin
   Self.Session := Session;
   Self.RegAccount := RegAccount;
   EditMode := Mode;
-  Group := TPosixGroup.Create(Session.pld, dn);
+  Group := TPosixGroup.Create(Session, dn);
   if EditMode = EM_MODIFY then
   begin
     Load;
@@ -201,6 +203,7 @@ begin
 
       end;
       edRid.Text := TSamba3Group(Group).Rid;
+      edDisplayName.Text := TSamba3Group(Group).DisplayName;
     end;
     edName.Enabled := false;
     Caption := Format(cPropertiesOf, [edName.Text]);
@@ -220,17 +223,26 @@ procedure TGroupDlg.Save;
 var
   i: Integer;
   Temp: TPosixGroup;
+  arid: string;
 begin
 
   if edName.Text = '' then
     raise Exception.Create(stGroupNameReq);
 
   try
-    Group.Cn := edName.Text;
+    with Group do
+    begin
+      Cn := edName.Text;
+      if EditMode = EM_ADD then
+      begin
+        dn := PChar('cn=' + edName.Text + ',' + ParentDn);
+        Description := edDescription.Text;
+        GidNumber := Session.GetFreeGidNumber(RegAccount.posixFirstGid, RegAccount.posixLastGID);
+      end;
+    end;
 
     if cbSambaGroup.Checked then
     begin
-
       if not IsSambaGroup then
       begin
         if cbSambaDomain.ItemIndex = -1 then
@@ -242,9 +254,15 @@ begin
         begin
           if EditMode = EM_MODIFY then
             Add;
-          DisplayName := Cn;
+          if edDisplayName.Text <> '' then
+            DisplayName := edDisplayName.Text
+          else
+            DisplayName := CN;
           GroupType := Self.GroupType;
-          Sid := Format('%s-%s', [DomList.Items[cbSambaDomain.ItemIndex].SID, edRid.Text])
+          arid := edRid.Text;
+          if arid = '' then
+            arid := IntToStr(2 * Group.gidNumber + DomList.Items[cbSambaDomain.ItemIndex].AlgorithmicRIDBase + 1);
+          Sid := Format('%s-%s', [DomList.Items[cbSambaDomain.ItemIndex].SID, arid])
         end;
       end;
     end
@@ -274,12 +292,7 @@ begin
       end;
 
       if EditMode = EM_ADD then
-      begin
-        dn := PChar('cn=' + edName.Text + ',' + ParentDn);
-        Description := edDescription.Text;
-        GidNumber := Session.GetFreeGidNumber(RegAccount.posixFirstGid, RegAccount.posixLastGID);
-        New;
-      end
+        New
       else
         Modify;
     end;
@@ -480,7 +493,7 @@ begin
       end
       else
       begin
-        EnableControls([cbSambaDomain, edRid, RadioGroup1, cbBuiltin], clBtnFace, false);
+        EnableControls([edDisplayName, cbSambaDomain, edRid, RadioGroup1, cbBuiltin], clBtnFace, false);
         cbSambaGroup.Enabled := DomList.Count > 0;
         for i := 0 to DomList.Count - 1 do
           Items.Add(DomList.Items[i].DomainName);
@@ -556,11 +569,14 @@ begin
     Color := clBtnFace;
     Enable := false;
   end;
-  EnableControls([cbSambaDomain, edRid, RadioGroup1], Color, Enable);
+  EnableControls([edDisplayName, cbSambaDomain, edRid, RadioGroup1], Color, Enable);
   if RadioGroup1.ItemIndex = 2 then
     cbBuiltin.Color := Color;
   if not (Group is TSamba3Group) then
+  begin
+    edDisplayName.Text := Group.Cn;
     cbSambaDomainChange(nil); // Refresh Rid
+  end;
 end;
         
 end.

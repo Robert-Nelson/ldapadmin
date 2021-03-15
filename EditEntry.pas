@@ -78,8 +78,8 @@ type
     procedure ToolBtnClick(Sender: TObject);
   private
     Entry: TLDAPEntry;
-    dn: string;
-    pld: PLDAP;
+    fdn: string;
+    fSession: TLDAPSession;
     EditMode: TEditMode;
     SaveVal: string;
     procedure PushShortCut(Command: TMenuItem);
@@ -89,7 +89,8 @@ type
     procedure Load;
     procedure Modify;
   public
-    constructor Create(AOwner: TComponent; dn: string; pld: PLDAP; Mode: TEditMode); reintroduce; overload;
+    constructor Create(const AOwner: TComponent; const adn: string;
+                       const ASession: TLDAPSession; const Mode: TEditMode); reintroduce; overload;
   end;
 
 var
@@ -172,27 +173,28 @@ begin
   end;
 end;
 
-constructor TEditEntryFrm.Create(AOwner: TComponent; dn: string; pld: PLDAP; Mode: TEditMode);
+constructor TEditEntryFrm.Create(const AOwner: TComponent; const adn: string;
+                                 const ASession: TLDAPSession; const Mode: TEditMode);
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  Self.pld := pld;
+  fdn := adn;
+  fSession := ASession;
   EditMode := Mode;
   if Mode = EM_MODIFY then
   begin
-    Caption := Format(cEditEntry, [dn]);
+    Caption := Format(cEditEntry, [adn]);
     EditDN.ReadOnly := true;
-    EditDN.Text := dn;
+    EditDN.Text := adn;
     Load;
   end
   else begin
     Caption := cNewEntry;
-    EditDN.Text := ',' + dn;
+    EditDN.Text := ',' + adn;
   end;
   with StringGrid do
   begin
     Cells[0,0] := 'Attribute';
-    Cells[1,0] := 'Wert';
+    Cells[1,0] := 'Value';
     SaveVal := Cells[Col, Row];
   end;
 end;
@@ -221,7 +223,7 @@ procedure TEditEntryFrm.Load;
 var
   I: Integer;
 begin
-  Entry := TLDAPEntry.Create(pld, dn);
+  Entry := TLDAPEntry.Create(fSession, fdn);
   Entry.Read;
   Entry.Items.Sort;
   with StringGrid do
@@ -294,7 +296,7 @@ var
 begin
   if EditMode = EM_ADD then
   begin
-    Entry := TLDAPEntry.Create(pld, EditDN.Text);
+    Entry := TLDAPEntry.Create(fSession, EditDN.Text);
     for i := 1 to StringGrid.RowCount - 1 do
       Entry.AddAttr(StringGrid.Cells[0, i], StringGrid.Cells[1, i], LDAP_MOD_ADD);
     Entry.New;

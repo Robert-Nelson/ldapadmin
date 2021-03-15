@@ -4,7 +4,7 @@ object UserDlg: TUserDlg
   ActiveControl = givenName
   BorderStyle = bsDialog
   Caption = 'User Properties'
-  ClientHeight = 463
+  ClientHeight = 451
   ClientWidth = 394
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -23,7 +23,7 @@ object UserDlg: TUserDlg
     Left = 0
     Top = 0
     Width = 394
-    Height = 399
+    Height = 396
     ActivePage = AccountSheet
     Align = alClient
     TabOrder = 0
@@ -305,7 +305,7 @@ object UserDlg: TUserDlg
         Left = 16
         Top = 232
         Width = 353
-        Height = 65
+        Height = 57
         TabOrder = 5
       end
       object cbDomain: TComboBox
@@ -319,8 +319,8 @@ object UserDlg: TUserDlg
       end
       object cbPwdMustChange: TCheckBox
         Left = 24
-        Top = 336
-        Width = 249
+        Top = 320
+        Width = 265
         Height = 17
         Caption = 'User &must change the password on next logon'
         TabOrder = 7
@@ -328,8 +328,8 @@ object UserDlg: TUserDlg
       end
       object cbPwdCantChange: TCheckBox
         Left = 24
-        Top = 312
-        Width = 193
+        Top = 296
+        Width = 265
         Height = 17
         Caption = 'User can &not change the password'
         TabOrder = 6
@@ -337,12 +337,20 @@ object UserDlg: TUserDlg
       end
       object BtnAdvanced: TButton
         Left = 296
-        Top = 304
+        Top = 296
         Width = 75
         Height = 25
         Caption = '&Advanced...'
         Enabled = False
         TabOrder = 8
+      end
+      object cbAccntDisabled: TCheckBox
+        Left = 24
+        Top = 344
+        Width = 265
+        Height = 17
+        Caption = 'Account is &disabled'
+        TabOrder = 9
       end
     end
     object MailSheet: TTabSheet
@@ -762,14 +770,14 @@ object UserDlg: TUserDlg
   end
   object Panel1: TPanel
     Left = 0
-    Top = 399
+    Top = 396
     Width = 394
-    Height = 64
+    Height = 55
     Align = alBottom
     TabOrder = 1
     object OkBtn: TButton
       Left = 120
-      Top = 24
+      Top = 16
       Width = 75
       Height = 25
       Caption = '&OK'
@@ -779,7 +787,7 @@ object UserDlg: TUserDlg
     end
     object CancelBtn: TButton
       Left = 200
-      Top = 24
+      Top = 16
       Width = 75
       Height = 25
       Caption = '&Cancel'

@@ -116,7 +116,7 @@ begin
   try
     if EditMode = EM_ADD then
     begin
-      Entry := TLDAPEntry.Create(Session.pld, 'ou=' + ou.Text + ',' + dn);
+      Entry := TLDAPEntry.Create(Session, 'ou=' + ou.Text + ',' + dn);
       Entry.AddAttr('objectclass', 'top', LDAP_MOD_ADD);
       Entry.AddAttr('objectclass', 'organizationalUnit', LDAP_MOD_ADD);
       Entry.AddAttr('ou', ou.Text, LDAP_MOD_ADD);
@@ -172,7 +172,7 @@ begin
     ou.Enabled := False;
     ou.text := Session.GetNameFromDN(dn);
     Caption := Format(cPropertiesOf, [ou.Text]);
-    Entry := TLDAPEntry.Create(Session.pld, dn);
+    Entry := TLDAPEntry.Create(Session, dn);
     Entry.Read;
 
     for I := 0 to Entry.Items.Count - 1 do

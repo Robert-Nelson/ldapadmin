@@ -46,15 +46,16 @@ type
     ResultLabel: TLabel;
     Label5: TLabel;
     ExportingLabel: TLabel;
+    Label4: TLabel;
     procedure BrowseBtnClick(Sender: TObject);
     procedure edFileNameChange(Sender: TObject);
     procedure OKBtnClick(Sender: TObject);
   private
     dn: string;
-    pld: PLDAP;
+    Session: TLDAPSession;
     function DumpTree(const Filter: string): Integer;
   public
-    constructor Create(AOwner: TComponent; const dn: string; const pld: PLDAP); reintroduce;
+    constructor Create(AOwner: TComponent; const adn: string; const ASession: TLDAPSession); reintroduce;
   end;
 
 var
@@ -66,11 +67,32 @@ uses Constant;
 
 {$R *.DFM}
 
-constructor TExportDlg.Create(AOwner: TComponent; const dn: string; const pld: PLDAP);
+function TrimPath(const s: string; const MaxLen: Integer): string;
+var
+  p, pr: PChar;
+begin
+  SetString(Result, PChar(s), Length(s));
+  if length(Result) <= MaxLen then
+    Exit;
+  p := PChar(Result);
+  p[MaxLen] := #0;
+
+  pr := AnsiStrRScan(p, ',');
+  if pr <> nil then
+  begin
+    SetLength(Result, pr-p+1);
+    Result := Result + '..';
+  end;
+end;
+
+constructor TExportDlg.Create(AOwner: TComponent; const adn: string; const ASession: TLDAPSession);
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  Self.pld := pld;
+  dn := adn;
+  Session := ASession;
+  ExportingLabel.Caption := TrimPath(dn, 40);
+  Label4.Caption := Label4.Caption + ExportingLabel.Caption;
+  Label4.Hint := dn;
 end;
 
 procedure TExportDlg.BrowseBtnClick(Sender: TObject);
@@ -82,6 +104,7 @@ end;
 function TExportDlg.DumpTree(const Filter: string): Integer;
 var
   plmSearch, plmEntry: PLDAPMessage;
+  pld: PLDAP;
   attrs: PCharArray;
   pszdn: PChar;
   Entry: TLDAPEntry;
@@ -102,6 +125,7 @@ begin
   SetLength(attrs, 2);
   attrs[0] := 'objectclass';
   attrs[1] := nil;
+  pld := Session.pld;
   LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_SUBTREE, PChar(Filter), PChar(attrs), 0, plmSearch));
 
   try
@@ -118,7 +142,7 @@ begin
 
       if Assigned(pszdn) then
       try
-        Entry := TLDAPEntry.Create(pld, pszdn);
+        Entry := TLDAPEntry.Create(Session, pszdn);
         try
           Entry.Read;
           Entry.ToLdif(F, C_WRAP);
@@ -154,7 +178,7 @@ end;
 
 procedure TExportDlg.OKBtnClick(Sender: TObject);
 begin
-  ExportingLabel.Caption := dn;
+  //ExportingLabel.Caption := dn;
   Notebook.ActivePage := 'Progress';
   Application.ProcessMessages;
   try
