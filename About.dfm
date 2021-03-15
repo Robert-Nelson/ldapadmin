@@ -14,6 +14,7 @@ object AboutDlg: TAboutDlg
   OldCreateOrder = False
   Position = poScreenCenter
   OnClose = FormClose
+  OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
   object Label1: TLabel
@@ -197,9 +198,8 @@ object AboutDlg: TAboutDlg
     object Label5: TLabel
       Left = 72
       Top = 24
-      Width = 37
+      Width = 65
       Height = 13
-      Caption = '0.9.84'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11

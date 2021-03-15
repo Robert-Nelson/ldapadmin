@@ -72,7 +72,7 @@ var
 
 implementation
 
-uses LDIF, Constant;
+uses LDIF, TextFile, Constant;
 
 {$R *.DFM}
 
@@ -92,7 +92,7 @@ procedure TImportDlg.ImportFile(const FileName: string);
 var
   Entry: TLDAPEntry;
   F: File;
-  R: TextFile;
+  R: TTextFile;
   ldFile: TLdifFile;
   i: Integer;
   StopOnError: Boolean;
@@ -105,9 +105,8 @@ begin
   RejectList := edRejected.Text <> '';
   if RejectList then
   begin
-    AssignFile(R, edRejected.Text);
     try
-      Rewrite(R);
+    R := TTextFile.Create(edRejected.Text, fmCreate);
     except
       on E: Exception do
         raise Exception.Create(Format('%s: %s!', [edRejected.Text, E.Message]));
@@ -137,10 +136,13 @@ begin
       while not (eof or Stop) do
       try
         ReadRecord(Entry);
-        ImportingLabel.Caption := Entry.dn;
         ProgressBar.Position := NumRead;
-        Entry.Write;
-        inc(ObjCount);
+        if esModified in Entry.State then
+        begin
+          ImportingLabel.Caption := Entry.dn;
+          Entry.Write;
+          inc(ObjCount);
+        end;
         Application.ProcessMessages;
       except
         on E: Exception do
@@ -150,10 +152,10 @@ begin
           mbErrors.Lines.Add('  ' + E.Message);
           if RejectList then
           try
-            WriteLn(R, Entry.dn);
+            R.WriteLn('# ' + Entry.dn);
             for i := 0 to RecordLines.Count - 1 do
-              WriteLn(R, RecordLines[i]);
-            WriteLn(R);
+              R.WriteLn(RecordLines[i]);
+            R.WriteLn('');
           except
             on E: EInOutError do
               RaiseLastWin32Error
@@ -171,7 +173,7 @@ begin
   finally
     if RejectList then
     try
-      CloseFile(R);
+      R.Free;
     except end;
     FreeAndNil(Entry);
     FreeAndNil(ldFile);

@@ -442,7 +442,7 @@ begin
     Dec(j);
   end;
   { Add dummy node to make node expandable }
-  if not CNode.Expanded and Container then
+  if not CNode.HasChildren and Container then
     LDAPTree.Items.AddChildObject(CNode, '', Pointer(ncDummyNode));
 end;
 
@@ -504,6 +504,8 @@ end;
 procedure TMainFrm.FormDestroy(Sender: TObject);
 begin
   ldapSession.Disconnect;
+  ldapSession.Free;
+  regAccount.Free;
 end;
 
 procedure TMainFrm.LDAPTreeExpanding(Sender: TObject; Node: TTreeNode; var AllowExpansion: Boolean);

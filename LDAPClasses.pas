@@ -180,6 +180,7 @@ type
     property Session: TLDAPSession read fSession;
     property dn: string read fdn write SetDn;
     constructor Create(const ASession: TLDAPSession; const adn: string); virtual;
+    destructor Destroy; override;
     procedure Read; virtual;
     procedure Write; virtual;
     procedure Delete; virtual;
@@ -981,7 +982,23 @@ begin
   //if (fModOp = LDAP_MOD_ADD) or (fModOp = LDAP_MOD_REPLACE) then
   if fModOp = LDAP_MOD_ADD then
     fModOp := LdapOpNoop
-  else begin
+  else
+  begin
+    if (fModOp = LdapOpReplace) and (fAttribute.fValues.Count > 1) then
+    begin
+      fModOp := LdapOpRead;
+      with fAttribute do
+      begin
+        i := fValues.Count - 1;
+        while i >= 0 do with Values[i] do
+        begin
+          if ModOp = LdapOpReplace then
+            Exit;
+          dec(i);
+        end;
+      end;
+    end;
+
     fModOp := LDAP_MOD_DELETE;
     fAttribute.fState := fAttribute.fState + [asModified];
     fEntry.fState := fEntry.fState + [esModified];
@@ -1092,6 +1109,7 @@ var
 begin
   for i := 0 to fValues.Count - 1 do
     TLDapAttributeData(fValues[i]).Free;
+  fValues.Free;
 end;
 
 procedure TLdapAttribute.DeleteValue(const AValue: string);
@@ -1161,6 +1179,7 @@ var
 begin
   for i := 0 to fList.Count - 1 do
     TLdapAttribute(fList[i]).Free;
+  fList.Free;
   inherited Destroy;
 end;
 
@@ -1253,6 +1272,12 @@ begin
   fAttributes := TLdapAttributeList.Create(Self);
 end;
 
+destructor TLDAPEntry.Destroy;
+begin
+  fAttributes.Free;
+  inherited;
+end;
+
 procedure TLDAPEntry.Read;
 begin
   fAttributes.Clear;
@@ -1309,6 +1334,7 @@ var
 begin
   for i := 0 to fList.Count - 1 do
     TLdapEntry(fList[i]).Free;
+  fList.Free;
   inherited Destroy;
 end;
 

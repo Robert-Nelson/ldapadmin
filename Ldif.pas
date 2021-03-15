@@ -23,10 +23,9 @@ unit Ldif;
 
 interface
 
-uses LdapClasses, Windows, Classes, SysUtils;
+uses LdapClasses, TextFile, Windows, Classes, SysUtils;
 
 const
-  SIZE_CRLF = 2;
   SafeChar:     set of Char = [#$01..#09, #$0B..#$0C, #$0E..#$7F];
   SafeInitChar: set of Char = [#$01..#09, #$0B..#$0C, #$0E..#$1F, #$21..#$39, #$3B, #$3D..#$7F];
 
@@ -70,8 +69,10 @@ type
 
   TLDIFFile = class(TLDIF)
   private
-    F: Text;
+    F: TTextFile;
     fNumRead: Integer;
+    function  GetUnixWrite: Boolean;
+    procedure SetUnixWrite(AValue: Boolean);
   protected
     function  ReadLine: string; override;
     procedure WriteLine(const Line: string); override;
@@ -79,6 +80,7 @@ type
     constructor Create(const FileName: string; const Mode: TLdifMode); reintroduce; overload;
     destructor Destroy; override;
     property NumRead: Integer read fNumRead;
+    property UnixWrite: Boolean read GetUnixWrite write SetUnixWrite;
   end;
 
   TLDIFStringList = class(TLDIF)
@@ -312,35 +314,42 @@ end;
 
 { TLDIFFile }
 
+function TLDIFFile.GetUnixWrite: Boolean;
+begin
+  Result := F.UnixWrite;
+end;
+
+procedure TLDIFFile.SetUnixWrite(AValue: Boolean);
+begin
+  F.UnixWrite := AValue;
+end;
+
 function TLDIFFile.ReadLine: string;
 begin
-  ReadLn(F, Result);
-  fEof := System.eof(F);
-  fNumRead := fNumRead + Length(Result) + SIZE_CRLF;
+  Result := F.ReadLn;
+  fEof := F.Eof;
+  fNumRead := fNumRead + Length(Result) + 1;
 end;
 
 procedure TLDIFFile.WriteLine(const Line: string);
 begin
-  WriteLn(F, Line);
+  F.WriteLn(Line);
 end;
 
 constructor TLDIFFile.Create(const FileName: string; const Mode: TLdifMode);
 begin
   inherited Create;
   fMode := Mode;
-  AssignFile(F, FileName);
   try
-    if Mode = fmRead then
-    begin
-      FileMode := 0;
-      Reset(F)
-    end
-    else begin
-      FileMode := 1;
-      if Mode = fmWrite then
-        Rewrite(F)
-      else
-        Append(F);
+    case Mode of
+      fmRead:   F := TTextFile.Create(FileName, fmOpenRead);
+      fmWrite:  F := TTextFile.Create(FileName, fmCreate);
+      fmAppend: begin
+                  F := TTextFile.Create(FileName, fmOpenReadWrite);
+                  F.Seek(0, soFromEnd);
+                end;
+    else
+      raise Exception.Create('Internal error: Invalid LDIF mode!');
     end;
   except
     RaiseLastWin32Error;
@@ -350,7 +359,7 @@ end;
 destructor TLDIFFile.Destroy;
 begin
   try
-    CloseFile(F);
+    F.Free;
   except end;
   inherited Destroy;
 end;

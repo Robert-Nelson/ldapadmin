@@ -76,8 +76,13 @@ const
     eSambaProfilePath          = 14;
     eSambaUserWorkstations     = 15;
     eSambaDomainName           = 16;
-    eSambaGroupType            = 17;
-    eInetOrgDisplayName        = 18;
+    eSambaPasswordHistory      = 17;
+    esambaMungedDial           = 18;
+    esambaBadPasswordCount     = 19;
+    esambaBadPasswordTime      = 20;
+    sambaLogonHours            = 21;
+    eSambaGroupType            = 22;
+    eInetOrgDisplayName        = 23;
 
 const
   Prop3AttrNames: array[eSambaSid..eInetOrgDisplayName] of string = (
@@ -98,6 +103,11 @@ const
     'sambaProfilePath',
     'sambaUserWorkstations',
     'sambaDomainName',
+    'sambaPasswordHistory',
+    'sambaMungedDial',
+    'sambaBadPasswordCount',
+    'sambaBadPasswordTime',
+    'sambaLogonHours',
     'sambaGroupType',
     'displayName'
     );
@@ -262,10 +272,11 @@ end;
 
 procedure TSamba3Account.SetSid(Value: Integer);
 begin
-  if Assigned(pDomaindata) then
-    SetString(eSambaSID, Format('%s-%d', [pDomainData^.SID, pDomainData^.AlgorithmicRIDBase + 2 * Value]))
+  if not Assigned(pDomaindata) then
+    SetString(eSambaSID, '')
   else
-    SetString(eSambaSID, '');
+  if IsNull(eSambaSid) then
+    SetString(eSambaSID, Format('%s-%d', [pDomainData^.SID, pDomainData^.AlgorithmicRIDBase + 2 * Value]))
 end;
 
 procedure TSamba3Account.SetDomainRec(pdr: PDomainRec);
@@ -276,8 +287,9 @@ begin
     SetString(eSambaDomainName, pDomainData^.DomainName);
     if not fPosixAccount.IsNull(eUidNumber) then
       SetSid(UidNumber);
-    if not fPosixAccount.IsNull(eGidNumber) then
-      SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * GidNumber + 1001]));
+    if IsNull(eSambaPrimaryGroupSID) and not fPosixAccount.IsNull(eGidNumber) then
+      //SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * GidNumber + 1001]));
+      SetGidNumber(fPosixAccount.GidNumber)
   end;
 end;
 
@@ -293,12 +305,20 @@ begin
 end;
 
 procedure TSamba3Account.SetGidNumber(Value: Integer);
+var
+  gsid: string;
 begin
-  fPosixAccount.GidNumber := Value;
   if Assigned(pDomainData) then
-    SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * Value + 1001]))
+  begin
+    gsid := fEntry.Session.Lookup(fEntry.Session.Base, Format(sGROUPBYGID, [Value]), 'sambasid', LDAP_SCOPE_SUBTREE);
+    if gsid <> '' then
+      SetString(eSambaPrimaryGroupSID, gsid)
+    else
+      SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * Value + 1001]))
+  end
   else
     SetString(eSambaPrimaryGroupSID, '');
+  fPosixAccount.GidNumber := Value;
 end;
 
 function TSamba3Account.GetGidNumber: Integer;

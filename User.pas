@@ -954,6 +954,11 @@ end;
 procedure TUserDlg.FormDestroy(Sender: TObject);
 begin
   Entry.Free;
+  PosixAccount.Free;
+  InetOrgPerson.Free;
+  ShadowAccount.Free;
+  SambaAccount.Free;
+  MailAccount.Free;
 end;
 
 procedure TUserDlg.cbPwdMustChangeClick(Sender: TObject);

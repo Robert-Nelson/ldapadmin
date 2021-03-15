@@ -43,7 +43,8 @@ uses
   uSchemaDlg in 'uSchemaDlg.pas' {SchemaDlg},
   Schema in 'Schema.pas',
   BinView in 'BinView.pas' {HexView},
-  AdvSamba in 'AdvSamba.pas' {SambaAdvancedDlg};
+  AdvSamba in 'AdvSamba.pas' {SambaAdvancedDlg},
+  TextFile in 'TextFile.pas';
 
 {$R *.RES}
 

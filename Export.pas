@@ -50,7 +50,7 @@ type
   private
     dn: string;
     Session: TLDAPSession;
-    function DumpTree(const Filter: string): Integer;
+    function DumpTree(const Filter: string; UnixWrite: Boolean): Integer;
   public
     constructor Create(AOwner: TComponent; const adn: string; const ASession: TLDAPSession); reintroduce;
   end;
@@ -98,13 +98,14 @@ begin
     edFileName.Text := SaveDialog.FileName;
 end;
 
-function TExportDlg.DumpTree(const Filter: string): Integer;
+function TExportDlg.DumpTree(const Filter: string; UnixWrite: Boolean): Integer;
 var
   EntryList: TLdapEntryList;
   ldif: TLDIFFile;
   i: Integer;
 begin
   ldif := TLDIFFile.Create(edFileName.Text, fmWrite);
+  ldif.UnixWrite := UnixWrite;
   try
     EntryList := TLdapEntryList.Create;
     try
@@ -137,7 +138,7 @@ begin
   Notebook.ActivePage := 'Progress';
   Application.ProcessMessages;
   try
-    ResultLabel.Caption := Format('Success: %d Object(s) succesfully exported!', [DumpTree(sANYCLASS)]);
+    ResultLabel.Caption := Format('Success: %d Object(s) succesfully exported!', [DumpTree(sANYCLASS, SaveDialog.FilterIndex = 2)]);
   except
     OKBtn.Caption := '&Retry';
     raise;

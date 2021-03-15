@@ -203,6 +203,7 @@ begin
   finally
     Reg.CloseKey;
     Reg.Free;
+    Dispose(Buffer);
   end;
 end;
 
@@ -279,6 +280,7 @@ begin
   finally
     Reg.CloseKey;
     Reg.Free;
+    Dispose(Buffer);
   end;
 end;
 

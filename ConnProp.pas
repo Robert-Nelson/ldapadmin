@@ -96,6 +96,7 @@ begin
     AccountEntry.Write;
   end;
   Action := caFree;
+  AccountEntry.Free;
 end;
 
 procedure TConnPropDlg.cbSSLClick(Sender: TObject);
