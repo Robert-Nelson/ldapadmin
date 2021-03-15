@@ -1,5 +1,5 @@
   {      LDAPAdmin - Samba.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -118,11 +118,15 @@ type
     pDomainData: PDomainRec;
     fPosixAccount: TPosixAccount;
     fNew: Boolean;
+    fSavePwdLastSet: Variant;
+    fLMPasswords: Boolean;
     procedure SetSid(Value: Integer);
     procedure SetUidNumber(Value: Integer);
     function  GetUidNumber: Integer;
     procedure SetGidNumber(Value: Integer);
     function  GetGidNumber: Integer;
+    procedure SetPwdMustChange(Value: Boolean);
+    function  GetPwdMustChange: Boolean;
     procedure SetDomainRec(pdr: PDomainRec);
     procedure SetFlag(Index: Integer; Value: Boolean);
     function  GetFlag(Index: Integer): Boolean;
@@ -141,8 +145,8 @@ type
     property DomainSID: string read GetDomainSid;
     property Rid: string read GetRid;
     property GroupSID: string index eSambaPrimaryGroupSID read GetString write SetString;
-    property PwdMustChange: Integer index eSambaPwdMustChange read GetInt write SetInt;
-    property PwdCanChange: Integer index eSambaPwdCanChange read GetInt write SetInt;
+    property PwdMustChange: Boolean read GetPwdMustChange write SetPwdMustChange;
+    property PwdCanChange: Boolean index eSambaPwdCanChange read GetBool write SetBool;
     property PwdLastSet: TDateTime index eSambaPwdLastSet read GetFromUnixTime;
     property KickoffTime: TDateTime index eSambaKickoffTime read GetFromUnixTime write SetAsUnixTime;
     property LogonTime: Integer index eSambaLogonTime read GetInt;
@@ -165,6 +169,7 @@ type
     property RequestHomeDir: Boolean Index Ord('H') read GetFlag write SetFlag;
     property NoPasswordExpiration: Boolean Index Ord('X') read GetFlag write SetFlag;
     property Autolocked: Boolean Index Ord('L') read GetFlag write SetFlag;
+    property LMPasswords: Boolean read fLMPasswords write fLMPasswords;
   end;
 
   TSamba3Computer = class(TSamba3Account)
@@ -409,9 +414,34 @@ begin
   mdfour(hash, Passwd, slen);
   SetString(eSambaNTPassword, HashToHex(@Hash, 16));
   { Get Lanman Password }
-  SetString(eSambaLMPassword, HashToHex(PByteArray(e_p16(UpperCase(Password))), 16));
+  if fLMPasswords then
+    SetString(eSambaLMPassword, HashToHex(PByteArray(e_p16(UpperCase(Password))), 16))
+  else
+    Attributes[eSambaLMPassword].Delete;
   { Set changetime attribute }
   SetAsUnixTime(eSambaPwdLastSet, LocalDateTimeToUTC(Now));
+end;
+
+{ There is a change in behaviour Since Samba 3.0.25. To force the user to }
+{ change a password the attribute sambaPwdLastSet must be set to 0 }
+procedure TSamba3Account.SetPwdMustChange(Value: Boolean);
+begin
+  if VarIsEmpty(fSavePwdLastSet) then
+     fSavePwdLastSet := GetInt(eSambaPwdLastSet);
+  if Value then
+    SetInt(eSambaPwdLastSet, 0)
+  else begin
+    if fSavePwdLastSet = 0 then
+      Attributes[eSambaPwdLastSet].Delete
+    else
+      SetInt(eSambaPwdLastSet, fSavePwdLastSet);
+  end;
+  SetBool(eSambaPwdMustChange, Value);
+end;
+
+function  TSamba3Account.GetPwdMustChange: Boolean;
+begin
+  Result := GetBool(eSambaPwdMustChange);
 end;
 
 constructor TSamba3Account.Create(const Entry: TLdapEntry);

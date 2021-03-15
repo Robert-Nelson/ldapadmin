@@ -1,5 +1,5 @@
   {      LDAPAdmin - Prefs.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -33,16 +33,6 @@ type
     TabSheet1: TTabSheet;
     TabSheet2: TTabSheet;
     TabSheet3: TTabSheet;
-    GroupBox1: TGroupBox;
-    Label1: TLabel;
-    Label2: TLabel;
-    edFirstUID: TEdit;
-    edLastUID: TEdit;
-    GroupBox2: TGroupBox;
-    Label3: TLabel;
-    Label4: TLabel;
-    edFirstGID: TEdit;
-    edLastGID: TEdit;
     Panel1: TPanel;
     GroupBox3: TGroupBox;
     Label5: TLabel;
@@ -69,22 +59,37 @@ type
     Label7: TLabel;
     edNetbios: TEdit;
     Label14: TLabel;
-    edGroup: TEdit;
-    SetBtn: TButton;
-    Label15: TLabel;
     cbDomain: TComboBox;
     edDisplayName: TEdit;
     edUsername: TEdit;
     Label16: TLabel;
     Label17: TLabel;
     BtnWizard: TButton;
+    cbxLMPasswords: TCheckBox;
+    TabSheet4: TTabSheet;
+    GroupBox1: TGroupBox;
+    Label1: TLabel;
+    Label2: TLabel;
+    edFirstUID: TEdit;
+    edLastUID: TEdit;
+    GroupBox2: TGroupBox;
+    Label3: TLabel;
+    Label4: TLabel;
+    edFirstGID: TEdit;
+    edLastGID: TEdit;
+    GroupBox7: TGroupBox;
+    Label15: TLabel;
+    edGroup: TEdit;
+    SetBtn: TButton;
     cbxExtendGroups: TCheckBox;
     cbExtendGroups: TComboBox;
+    IDGroup: TRadioGroup;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure SetBtnClick(Sender: TObject);
     procedure PageControl1Change(Sender: TObject);
     procedure BtnWizardClick(Sender: TObject);
     procedure cbxExtendGroupsClick(Sender: TObject);
+    procedure IDGroupClick(Sender: TObject);
   private
     Session: TLDAPSession;
     DomList: TDomainList;
@@ -109,23 +114,28 @@ begin
   Session := lSession;
   with AccountConfig do
   begin
-    edFirstUID.Text     := IntToStr(ReadInteger(rposixFirstUID, FIRST_UID));
-    edLastUID.Text      := IntToStr(ReadInteger(rposixLastUID,  LAST_UID));
-    edFirstGID.Text     := IntToStr(ReadInteger(rposixFirstGID, FIRST_GID));
-    edLastGID.Text      := IntToStr(ReadInteger(rposixLastGID,  LAST_GID));
-    edUserName.Text     := ReadString(rposixUserName, '');
-    edDisplayName.Text  := ReadString(rinetDisplayName, '');
-    edHomeDir.Text      := ReadString(rposixHomeDir, '');
-    edLoginShell.Text   := ReadString(rposixLoginShell, '');
+    try
+      IDGroup.ItemIndex    := ReadInteger(rPosixIDType, POSIX_ID_RANDOM)
+    except end;
+    IDGroup.OnClick        := IDGroupClick;
+    edFirstUID.Text        := IntToStr(ReadInteger(rposixFirstUID, FIRST_UID));
+    edLastUID.Text         := IntToStr(ReadInteger(rposixLastUID,  LAST_UID));
+    edFirstGID.Text        := IntToStr(ReadInteger(rposixFirstGID, FIRST_GID));
+    edLastGID.Text         := IntToStr(ReadInteger(rposixLastGID,  LAST_GID));
+    edUserName.Text        := ReadString(rposixUserName, '');
+    edDisplayName.Text     := ReadString(rinetDisplayName, '');
+    edHomeDir.Text         := ReadString(rposixHomeDir, '');
+    edLoginShell.Text      := ReadString(rposixLoginShell, '');
     if ReadInteger(rposixGroup, NO_GROUP) <> NO_GROUP then
-      edGroup.Text      := Session.GetDN(Format(sGROUPBYGID, [ReadInteger(rposixGroup, NO_GROUP)]));
-    edNetbios.Text      := ReadString(rsambaNetbiosName, '');
-    edHomeShare.Text    := ReadString(rsambaHomeShare, '');
-    cbHomeDrive.ItemIndex := cbHomeDrive.Items.IndexOf(ReadString(rsambaHomeDrive, ''));
-    edScript.Text       := ReadString(rsambaScript, '');
-    edProfilePath.Text  := ReadString(rsambaProfilePath, '');
-    edMailAddress.Text  := ReadString(rpostfixMailAddress, '');
-    edMaildrop.Text     := ReadString(rpostfixMaildrop, '');
+      edGroup.Text         := Session.GetDN(Format(sGROUPBYGID, [ReadInteger(rposixGroup, NO_GROUP)]));
+    edNetbios.Text         := ReadString(rsambaNetbiosName, '');
+    edHomeShare.Text       := ReadString(rsambaHomeShare, '');
+    cbHomeDrive.ItemIndex  := cbHomeDrive.Items.IndexOf(ReadString(rsambaHomeDrive, ''));
+    edScript.Text          := ReadString(rsambaScript, '');
+    edProfilePath.Text     := ReadString(rsambaProfilePath, '');
+    cbxLMPasswords.Checked := ReadBool(rSambaLMPasswords);
+    edMailAddress.Text     := ReadString(rpostfixMailAddress, '');
+    edMaildrop.Text        := ReadString(rpostfixMaildrop, '');
     idx := ReadInteger(rPosixGroupOfUnames, 0) - 1;
     if idx >= 0 then
     begin
@@ -141,6 +151,7 @@ procedure TPrefDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   if ModalResult = mrOK then
   with AccountConfig do begin
+    WriteInteger(rPosixIDType,        IDGroup.ItemIndex);
     WriteInteger(rposixFirstUID,      StrToInt(edFirstUID.Text));
     WriteInteger(rposixLastUID,       StrToInt(edLastUID.Text));
     WriteInteger(rposixFirstGID,      StrToInt(edFirstGID.Text));
@@ -156,6 +167,7 @@ begin
     WriteString (rsambaHomeDrive,     cbHomeDrive.Text);
     WriteString (rsambaScript,        edScript.Text);
     WriteString (rsambaProfilePath,   edProfilePath.Text);
+    WriteBool   (rSambaLMPasswords,   cbxLMPasswords.Checked);
     WriteString (rpostfixMailAddress, edMailAddress.Text);
     WriteString (rpostfixMaildrop,    edMaildrop.Text);
     WriteInteger(rPosixGroupOfUnames, cbExtendGroups.ItemIndex + 1);
@@ -167,7 +179,7 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
     Columns[1].Caption:='Description';
-    Populate(Session, sGROUPS, ['cn', 'description']);
+    Populate(Session, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;
 
@@ -219,6 +231,20 @@ begin
     Color := clBtnFace;
     ItemIndex := -1;
   end;
+end;
+
+procedure TPrefDlg.IDGroupClick(Sender: TObject);
+var
+  Msg: string;
+begin
+  Case IDGroup.ItemIndex of
+    0: Msg := stNoPosixID;
+    2: Msg := stSequentialID;
+  else
+    Msg := '';
+  end;
+  if Msg <> '' then
+    MessageDlg(Msg, mtWarning, [mbOk], 0);
 end;
 
 end.

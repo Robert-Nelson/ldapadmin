@@ -1,5 +1,5 @@
   {      LDAPAdmin - Pickup.pas
-  *      Copyright (C) 2003 - 2007 Tihomir Karlovic
+  *      Copyright (C) 2003 - 2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -24,7 +24,7 @@ unit Pickup;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Misc;
+  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Sorter;
 
 type
   TPopulateColumn = record
@@ -87,7 +87,7 @@ implementation
 
 {$R *.DFM}
 
-uses WinLDAP, Constant, Main;
+uses WinLDAP, Constant, Main, Misc;
 
 ////////////////////////////////////////////////////////////////////////////////
 

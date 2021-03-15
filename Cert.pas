@@ -1,5 +1,5 @@
   {      LDAPAdmin - Cert.pas
-  *      Copyright (C) 2003-2008 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -26,7 +26,14 @@ interface
 uses WinLdap, wcrypt2, Windows;
 
 procedure ShowCert(x509Cert: Pointer; x509CertLen: Cardinal);
+procedure ShowContext(x509Cert: Pointer; x509CertLen: Cardinal; ContextType: DWORD);
 function  VerifyCert(Connection: PLDAP; pServerCert: PCCERT_CONTEXT): BOOLEAN; cdecl ;
+
+const
+  ctxAuto        = 0;
+  ctxCertificate = CERT_STORE_CERTIFICATE_CONTEXT;
+  ctxCRL         = CERT_STORE_CRL_CONTEXT;
+  ctxCTL         = CERT_STORE_CTL_CONTEXT;
 
 { Global variables used by VerifyCert }
 var
@@ -38,37 +45,52 @@ implementation
 uses Controls, sysutils, Dialogs, Misc, Constant,Classes;
 
 type
-  TCryptUIDlgViewCertificate = function (
+  {TCryptUIDlgViewCertificate = function (
                            pViewCertificateInfo: PCCRYPTUI_VIEWCERTIFICATE_STRUCT;
                            pfPropertiesChanged: PBOOL
-                           ): DWORD; stdcall;
+                           ): DWORD; stdcall;}
+
+  TCryptUIDlgViewContext = function (
+                           dwContextType: DWORD;
+                           pvContext: PCCERT_CONTEXT;
+                           hwnd: HWND;
+                           pwszTitle: LPCWSTR;
+                           dwFlags: DWORD;
+                           pvReserved: Pointer): DWORD; stdcall;
+
   TUIDlg = class
   private
     Handle: THandle;
-    CryptUIDlgViewCertificate: TCryptUIDlgViewCertificate;
+    fContextType: DWORD;
+    //CryptUIDlgViewCertificate: TCryptUIDlgViewCertificate;
+    CryptUIDlgViewContext: TCryptUIDlgViewContext;
     pCertContext: PCCERT_CONTEXT;
     Caption: string;
     procedure OnClick(Sender: TObject);
     procedure ShowCert;
   public
     OnClickProc: TNotifyEvent;
-    constructor Create(ApCertContext: PCCERT_CONTEXT; ACaption: string);
+    constructor Create(ApCertContext: PCCERT_CONTEXT; ContextType: DWORD; ACaption: string);
     destructor Destroy; override;
   end;
 
 
-constructor TUIDlg.Create(ApCertContext: PCCERT_CONTEXT; ACaption: string);
+constructor TUIDlg.Create(ApCertContext: PCCERT_CONTEXT; ContextType: DWORD; ACaption: string);
 begin
   Handle := LoadLibrary(CRYPTUI);
   if Handle <> 0 then
   begin
-    {$IFDEF UNICODE}
+    (*{$IFDEF UNICODE}
     @CryptUIDlgViewCertificate := GetProcAddress(Handle, 'CryptUIDlgViewCertificateW');
     {$ELSE}
     @CryptUIDlgViewCertificate :=  GetProcAddress(Handle, 'CryptUIDlgViewCertificateA');
     {$ENDIF}
 
-    if @CryptUIDlgViewCertificate <> nil then
+    if @CryptUIDlgViewCertificate <> nil then*)
+
+    fContextType := ContextType;
+    @CryptUIDlgViewContext :=  GetProcAddress(Handle, 'CryptUIDlgViewContext');
+    if @CryptUIDlgViewContext <> nil then
     begin
       OnClickProc := OnClick;
       Caption := ACaption;
@@ -88,7 +110,7 @@ begin
   ShowCert;
 end;
 
-procedure TUIDlg.ShowCert;
+{procedure TUIDlg.ShowCert;
 var
   pvcStruct: PCCRYPTUI_VIEWCERTIFICATE_STRUCT;
   PropChanged: BOOL;
@@ -105,6 +127,58 @@ begin
   finally
     Dispose(pvcStruct);
   end;
+end;}
+
+procedure TUIDlg.ShowCert;
+begin
+    CryptUIDlgViewContext(fContextType, pCertContext, 0, nil, 0, nil);
+end;
+
+procedure ShowContext(x509Cert: Pointer; x509CertLen: Cardinal; ContextType: DWORD);
+var
+  pCertContext: Pointer;
+  uiDlg: TUIDlg;
+
+  function AutoGetContext: Pointer;
+  begin
+    Result := CertCreateCertificateContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+    if not Assigned(Result) then
+    begin
+      Result := CertCreateCRLContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+      if not Assigned(Result) then
+      begin
+        Result := CertCreateCTLContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+        if Assigned(Result) then
+          ContextType := ctxCTL
+      end
+      else
+        ContextType := ctxCRL;
+    end
+    else
+      ContextType := ctxCertificate;
+  end;
+
+begin
+  { Could use CertCreateContext instead }
+  pCertContext := nil;
+  case ContextType of
+    ctxAuto:        pCertContext := AutoGetContext;
+    ctxCertificate: pCertContext := CertCreateCertificateContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+    ctxCRL:         pCertContext := CertCreateCRLContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+    ctxCTL:         pCertContext := CertCreateCTLContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+  end;
+
+  if Assigned(pCertContext) then
+  try
+    uiDlg := TUIDlg.Create(pCertContext, ContextType, 'Certificate');
+    try
+      uidlg.ShowCert;
+    finally
+      uiDlg.Free;
+    end;
+  finally
+     CertFreeCertificateContext(pCertContext);
+  end;
 end;
 
 procedure ShowCert(x509Cert: Pointer; x509CertLen: Cardinal);
@@ -115,7 +189,7 @@ begin
   pCertContext := CertCreateCertificateContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
   if Assigned(pCertContext) then
   try
-    uiDlg := TUIDlg.Create(pCertContext, 'Certificate');
+    uiDlg := TUIDlg.Create(pCertContext, CERT_STORE_CERTIFICATE_CONTEXT, 'Certificate');
     try
       uidlg.ShowCert;
     finally
@@ -260,7 +334,7 @@ begin
     Result := true
   else
   begin
-    uiDlg := TUIDlg.Create(pSub, 'Certificate');
+    uiDlg := TUIDlg.Create(pSub, CERT_STORE_CERTIFICATE_CONTEXT, 'Certificate');
     if Assigned(UIDlg.OnClickProc) then
       cap := '&View...'
     else

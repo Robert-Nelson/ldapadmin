@@ -1,5 +1,5 @@
   {      LDAPAdmin - Password.pas
-  *      Copyright (C) 2005 Tihomir Karlovic
+  *      Copyright (C) 2005-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,23 +23,23 @@ unit Password;
 
 interface
 
-uses LdapClasses, MessageDigests;
+uses LdapClasses, DECHash;
 
 type
-  THashType = (chCrypt, chMd5Crypt, chMd2, chMd4, chMd5, chSha1, chRipemd);
+  THashType = (chText, chCrypt, chMd5Crypt, chMd2, chMd4, chMd5, chSha1, chSMD5, chSSHA, chSha256, chSha512, chRipemd);
 
 const
-  HashClasses: array [chMd2..chRipemd] of TMessageDigestClass = (
-   TMD2, TMD4, TMD5, TSHA1, TRIPEMD160
+  HashClasses: array [chMd2..chRipemd] of TDECHashClass = (
+   THash_MD2, THash_MD4, THash_MD5, THash_SHA1, THash_MD5, THash_SHA1, THash_SHA256, THash_SHA512, THash_RIPEMD160
   );
-  IdStrings: array [chCrypt..chRipemd] of string = (
-  '{CRYPT}','{CRYPT}','{MD2}','{MD4}','{MD5}','{SHA}','{RMD160}');
+  IdStrings: array [chText..chRipemd] of string = (
+  '','{CRYPT}','{CRYPT}','{MD2}','{MD4}','{MD5}','{SHA}','{SMD5}','{SSHA}','{CRYPT}','{CRYPT}','{RMD160}');
 
 function GetPasswordString(const HashType: THashType; const Password: string): string;
 
 implementation
 
-uses Sysutils, Unixpass, md5crypt, base64;
+uses Sysutils, Unixpass, md5crypt, ShaCrypt, base64;
 
 function GetSalt(Len: Integer): string;
 const
@@ -48,24 +48,10 @@ const
 var
   i: Integer;
 begin
+  Randomize;
   SetLength(Result, Len);
   for i := 1 to Len do
     Result[i] := SaltChars[Random(64)];
-end;
-
-function Digest(const HashType: THashType; const Password: string): string;
-var
-  md: TMessageDigest;
-begin
-  md := HashClasses[HashType].Create;
-  try
-    md.TransformString(Password);
-    md.Complete;
-    SetLength(Result, Base64encSize(md.DigestSize));
-    Base64Encode(md.HashValueBytes^, md.DigestSize, Result[1]);
-  finally
-    md.Free;
-  end;
 end;
 
 function Crypt(const AValue: string): string;
@@ -76,15 +62,54 @@ begin
   Result := StrPas(Buff);
 end;
 
+function Digest(const HashType: THashType; const Password: string): string;
+var
+  md: TDECHash;
+begin
+  md := HashClasses[HashType].Create;
+  try
+    md.Init;
+    md.Calc(Password[1], Length(Password));
+    md.Done;
+    Result := Base64Encode(md.Digest^, md.DigestSize);
+  finally
+    md.Free;
+  end;
+end;
+
+function SaltedDigest(const HashType: THashType; const Password: string): string;
+var
+  Salt, SaltedKey, Hash: string;
+  md: TDECHash;
+begin
+  Salt := GetSalt(12);
+  SaltedKey := Password + Salt;
+  md := HashClasses[HashType].Create;
+  try
+    md.Init;
+    md.Calc(SaltedKey[1], Length(SaltedKey));
+    md.Done;
+    SetString(Hash, PChar(md.Digest), md.DigestSize);
+    Result := Base64Encode(Hash + Salt);
+  finally
+    md.Free;
+  end;
+end;
+
 function GetPasswordString(const HashType: THashType; const Password: string): string;
 var
   passwd: string;
 begin
   case HashType of
+    chText:      passwd := Password;
     chCrypt:     passwd := Crypt(Password);
     chMd5Crypt:  passwd := md5_crypt(PChar(Password), PChar(GetSalt(8)));
+    chSMD5,
+    chSSHA:      passwd := SaltedDigest(HashType, Password);
+    chSha256:    passwd := Sha256(Password);
+    chSha512:    passwd := Sha512(Password);
   else
-    passwd := Digest(HashType, PAssword);
+    passwd := Digest(HashType, Password);
   end;
   Result := IdStrings[HashType] + passwd;
 end;

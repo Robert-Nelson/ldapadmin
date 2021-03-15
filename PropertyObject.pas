@@ -26,7 +26,9 @@ interface
 uses Classes, LdapClasses, SysUtils;
 
 const
-  INT_NULL    = 0; //??? TODO
+  INT_NULL    = 0;
+  BOOL_FALSE  = 2147483647;
+  BOOL_TRUE   = 0;
 
 type
   TProperties = integer;
@@ -43,6 +45,8 @@ type
     procedure RemoveObjectClass(Oc: array of string);
     procedure SetInt(Index: TProperties; Value: Integer);
     function  GetInt(Index: TProperties): Integer;
+    procedure SetBool(Index: TProperties; Value: Boolean);
+    function  GetBool(Index: TProperties): Boolean;
     procedure SetString(Index: TProperties; Value: string);
     function  GetString(Index: TProperties): string;
     function  GetMultiString(VIndex, AIndex: TProperties): string;
@@ -127,6 +131,23 @@ begin
       Result := StrToInt(AsString)
     else
       Result := INT_NULL;
+end;
+
+procedure TPropertyObject.SetBool(Index: TProperties; Value: Boolean);
+begin
+     if Value then
+       SetProperty(Index, IntToStr(BOOL_TRUE))
+     else
+       SetProperty(Index, IntToStr(BOOL_FALSE));
+end;
+
+function  TPropertyObject.GetBool(Index: TProperties): Boolean;
+begin
+  with fEntry.AttributesByName[PCharArray(fPropertyNames)[Index]] do
+    if AsString <> '' then
+      Result := StrToInt(AsString) = BOOL_TRUE
+    else
+      Result := false;
 end;
 
 procedure TPropertyObject.SetString(Index: TProperties; Value: string);

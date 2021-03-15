@@ -1,5 +1,5 @@
   {      LDAPAdmin - Main.pas
-  *      Copyright (C) 2003-2008 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -24,7 +24,7 @@ unit Main;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, Sorter,
   ComCtrls, Menus, ImgList, ToolWin, WinLdap, StdCtrls, ExtCtrls, Posix, Samba,
   LDAPClasses, Clipbrd, ActnList, uSchemaDlg, Config, Tabs, contnrs, uBetaImgLists;
 
@@ -312,6 +312,7 @@ type
   TSessionNode = class
     Account: TAccount;
     Session: TLdapSession;
+    LVSorter: TListViewSorter;
     Selected: string;
     constructor Create;
     destructor Destroy; override;
@@ -324,8 +325,8 @@ var
 implementation
 
 uses EditEntry, Group, User, Computer, PassDlg, ConnList, Transport, Search, Ou,
-     Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs,
-     LdapCopy, Schema, BinView, Misc, Input, ConfigDlg, Templates, TemplateCtrl,
+     Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs, Misc,
+     LdapCopy, Schema, BinView, Input, ConfigDlg, Templates, TemplateCtrl,
      Shellapi, Cert, PicView, About;
 
 {$R *.DFM}
@@ -349,12 +350,14 @@ end;
 
 constructor TSessionNode.Create;
 begin
+  LVSorter := TListViewSorter.Create;
   Session := TLdapSession.Create;
 end;
 
 destructor TSessionNode.Destroy;
 begin
   Session.Free;
+  LVSorter.Free;
   inherited;
 end;
 
@@ -1225,6 +1228,7 @@ begin
   ActCopy.Enabled := Enbl;
   ActCopyValue.Enabled := Enbl;
   ActCopyName.Enabled := Enbl;
+  ActFindInSchema.Enabled := Enbl;
 
   mbViewStyle.Enabled := EntryListView.Visible;
 
@@ -1362,6 +1366,7 @@ begin
       bmSamba3User,
       bmPosixUser:    TUserDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
       bmGroup,
+      bmSambaGroup,
       bmGrOfUnqNames: TGroupDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
       bmMailGroup:    TMailGroupDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
       bmComputer:     TComputerDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
@@ -1588,6 +1593,7 @@ procedure TMainFrm.FormShow(Sender: TObject);
 var
   aproto, auser, apassword, ahost, abase: string;
   aport, i:     integer;
+  auth: TLdapAuthMethod;
   SessionName, StorageName: string;
   AStorage: TConfigStorage;
   FakeAccount: TFakeAccount;
@@ -1601,7 +1607,7 @@ begin
     aport:=LDAP_PORT;
     auser:='';
     apassword:='';
-    ParseURL(ParamStr(1), aproto, auser, apassword, ahost, abase, aport);
+    ParseURL(ParamStr(1), aproto, auser, apassword, ahost, abase, aport, auth);
     FakeAccount := TFakeAccount.Create(nil, 'FAKE');
     with FakeAccount do try
       Server := ahost;
@@ -1610,6 +1616,7 @@ begin
       User := auser;
       Password := apassword;
       SSL := aproto='ldaps';
+      AuthMethod := auth;
       LdapVersion := LDAP_VERSION3;
       ServerConnect(FakeAccount);
     finally
@@ -1781,10 +1788,14 @@ end;
 
 procedure TMainFrm.TabSet1Change(Sender: TObject; NewTab: Integer; var AllowChange: Boolean);
 begin
-  if TabSet1.TabIndex <> -1 then
-    TSessionNode(fLdapSessions[TabSet1.TabIndex]).Selected := PChar(LDAPTree.Selected.Data);
+  if TabSet1.TabIndex <> -1 then with TSessionNode(fLdapSessions[TabSet1.TabIndex]) do
+  begin
+    Selected := PChar(LDAPTree.Selected.Data);
+    LVSorter.ListView := nil;
+  end;
   if NewTab <> -1 then with TSessionNode(fLdapSessions[NewTab]) do
   begin
+    LVSorter.ListView := ValueListView;
     fTreeHistory.Clear;
     if SearchPanel.Visible then
       edSearchExit(nil);
@@ -1844,6 +1855,7 @@ var
 begin
   pbViewCert.Visible := false;
   pbViewPicture.Visible := false;
+  if not Assigned(ValueListView.Selected) then exit;
   s := ValueListView.Selected.SubItems[0];
   if Copy(s, 1, 5) = '30 82' then // DER Sequence
     pbViewCert.Visible := true
@@ -1862,7 +1874,7 @@ begin
     try
       Entry.Read;
       with Entry.AttributesByName[ValueListView.Selected.Caption].Values[Integer(ValueListView.Selected.Data)] do
-        ShowCert(Data, DataSize);
+        ShowContext(Data, DataSize, ctxAuto);
     finally
       Entry.Free;
     end;
@@ -1887,11 +1899,27 @@ end;
 
 procedure TMainFrm.ValueListViewInfoTip(Sender: TObject; Item: TListItem; var InfoTip: String);
 const
-  TimeStamps = 'sambapwdlastset,sambapwdcanchange,sambapwdmustchange';
+  //TimeStamps = 'sambapwdlastset,sambapwdcanchange,sambapwdmustchange';
+  Partials: array[0..8] of string = ('time', 'expires', 'logon', 'logoff', 'last', 'created', 'modify', 'modified', 'change');
 var
   n: Int64;
   c: Integer;
   s, Value: string;
+  ST: SystemTime;
+
+  function PartialMatch(const m: string): Boolean;
+  var
+    i: Integer;
+  begin
+    Result := false;
+    for i := 0 to High(Partials) do
+      if Pos(Partials[i], m) > 0 then
+      begin
+        Result := true;
+        Break;
+      end;
+  end;
+
 begin
   InfoTip := '';
   try
@@ -1902,12 +1930,17 @@ begin
       Exit;
     end;
     s := lowercase(Item.Caption);
-    if (Pos(s, TimeStamps) > 0) or // Timestamp
-       (Pos('time', s) > 0) then   // Possibly timestamp
+    if //(Pos(s, TimeStamps) > 0) or // Timestamp
+       PartialMatch(s) then        // Possibly timestamp
     begin
       Val(Value, n, c);
       if c = 0 then
+      try
         InfoTip := DateTimeToStr(UnixTimeToDateTime(n));
+      except
+        FileTimeToSystemTime(Filetime(n), ST);
+        InfoTip := DateTimeToStr(SystemTimeToDateTime(ST));
+      end;
     end
     else
     if s = 'shadowexpire' then

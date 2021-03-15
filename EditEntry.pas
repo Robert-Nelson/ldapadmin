@@ -1,5 +1,5 @@
   {      LDAPAdmin - EditEntry.pas
-  *      Copyright (C) 2003-2006 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, WinLDAP, Grids, ToolWin, LDAPClasses, Constant,
-  Menus, ImgList, ActnList, IControls, Schema, Templates, TemplateCtrl;
+  Menus, ImgList, ActnList, IControls, Schema, Templates, TemplateCtrl, Sorter;
 
 const
   NAMING_VALUE_TAG = -1;
@@ -160,6 +160,8 @@ type
     fTemplatesInited: Boolean;
     fTemplateScrollBox: TTemplateBox;
     fSchema: TLdapSchema;
+    fValueSorter: TStringGridSorter;
+    fOcSorter: TStringGridSorter;
     procedure DataChange(Sender: TLdapAttributeData);
     procedure PushShortCut(Command: TAction);
     procedure HandleTabExit(InplaceAttribute: TInplaceAttribute);
@@ -487,6 +489,12 @@ begin
   StatusBar.Panels[0].Text := Format(cServer, [ASession.Server]);
   StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(StatusBar.Panels[0].Text) + 16;
   StatusBar.Panels[1].Text := Format(cPath, [adn]);
+  fValueSorter := TStringGridSorter.Create;
+  fValueSorter.StringGrid := attrStringGrid;
+  fValueSorter.FixedBottomRows := 1;
+  fOcSorter := TStringGridSorter.Create;
+  fOcSorter.StringGrid := objStringGrid;
+  fOcSorter.FixedBottomRows := 1;
 end;
 
 procedure TEditEntryFrm.SessionDisconnect(Sender: TObject);
@@ -906,6 +914,8 @@ procedure TEditEntryFrm.FormDestroy(Sender: TObject);
 var
   i: Integer;
 begin
+  fValueSorter.Free;
+  fOcSorter.Free;
   ObjectCombo.Free;
   AttributeCombo.Free;
   Entry.Free;

@@ -43,7 +43,7 @@ OutputDir=
 UnitOutputDir=
 PackageDLLOutputDir=
 PackageDCPOutputDir=
-SearchPath=
+SearchPath=.\declib
 Packages=Vcl50;Vclx50;VclSmp50;Vcldb50;vclado50;ibevnt50;Vclbde50;vcldbx50;Qrpt50;TeeUI50;TeeDB50;Tee50;Dss50;TeeQR50;VCLIB50;Vclmid50;vclie50;Inetdb50;Inet50;NMFast50;webmid50;dclocx50;dclaxserver50
 Conditionals=
 DebugSourceDirs=
@@ -59,7 +59,7 @@ RootDir=
 IncludeVerInfo=1
 AutoIncBuild=0
 MajorVer=1
-MinorVer=1
+MinorVer=2
 Release=0
 Build=0
 Debug=0
@@ -72,7 +72,7 @@ CodePage=1252
 [Version Info Keys]
 CompanyName=
 FileDescription=
-FileVersion=1.1.0.0
+FileVersion=1.2.0.0
 InternalName=
 LegalCopyright=
 LegalTrademarks=
@@ -80,3 +80,9 @@ OriginalFilename=
 ProductName=
 ProductVersion=0.9.8
 Comments=
+[HistoryLists\hlUnitAliases]
+Count=1
+Item0=WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;
+[HistoryLists\hlSearchPath]
+Count=1
+Item0=.\declib

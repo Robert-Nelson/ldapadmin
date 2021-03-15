@@ -240,11 +240,11 @@ object AboutDlg: TAboutDlg
       Top = 112
       Width = 144
       Height = 13
-      Caption = '(c) 2003-2008 Tihomir Karlovic'
+      Caption = '(c) 2003-2011 Tihomir Karlovic'
     end
   end
   object BtnClose: TButton
-    Left = 80
+    Left = 76
     Top = 216
     Width = 113
     Height = 25

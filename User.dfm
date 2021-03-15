@@ -893,6 +893,21 @@ object UserDlg: TUserDlg
         Enabled = False
         TabOrder = 0
       end
+      object cbxGroups: TComboBox
+        Left = 200
+        Top = 336
+        Width = 169
+        Height = 21
+        Style = csDropDownList
+        ItemHeight = 13
+        TabOrder = 5
+        OnChange = cbxGroupsChange
+        Items.Strings = (
+          'All groups'
+          'Posix groups'
+          'Samba groups'
+          'Mail groups')
+      end
     end
   end
   object Panel1: TPanel

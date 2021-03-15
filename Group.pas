@@ -328,15 +328,23 @@ begin
 end;
 
 procedure TGroupDlg.Save;
+var
+  idType: Integer;
 begin
-  if edName.Text = '' then 
+  if edName.Text = '' then
     raise Exception.Create(stGroupNameReq);
   if cbSambaGroup.Checked and Assigned(DomList) and (cbSambaDomain.ItemIndex = -1) then
     raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
   if Assigned(PosixGroup) and (esNew in Entry.State) then
   begin
-    PosixGroup.GidNumber := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, START_GID), AccountConfig.ReadInteger(rposixLastGID, LAST_GID));
-    edRidChange(nil);  // Update sambaSid
+    idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+    if idType <> POSIX_ID_NONE then
+    begin
+      PosixGroup.GidNumber := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, FIRST_GID),
+                                                       AccountConfig.ReadInteger(rposixLastGID, LAST_GID),
+                                                       IdType = POSIX_ID_SEQUENTIAL);
+      edRidChange(nil);  // Update sambaSid
+    end;
   end;
   Entry.Write;
 end;

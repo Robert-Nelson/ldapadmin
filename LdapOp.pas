@@ -306,7 +306,7 @@ begin
     SourceSession.DeleteEntry(dn);
     if rdn <> '' then // base entry renamed, adjust posix group references
       with SourceSession do
-      ModifySet(Format(sMY_POSIX_GROUP,[GetNameFromDn(dn)]), Base, LDAP_SCOPE_SUBTREE,
+      ModifySet(Format(sMY_POSIX_GROUPS,[GetNameFromDn(dn)]), Base, LDAP_SCOPE_SUBTREE,
                 ['memberUid'],
                 [GetNameFromDn(dn)],
                 [GetNameFromDn(rdn)], LdapOpReplace);

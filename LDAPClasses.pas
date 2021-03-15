@@ -1,5 +1,5 @@
   {      LDAPAdmin - LDAPClasses.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -41,15 +41,15 @@ const
   AUTH_GSS              = $01;
   AUTH_GSS_SASL         = $03;
 
-  StandardOperationalAttributes                          = 'createTimestamp,' +
-                                                           'modifyTimestamp,' +
-                                                           'creatorsName,' +
-                                                           'modifiersName,' +
-                                                           'subschemaSubentry,' +
-                                                           'structuralObjectClass,' +
-                                                           'hasSubordinates,' +
-                                                           'entryCSN,' +
-                                                           'entryUUID';
+  StandardOperationalAttributes = 'createTimestamp,' +
+                                  'modifyTimestamp,' +
+                                  'creatorsName,' +
+                                  'modifiersName,' +
+                                  'subschemaSubentry,' +
+                                  'structuralObjectClass,' +
+                                  'hasSubordinates,' +
+                                  'entryCSN,' +
+                                  'entryUUID';
 
 type
   ErrLDAP = class(Exception);
@@ -192,6 +192,9 @@ type
     function  ISConnected: Boolean;
     procedure ProcessSearchEntry(const plmEntry: PLDAPMessage; Attributes: TLdapAttributeList);
     procedure ProcessSearchMessage(const plmSearch: PLDAPMessage; const NoValues: LongBool; Result: TLdapEntryList);
+  published
+    function GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+    function GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
   public
     constructor Create;
     destructor Destroy; override;
@@ -216,9 +219,8 @@ type
     property Connected: Boolean read IsConnected write SetConnect;
     function Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
     function GetDn(sFilter: string): string;
-    function GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
-    function GetFreeUidNumber(const MinUid, MaxUID: Integer): Integer;
-    function GetFreeGidNumber(const MinGid, MaxGID: Integer): Integer;
+    function GetFreeUidNumber(const MinUid, MaxUID: Integer; const Sequential: Boolean): Integer;
+    function GetFreeGidNumber(const MinGid, MaxGID: Integer; const Sequential: Boolean): Integer;
     procedure Search(const Filter, Base: string; const Scope: Cardinal; QueryAttrs: array of string; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload;
     procedure Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload;
     procedure ModifySet(const Filter, Base: string;
@@ -743,7 +745,7 @@ begin
 end;
 
 { Get random free uidNumber from the pool of available numbers, return -1 if
-  no more free numbers available }
+  no more free numbers are available }
 function TLDAPSession.GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
 var
   i: Integer;
@@ -768,16 +770,63 @@ begin
   Result := -1;
 end;
 
-function TLDAPSession.GetFreeUidNumber(const MinUid, MaxUID: Integer): Integer;
+{ Get sequential free uidNumber from the pool of available numbers, return -1 if
+  no more free numbers are available }
+function TLDAPSession.GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+var
+  plmSearch, plmEntry: PLDAPMessage;
+  attrs: PCharArray;
+  ppcVals: PPCHAR;
+  n: Integer;
 begin
-  Result := GetFreeNumber(MinUid, MaxUid, 'posixAccount', 'uidNumber');
+    Result := Min;
+    SetLength(attrs, 2);
+    attrs[0] := PChar(id);
+    attrs[1] := nil;
+    // perform search
+    LdapCheck(ldap_search_s(pld, PChar(Base), LDAP_SCOPE_SUBTREE, PChar(Format('(objectclass=%s)', [Objectclass])), PChar(attrs), 0, plmSearch));
+    try
+      plmEntry := ldap_first_entry(pld, plmSearch);
+      while Assigned(plmEntry) do
+      begin
+        ppcVals := ldap_get_values(pld, plmEntry, attrs[0]);
+        try
+          if Assigned(ppcVals) then
+          begin
+            n := StrToInt(pchararray(ppcVals)[0]);
+            if (n <= Max) and (n >= Result) then
+              Result :=  n + 1;
+          end;
+        finally
+          LDAPCheck(ldap_value_free(ppcVals), false);
+        end;
+        plmEntry := ldap_next_entry(pld, plmEntry);
+      end;
+    finally
+      // free search results
+      LDAPCheck(ldap_msgfree(plmSearch), false);
+    end;
+
+    if Result > Max then
+      Result := -1;
+end;
+
+function TLDAPSession.GetFreeUidNumber(const MinUid, MaxUID: Integer; const Sequential: Boolean): Integer;
+begin
+  if Sequential then
+    Result := GetSequentialNumber(MinUid, MaxUid, 'posixAccount', 'uidNumber')
+  else
+    Result := GetFreeNumber(MinUid, MaxUid, 'posixAccount', 'uidNumber');
   if Result = -1 then
     raise Exception.Create(Format(stNoMoreNums, ['uidNumber']));
 end;
 
-function TLDAPSession.GetFreeGidNumber(const MinGid, MaxGid: Integer): Integer;
+function TLDAPSession.GetFreeGidNumber(const MinGid, MaxGid: Integer; const Sequential: Boolean): Integer;
 begin
-  Result := GetFreeNumber(MinGid, MaxGid, 'posixGroup', 'gidNumber');
+  if Sequential then
+    Result := GetSequentialNumber(MinGid, MaxGid, 'posixGroup', 'gidNumber')
+  else
+    Result := GetFreeNumber(MinGid, MaxGid, 'posixGroup', 'gidNumber');
   if Result = -1 then
     raise Exception.Create(Format(stNoMoreNums, ['gidNumber']));
 end;
@@ -1178,24 +1227,24 @@ begin
   inherited Create;
 end;
 
-{ Same as Result := (DataSize <> ADataSize) or not (Assigned(fBerval.Bv_Val) and CompareMem(AData, Data, ADataSize)); }
+{ Same as Result := (DataSize <> Length) or not (Assigned(fBerval.Bv_Val) and CompareMem(P, Data, Length)); }
 function TLDapAttributeData.CompareData(P: Pointer; Length: Integer): Boolean; assembler;
 asm
         PUSH    ESI
-        PUSH    EDI
         MOV     ESI,P
         MOV     EDX,EAX
         XOR     EAX,EAX
-        MOV     EDI,[edx + fBerval.Bv_Val]
         CMP     ECX,[edx + fBerval.Bv_Len]
-        JNE     @@2
+        JNE     @@3
+        PUSH    EDI
+        MOV     EDI,[edx + fBerval.Bv_Val]
         CMP     ESI,EDI
         JE      @@1
         REPE    CMPSB
         JNE     @@2
 @@1:    INC     EAX
 @@2:    POP     EDI
-        POP     ESI
+@@3:    POP     ESI
 end;
 
 procedure TLDapAttributeData.SetData(AData: Pointer; ADataSize: Cardinal);

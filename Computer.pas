@@ -64,10 +64,11 @@ var
 begin
   inherited Create(AOwner);
   Entry := TLdapEntry.Create(ASession, adn);
+  Account := TSamba3Computer.Create(Entry);
   if AMode = EM_MODIFY then
   begin
     Entry.Read;
-    Account := TSamba3Computer.Create(Entry);
+    //Account := TSamba3Computer.Create(Entry);
     with Account do
     begin
       if DomainName <> '' then
@@ -100,21 +101,25 @@ end;
 
 procedure TComputerDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 var
-  uidnr: Integer;
+  //uidnr: Integer;
+  idType: Integer;
 begin
   if ModalResult = mrOk then
   begin
     if esNew in Entry.State then
     begin
-      // Acquire next available uidNumber
-      uidnr := Entry.Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID), AccountConfig.ReadInteger(rposixLastUID, LAST_UID));
-      Account := TSamba3Computer.Create(Entry);
+      //Account := TSamba3Computer.Create(Entry);
       with Account do
       begin
         New;
         ComputerName := edComputername.Text;
         DomainData := DomList.Items[cbDomain.ItemIndex];
-        UidNumber := uidnr;
+        // Acquire next available uidNumber
+        idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+        if idType <> POSIX_ID_NONE then
+          UidNumber := Entry.Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
+                                                      AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
+                                                      IdType = POSIX_ID_SEQUENTIAL);
         GidNumber := COMPUTER_GROUP;
         Entry.dn := 'uid=' + ComputerName + ',' + Entry.dn;
       end;
@@ -128,6 +133,7 @@ end;
 procedure TComputerDlg.FormDestroy(Sender: TObject);
 begin
   Entry.Free;
+  Account.Free;
 end;
 
 end.

@@ -1375,7 +1375,10 @@ begin
       else
       if Content = 'sub' then
         fScope := LDAP_SCOPE_SUBTREE
-    end;
+    end
+    else
+    if Name = 'sorted' then
+      TComboBox(fControl).Sorted := true;
 end;
 
 procedure TTemplateCtrlComboLookupList.SetLdapAttribute(Attribute: TLdapAttribute);
@@ -1405,19 +1408,14 @@ begin
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     try
       if fDisplayAttribute <> '' then
-        cap := Attributes[0].AsString
+        cap := AttributesByName[fDisplayAttribute].AsString
       else
         cap := dn;
       if CompareText(fValueAttribute, fDisplayAttribute) = 0 then
         val := cap
       else
         if fValueAttribute <> '' then
-        begin
-          if fDisplayAttribute <> '' then
-            val := Attributes[1].AsString
-          else
-            val := Attributes[0].AsString;
-        end
+          val := AttributesByName[fValueAttribute].AsString
         else
           val := dn;
       TComboBox(fControl).Items.AddObject(cap, Pointer(StrNew(PChar(val))));
@@ -2455,7 +2453,7 @@ begin
         fFilter := Content
       else
       if t = 'groups' then
-        fFilter := sGroups
+        fFilter := sPosixGroups
       else
       if t = 'users' then
         fFilter := sUsers
@@ -2818,12 +2816,11 @@ function TTemplate.Matches(ObjectClass: TLdapAttribute): Boolean;
 var
   i: Integer;
 begin
+  Result := false;
+  if ObjectclassCount = 0 then Exit;
   for i := 0 to ObjectclassCount - 1 do
     if ObjectClass.IndexOf(Objectclasses[i]) = -1 then
-    begin
-      Result := false;
       Exit;
-    end;
   Result := true;
 end;
 

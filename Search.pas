@@ -1,5 +1,5 @@
   {      LDAPAdmin - Search.pas
-  *      Copyright (C) 2003-2008 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  ComCtrls, StdCtrls, LDAPClasses, Menus, ExtCtrls, Misc, WinLdap, ToolWin,
+  ComCtrls, StdCtrls, LDAPClasses, Menus, ExtCtrls, Sorter, WinLdap, ToolWin,
   ImgList, ActnList, Buttons, Schema, Contnrs;
 
 const
@@ -219,7 +219,7 @@ var
 
 implementation
 
-uses EditEntry, Constant, Main, Ldif, PickAttr, Xml, Config, Dsml, Params;
+uses EditEntry, Constant, Main, Ldif, PickAttr, Xml, Config, Dsml, Params, Misc;
 
 {$R *.DFM}
 
@@ -715,6 +715,7 @@ end;
 
 procedure TResultTabSheet.ListViewSort(SortColumn: TListColumn; SortAsc: boolean);
 begin
+  if not Assigned(SearchList) then exit;
   with SearchList do
   if SortColumn.Tag<0 then Entries.Sort([PSEUDOATTR_DN], SortAsc)
   else Entries.Sort([Attributes[SortColumn.Tag]], SortAsc);

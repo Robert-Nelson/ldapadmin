@@ -3,73 +3,76 @@ unit Constant;
 interface
 
 const
-  bmRoot           =  0;
-  bmRootSel        =  1;
-  bmEntry          =  2;
-  bmEntrySel       =  3;
-  bmPosixUser      =  4;
-  bmPosixUserSel   =  4;
-  bmSamba3User     =  5;
-  bmSamba3UserSel  =  5;
-  bmGroup          =  6;
-  bmGroupSel       =  6;
-  bmComputer       =  7;
-  bmComputerSel    =  7;
-  bmMailGroup      =  9;
-  bmMailGroupSel   =  9;
-  bmOu             = 13;
-  bmOuSel          = 13;
-  bmTransport      = 15;
-  bmTransportSel   = 15;
-  bmSamba2User     = 19;
-  bmSamba2UserSel  = 19;
-  bmSudoer         = 21;
-  bmSudoerSel      = 21;
-  bmHost           = 22;
-  bmHostSel        = 22;
-  bmNetwork        = 23;
-  bmNetworkSel     = 23;
-  bmLocality       = 24;
-  bmLocalitySel    = 24;
-  bmSambaDomain    = 25;
-  bmSambaDomainSel = 25;
-  bmIdPool         = 26;
-  bmIdPoolSel      = 26;
-  bmSchema         = 27;
-  bmSchemaSel      = 27;
-  bmLocked         = 28;
-  bmLockedSel      = 28;
-  bmUnlocked       = 29;
-  bmUnlockedSel    = 29;
-  bmGrOfUnqNames   = 35;
-  bmGrOfUnqNamesSel= 35;
+  bmRoot               =  0;
+  bmRootSel            =  1;
+  bmEntry              =  2;
+  bmEntrySel           =  3;
+  bmPosixUser          =  4;
+  bmPosixUserSel       =  4;
+  bmSamba3User         =  5;
+  bmSamba3UserSel      =  5;
+  bmGroup              =  6;
+  bmGroupSel           =  6;
+  bmComputer           =  7;
+  bmComputerSel        =  7;
+  bmMailGroup          =  9;
+  bmMailGroupSel       =  9;
+  bmOu                 = 13;
+  bmOuSel              = 13;
+  bmTransport          = 15;
+  bmTransportSel       = 15;
+  bmSamba2User         = 19;
+  bmSamba2UserSel      = 19;
+  bmSudoer             = 21;
+  bmSudoerSel          = 21;
+  bmHost               = 22;
+  bmHostSel            = 22;
+  bmNetwork            = 23;
+  bmNetworkSel         = 23;
+  bmLocality           = 24;
+  bmLocalitySel        = 24;
+  bmSambaDomain        = 25;
+  bmSambaDomainSel     = 25;
+  bmIdPool             = 26;
+  bmIdPoolSel          = 26;
+  bmSchema             = 27;
+  bmSchemaSel          = 27;
+  bmLocked             = 28;
+  bmLockedSel          = 28;
+  bmUnlocked           = 29;
+  bmUnlockedSel        = 29;
+  bmGrOfUnqNames       = 35;
+  bmGrOfUnqNamesSel    = 35;
+  bmSambaGroup         = 39;
 
-  ncDummyNode      = -1;
+  ncDummyNode          = -1;
 
 // Registry strings
 
-  REG_KEY = 'Software\LdapAdmin\';
-  REG_ACCOUNT = 'Accounts';
-  REG_CONFIG = 'Config';
+  REG_KEY              = 'Software\LdapAdmin\';
+  REG_ACCOUNT          = 'Accounts';
+  REG_CONFIG           = 'Config';
 
 // System
 
-  SAMBA_VERSION2    = 2;
-  SAMBA_VERSION3    = 3;
-  FIRST_UID         = 1000;
-  LAST_UID          = 65534;
-  FIRST_GID         = 1000;
-  LAST_GID          = 65534;
+  SAMBA_VERSION2       = 2;
+  SAMBA_VERSION3       = 3;
 
-  START_UID         = 1000;
-  START_GID         = 1000;
-  NO_GROUP          = 65534;
-  COMPUTER_GROUP    = NO_GROUP;
+  POSIX_ID_NONE        = 0;
+  POSIX_ID_RANDOM      = 1;
+  POSIX_ID_SEQUENTIAL  = 2;
+  FIRST_UID            = 1000;
+  LAST_UID             = 65534;
+  FIRST_GID            = 1000;
+  LAST_GID             = 65534;
 
-  COMBO_HISTORY     = 10;
+  NO_GROUP             = 65534;
+  COMPUTER_GROUP       = NO_GROUP;
+
+  COMBO_HISTORY        = 10;
 
 type
-  TEditMode = (EM_ADD, EM_MODIFY);
+  TEditMode            = (EM_ADD, EM_MODIFY);
 
 const
 
@@ -94,6 +97,8 @@ const
   rQuickSearchFilter  = 'QuickSearchFilter';
   rSmartDelete        = 'SmartDelete';
   rEditorSchemaHelp   = 'General\EdSchemaHelp';
+  rLastMemberOf       = 'General\LastMemberOf';
+  rPosixIDType        = 'Posix\IdType';
   rPosixFirstUID      = 'Posix\FirstUID';
   rPosixLastUID       = 'Posix\LastUID';
   rPosixFirstGID      = 'Posix\FirstGID';
@@ -104,12 +109,14 @@ const
   rPosixLoginShell    = 'Posix\LoginShell';
   rPosixGroup         = 'Posix\Group';
   rPosixGroupOfUnames = 'Posix\PosixGroupOfUniqueNames';
+  rPosixPwdHashType   = 'Posix\PwdHashType';
   rSambaNetbiosName   = 'Samba\NetbiosName';
   rSambaDomainName    = 'Samba\DomainName';
   rSambaHomeShare     = 'Samba\HomeShare';
   rSambaHomeDrive     = 'Samba\HomeDrive';
   rSambaScript        = 'Samba\Script';
   rSambaProfilePath   = 'Samba\ProfilePath';
+  rSambaLMPasswords   = 'Samba\LMPasswords';
   rPostfixMailAddress = 'Postfix\MailAddress';
   rPostfixMaildrop    = 'Postfix\Maildrop';
   rSearchBase         = 'Search\Base';
@@ -127,21 +134,29 @@ const
   sSAMBAACCNT       = '(objectclass=sambaAccount)';
   sPOSIXACCNT       = '(objectclass=posixAccount)';
   sMAILACCNT        = '(objectclass=mailUser)';
-  sGROUPS           = '(objectclass=posixGroup)';
+  sPOSIXGROUPS      = '(objectclass=posixGroup)';
   sCOMPUTERS        = '(&'+sPOSIXACCNT+'(uid=*$))';
   sUSERS            = '(&'+sPOSIXACCNT+'(!(uid=*$)))';
   sMAILGROUPS       = '(objectclass=mailGroup)';
   {sMY_GROUP         = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
                         '(&(objectclass=groupOfNames)(member=%1:s))' +
                         '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';}
-  sMY_GROUP         = '(&(objectclass=posixGroup)(|(memberUid=%s)(member=%s)(uniqueMember=%1:s)))';
-  sMY_POSIX_GROUP   = '(&(objectclass=posixGroup)(memberUid=%s))';
-  sMY_MAILGROUP     = '(&(objectclass=mailGroup)(member=%s))';
+  sMY_AUTHGROUPS    = '(&(objectclass=posixGroup)(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s)))';
+  sMY_POSIX_GROUPS  = '(&(objectclass=posixGroup)(memberUid=%s))';
+  sMY_SAMBAGROUPS   = '(&(objectclass=sambaGroupMapping)(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s)))';
+  sMY_MAILGROUPS    = '(&(objectclass=mailGroup)(member=%s))';
   sMY_GROUPS        = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
-                        '(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%1:s))' +
-                        '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';
+                      '(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%1:s))' +
+                      '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';
   sMY_DN_GROUPS     = '(|(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%0:s))' +
-                        '(&(objectclass=groupOfUniqueNames)(uniqueMember=%0:s)))';
+                      '(&(objectclass=groupOfUniqueNames)(uniqueMember=%0:s)))';
+  sNMY_AUTHGROUPS   = '(&(objectclass=posixGroup)(!(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s))))';
+  sNMY_POSIX_GROUPS = '(&(objectclass=posixGroup)(!memberUid=%s))';
+  sNMY_SAMBAGROUPS  = '(&(objectclass=sambaGroupMapping)(!(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s))))';
+  sNMY_MAILGROUPS   = '(&(objectclass=mailGroup)(!member=%s))';
+  sNMY_GROUPS       = '(|(&(objectclass=posixGroup)(!memberUid=%s))'  +
+                      '(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(!member=%1:s))' +
+                      '(&(objectclass=groupOfUniqueNames)(!uniqueMember=%1:s)))';
   sGROUPBYGID       = '(&(objectclass=posixGroup)(gidNumber=%d))';
   sACCNTBYUID       = '(&(objectclass=posixAccount)(uid=%s))';
   sDEFQUICKSRCH     = '(|(cn=*%s*)(uid=*%s*)(displayName=*%s*))';
@@ -220,7 +235,7 @@ const
   stConfirmDelAccnt = 'Delete account "%s"?';
   stConfirmMultiDel = 'Delete %d entries?';
   stRegAccntErr     = 'Could not read account data!';
-  stNoMoreNums      = 'No more available numbers for %s!';
+  stNoMoreNums      = 'Pool depleted! No more available free id''s for %s!';
   stUnclosedStr     = 'Unclosed string!';
   stObjnRetrvd      = 'Object not yet retrieved!';
   stSmbDomainReq    = 'You have to select samba domain to which this group should be mapped!';
@@ -276,6 +291,12 @@ const
   stInvalidFilter   = 'Invalid or unsupported filter type!';
   stRegexFailed     = 'Regexp validation failed!';
   stInvalidTimeFmt  = 'Invalid time format!';
+  stUnsupportedAuth = 'Unsupported authentication method: %s!';
+  stInvalidURL      = 'Invalid URL format!';
+  stNeedElevated    = 'On Vista or higher, LDAPAdmin must be executed with elevated privileges for this operation to succesfully complete!';
+  stSaslSSL         = 'SASL encryption can not be used over an SSL connection!';
+  stNoPosixID       = 'You should disable id creation only if you use a server side id assignment! Otherwise, you will not be able to create any users or groups.';
+  stSequentialID    = 'Activating this option could cause a significant network traffic with large user databases. Unless you REALLY need sequential id''s, leave the default option (random) on!';
 
 implementation
 

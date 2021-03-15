@@ -1,5 +1,5 @@
   {      LDAPAdmin - base64.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -94,7 +94,7 @@ function  Base64EncSize(InSize: Cardinal): Cardinal;
 function  Base64DecSize(InSize: Cardinal): Cardinal; overload;
 procedure Base64Encode(const InBuf; const Length: Cardinal; var OutBuf); overload;
 function  Base64Decode(const InBuf; const Length: Cardinal; var OutBuf): Cardinal; overload;
-
+function  Base64Encode(const InStr: string): string; overload;
 function  Base64Encode(const InBuf; const Length: Cardinal): string; overload;
 function  Base64DecSize(InBuf: string): Cardinal; overload;
 function  Base64Decode(const InBuf: string; var OutBuf): integer; overload;
@@ -214,12 +214,21 @@ end;
 ////////////////////////////////////////////////////////////////////////////////
 function Base64Encode(const InBuf; const Length: Cardinal): string;
 begin
-  setlength(result, Base64encSize(Length));
-  if Length=0 then exit;
-  Base64Encode(InBuf, Length, result[1]);
+  SetLength(result, Base64encSize(Length));
+  if Length=0 then Exit;
+  Base64Encode(InBuf, Length, Result[1]);
 end;
 
-////////////////////////////////////////////////////////////////////////////////
+function Base64Encode(const InStr: string): string;
+var
+  Len: Integer;
+begin
+  Len := Length(InStr);
+  SetLength(Result, Base64encSize(Len));
+  if Len=0 then Exit;
+  Base64Encode(InStr[1], Len, Result[1]);
+end;
+
 function Base64decSize(InBuf: string): Cardinal; overload;
 var
   i: integer;
@@ -234,8 +243,13 @@ begin
   end;
 end;
 
+function Base64Decode(const InBuf: string; var OutBuf): Integer;
+begin
+  Result := Base64Decode(InBuf[1], Base64DecSize(InBuf), Outbuf);
+end;
+
 ////////////////////////////////////////////////////////////////////////////////
-function Base64Decode(const InBuf: string; var OutBuf): integer; overload;
+{function Base64Decode(const InBuf: string; var OutBuf): integer; overload;
 var
   i, n: integer;
   p: PbyteArray;
@@ -289,6 +303,6 @@ begin
 
     inc(i, 4);
   end;
-end;
+end;}
 
 end.

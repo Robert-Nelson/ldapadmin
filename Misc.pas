@@ -1,5 +1,5 @@
   {      LDAPAdmin - Misc.pas
-  *      Copyright (C) 2003-2006 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -23,36 +23,10 @@ unit Misc;
 
 interface
 
-uses LdapClasses, Classes, ComCtrls, Windows, Graphics, Forms, Dialogs, Controls;
+uses LdapClasses, Classes, Windows, Forms, Dialogs, Controls;
 
 type
   TStreamProcedure = procedure(Stream: TStream) of object;
-
-  TLVSorterOnSort=procedure(SortColumn:  TListColumn; SortAsc: boolean) of object;
-
-  TListViewSorter=class
-  private
-    FListView:      TListView;
-    FSortColumn:    TListColumn;
-    FSortAsc:       boolean;
-    FBmp:           TBitmap;
-    FOnColumnClick: TLVColumnClickEvent;
-    FOnCustomDraw:  TLVCustomDrawEvent;
-    FOnSort:        TLVSorterOnSort;
-    procedure       SetSortMark; overload;
-    procedure       SetSortMark(Column: TListColumn); overload;
-    procedure       SetListView(const Value: TListView);
-    procedure       DoCustomDraw(Sender: TCustomListView; const ARect: TRect; var DefaultDraw: Boolean);
-    procedure       DoColumnClick(Sender: TObject; Column: TListColumn);
-    procedure       DoCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
-  public
-    constructor     Create; reintroduce;
-    destructor      Destroy; override;
-    property        ListView: TListView read FListView write SetListView;
-    property        SortColumn:  TListColumn read FSortColumn;
-    property        SortAsc: boolean read FSortAsc;
-    property        OnSort: TLVSorterOnSort read FOnSort write FOnSort;
-  end;
 
 { String conversion routines }
 function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
@@ -60,14 +34,14 @@ function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
 { Time conversion routines }
 function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
 function  UnixTimeToDateTime(const AValue: Int64): TDateTime;
-function  GTZToDateTime(AValue: string): TDateTime;
+function  GTZToDateTime(const Value: string): TDateTime;
 function  LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
 { String handling routines }
 procedure Split(Source: string; Result: TStrings; Separator: Char);
 function  FormatMemoInput(const Text: string): string;
 function  FormatMemoOutput(const Text: string): string;
 { URL handling routines }
-procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer);
+procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
 { Some handy dialogs }
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
@@ -88,7 +62,7 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses SysUtils, CommCtrl, StdCtrls, Messages, Constant {$IFDEF VARIANTS} ,variants {$ENDIF};
+uses SysUtils, StdCtrls, Messages, Constant {$IFDEF VARIANTS} ,variants {$ENDIF};
 
 { String conversion routines }
 
@@ -134,11 +108,13 @@ begin
   Result := AValue / 86400 + 25569.0;
 end;
 
-function GTZToDateTime(AValue: string): TDateTime;
+function GTZToDateTime(const Value: string): TDateTime;
+var
+  AValue: string;
 begin
-  if (Length(AValue) < 15) or (Uppercase(AValue[Length(AValue)]) <> 'Z') then
+  if (Length(Value) < 15) or (Uppercase(Value[Length(Value)]) <> 'Z') then
         raise EConvertError.Create(stInvalidTimeFmt);
-  AValue[15] := ' ';
+  AValue := Copy(Value, 1, 14); // not interested in ms
   Insert(':', AValue, 13);
   Insert(':', AValue, 11);
   Insert(' ', AValue, 9);
@@ -168,7 +144,7 @@ end;
 
 { URL handling routines }
 
-procedure  ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer);
+procedure ParseLAURL(const URL: string; var proto, user, password, host, path: string; var port: integer);
 var
   n1, n2: integer;
   AUrl: string;
@@ -201,7 +177,7 @@ begin
   end
   else begin
     host:=copy(AURL,1,n1-1);
-    if proto='ldaps' then
+    if (proto='ldaps') or (proto='ldapsg') then
       port := 636;
   end;
 
@@ -210,6 +186,122 @@ begin
   path:=AURL;
 end;
 
+procedure ParseRFCURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
+var
+  n1, n2: integer;
+  AUrl: string;
+  p: PChar;
+  Extensions: TStringList;
+
+  //{$DEFINE UTF8}
+  function UnpackString(const Src: string): string;
+  var
+    p, p1: PChar;
+  {$IFDEF UTF8}
+    rg: string;
+  {$ENDIF}
+  begin
+    Result := '';
+    p := PChar(Src);
+    while p^ <> #0 do begin
+      p1 := CharNext(p);
+      if (p^ = '%') then
+      begin
+        p := CharNext(p);
+        p1 := CharNext(p);
+        p1 := CharNext(p1);
+  {$IFDEF UTF8}
+        SetString(rg, p, p1 - p);
+        Result := Result + Char(StrToInt('$' + rg));
+      end
+      else
+        Result := Result + p^;
+  {$ELSE}
+        HexToBin(p, p, p1-p);
+      end;
+      Result := Result + p^;
+  {$ENDIF}
+      p := p1;
+    end;
+  end;
+
+  procedure ParseExtensions(const ExtStr: string);
+  var
+    val: string;
+  begin
+    if ExtStr = '' then Exit;
+    try
+      Extensions := TStringList.Create;
+      with Extensions do begin
+        CommaText := ExtStr;
+        user := UnpackString(Values['bindname']);
+        password := UnpackString(Values['password']);
+        val := Values['auth'];
+        if (val='') or (val='simple') then
+          auth := AUTH_SIMPLE
+        else
+        if val = 'gss' then
+          auth := AUTH_GSS
+        else
+        if val = 'sasl' then
+        begin
+          if proto = 'ldaps' then
+            raise Exception.Create(stSaslSSL);
+          auth := AUTH_GSS_SASL;
+        end
+        else
+          raise Exception.Create(Format(stUnsupportedAuth, [val]));
+      end;
+    finally
+      Extensions.Free;
+    end;
+  end;
+
+begin
+  //URL format <proto>://[host[:port]]/<dn>?[bindname=[username]][,password=[password]][,auth=[plain|gss|sasl]]
+
+  AUrl:=Url;
+  n1:=pos('://',AURL);
+  if n1>0 then begin
+    proto:=copy(AURL,1,n1-1);
+    Delete(AURL,1,n1+2);
+  end;
+
+  n1:=pos('/',AURL);
+  if n1=0 then
+    raise Exception.Create(stInvalidURL);
+  n2:=pos(':',copy(AURL,1,n1-1));
+  if n2>0 then begin
+    host:=copy(AURL,1,n2-1);
+    port:=StrToIntDef(copy(AURL,n2+1,n1-n2-1),-1);
+  end
+  else begin
+    if n1=1 then
+      host := 'localhost'
+    else
+      host:=copy(AURL,1,n1-1);
+    if proto='ldaps' then
+      port := 636;
+  end;
+  Delete(AURL,1,n1);
+  n1:=pos('?',AURL);
+  if n1=0 then
+    path:=UnpackString(AURL)
+  else begin
+    path := UnpackString(Copy(AURL,1,n1-1));
+    p := StrRScan(@AURL[n1], '?');
+    p := CharNext(p);
+    ParseExtensions(p);
+  end;
+end;
+
+procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
+begin
+  if Pos('@',URL) > 0 then // old LdapAdmin style
+    ParseLAURL(URL, proto, user, password, host, path, port)
+  else
+    ParseRFCURL(URL, proto, user, password, host, path, port, auth);
+end;
 
 function HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 var
@@ -363,6 +455,11 @@ begin
         ImageIndex := bmSamba3User;
       Container := false;
     end
+    else if s = 'sambagroupmapping' then
+    begin
+      ImageIndex := bmSambaGroup;
+      Container := false;
+    end
     else if s = 'mailgroup' then
     begin
       ImageIndex := bmMailGroup;
@@ -370,8 +467,11 @@ begin
     end
     else if s = 'posixgroup' then
     begin
-      ImageIndex := bmGroup;
-      Container := false;
+      if ImageIndex = bmEntry then // if not yet assigned to Samba group
+      begin
+        ImageIndex := bmGroup;
+        Container := false;
+      end;
     end
     else if s = 'groupofuniquenames' then
     begin
@@ -403,7 +503,7 @@ begin
     else if s = 'sambaunixidpool' then
     begin
       ImageIndex := bmIdPool;
-      Container := false;
+      //Container := false;
     end;
     Dec(j);
   end;
@@ -416,6 +516,8 @@ begin
     bmSamba3User,
     bmPosixUser,
     bmGroup,
+    bmSambaGroup,
+    bmGrOfUnqNames,
     bmMailGroup,
     bmComputer,
     bmTransport,
@@ -425,122 +527,6 @@ begin
   else
     Result := false;
   end;
-end;
-
-{ TListViewSorter }
-
-constructor TListViewSorter.Create;
-begin
-  inherited Create;
-  FSortColumn:=nil;
-  FSortAsc:=true;
-  FBmp:=TBitmap.Create;
-  FBmp.Width:=9;
-  FBmp.Height:=5;
-end;
-
-destructor TListViewSorter.Destroy;
-begin
-  ListView:=nil;
-  FBmp.Free;
-  inherited;
-end;
-
-procedure TListViewSorter.DoColumnClick(Sender: TObject; Column: TListColumn);
-begin
-  if FSortColumn=Column then FSortAsc:=not FSortAsc
-  else FSortAsc:=true;
-
-  FSortColumn:=Column;
-  SetSortMark;
-  if assigned(FOnSort) then FOnSort(FSortColumn, FSortAsc)
-  else FListView.AlphaSort;
-  if assigned(FOnColumnClick) then FOnColumnClick(Sender, Column);
-end;
-
-procedure TListViewSorter.DoCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
-begin
-  Compare:=0;
-  if FSortColumn=nil then exit;
-  case FSortColumn.Index of
-    0: Compare:=AnsiCompareStr(Item1.Caption,Item2.Caption);
-    else begin
-          if FSortColumn.Index>Item1.SubItems.Count then exit;
-          if FSortColumn.Index>Item2.SubItems.Count then exit;
-          Compare:=AnsiCompareStr(
-            Item1.SubItems[FSortColumn.Index-1],
-            Item2.SubItems[FSortColumn.Index-1]);
-         end;
-  end;
-  if not FSortAsc then Compare:=-Compare;
-end;
-
-procedure TListViewSorter.DoCustomDraw(Sender: TCustomListView; const ARect: TRect; var DefaultDraw: Boolean);
-begin
-  SetSortMark;
-  if assigned(FOnCustomDraw) then FOnCustomDraw(Sender,Arect, DefaultDraw);
-end;
-
-procedure TListViewSorter.SetListView(const Value: TListView);
-begin
-  if FListView<>nil then begin
-    FListView.OnColumnClick:=FOnColumnClick;
-    FListView.OnCustomDraw:=FOnCustomDraw;
-  end;
-
-  FListView := Value;
-
-  if FListView=nil then exit;
-  FOnColumnClick:=FListView.OnColumnClick;
-  FOnCustomDraw:=FListView.OnCustomDraw;
-  FListView.OnColumnClick:=DoColumnClick;
-  FListView.OnCustomDraw:=DoCustomDraw;
-  if not assigned(FListView.OnCompare) then FListView.OnCompare:=DoCompare;
-end;
-
-procedure TListViewSorter.SetSortMark;
-var
-  i: integer;
-begin
-  if FListView=nil then exit;
-  for i:=0 to FListView.Columns.Count-1 do
-    SetSortMark(FlistView.Columns[i]);
-end;
-
-procedure TListViewSorter.SetSortMark(Column: TListColumn);
-var
- Align,hHeader: integer;
- HD: HD_ITEM;
-begin
-  if FListView=nil then exit;
-  hHeader := SendMessage(FListView.Handle, LVM_GETHEADER, 0, 0);
-  with HD do
-  begin
-    case Column.Alignment of
-      taLeftJustify:  Align := HDF_LEFT;
-      taCenter:       Align := HDF_CENTER;
-      taRightJustify: Align := HDF_RIGHT;
-    else
-      Align := HDF_LEFT;
-    end;
-    mask := HDI_BITMAP or HDI_FORMAT;
-
-    if Column=FSortColumn then begin
-      with FBmp.Canvas do begin
-        Brush.Color:=clBtnFace;
-        FillRect(rect(0,0,Fbmp.Width,FBmp.Height));
-        Brush.Color:=clBtnShadow;
-        Pen.Color:=Brush.Color;
-        if FSortAsc then Polygon([point(0,4),point(4,0), point(8,4)])
-        else Polygon([point(0,0),point(4,4), point(8,0)]);
-      end;
-      hbm:=FBmp.Handle;
-      fmt := HDF_STRING or HDF_BITMAP or HDF_BITMAP_ON_RIGHT;
-    end
-    else fmt := HDF_STRING or Align;
-
-  end;
-  SendMessage(hHeader, HDM_SETITEM, Column.Index, Integer(@HD));
 end;
 
 function CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;

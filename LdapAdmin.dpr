@@ -61,13 +61,14 @@ uses
   Gss in 'Gss.pas',
   uBetaImgLists in 'uBetaImgLists.pas',
   Params in 'Params.pas',
-  PicView in 'PicView.pas' {ViewPicFrm};
+  PicView in 'PicView.pas' {ViewPicFrm},
+  Sorter in 'Sorter.pas',
+  ShaCrypt in 'ShaCrypt.pas';
 
 {$R *.RES}
 
 begin
   Application.Initialize;
   Application.CreateForm(TMainFrm, MainFrm);
-  Application.CreateForm(TViewPicFrm, ViewPicFrm);
   Application.Run;
 end.

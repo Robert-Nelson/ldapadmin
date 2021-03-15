@@ -96,8 +96,8 @@ type
     function      GetServer: string; virtual;
     function      GetUser: string; virtual;
     function      GetSSL: boolean; virtual;
-    procedure     SetAuthMethod(const Value: TLdapAuthMethod);
-    function      GetAuthMethod: TLdapAuthMethod;
+    procedure     SetAuthMethod(const Value: TLdapAuthMethod); virtual;
+    function      GetAuthMethod: TLdapAuthMethod; virtual;
     function      GetTimeLimit: Integer;
     procedure     SetTimeLimit(const Value: Integer);
     function      GetSizeLimit: Integer;
@@ -147,6 +147,7 @@ type
     FUser:        string;
     FSSL:         boolean;
     FLdapVersion: integer;
+    FAuthMethod:  TLdapAuthMethod;
   protected
     procedure     SetBase(const Value: string); override;
     procedure     SetPort(const Value: integer); override;
@@ -154,6 +155,8 @@ type
     procedure     SetUser(const Value: string); override;
     procedure     SetSSL(const Value: boolean); override;
     procedure     SetLdapVersion(const Value: integer); override;
+    procedure     SetAuthMethod(const Value: TLdapAuthMethod); override;
+    function      GetAuthMethod: TLdapAuthMethod; override;
     function      GetBase: string; override;
     function      GetLdapVersion: integer; override;
     function      GetPort: integer; override;
@@ -229,8 +232,9 @@ type
     FRootPath:    string;
     function      GetKeyName(Ident: string): string;
     function      GetValName(Ident: string): string;
+    {Removed 25.05.2011 T.Karlovic
     procedure     CompatImportAccount(Account: TAccount);
-    procedure     CompatExportAccount(Account: TAccount);
+    procedure     CompatExportAccount(Account: TAccount);}
   protected
     function      GetName: string; override;
     procedure     Copy(Parent, SrcName, DestName: string); override;
@@ -317,7 +321,7 @@ const
 
 
   LAC_ROOTNAME    = 'LDAPAccounts';
-  LAC_NOTLAC      = 'The file "%s" is not a Ldap Admin accounts file';
+  LAC_NOTLAC      = 'The file "%s" is not an Ldap Admin accounts file';
 
 procedure SetAccount(Account: TAccount);
 procedure RegProtocol(Ext: string);
@@ -345,7 +349,8 @@ begin
   try
     Reg.RootKey := HKEY_CLASSES_ROOT;
     Reg.OpenKey('\'+Ext+'\Shell\Open\Command',True);
-    result:=(Reg.ReadString('')<> ParamStr(0)+' %1');
+    //result:=(Reg.ReadString('')<> ParamStr(0)+' %1');
+    result:=(ExtractFileName(Reg.ReadString(''))<> ExtractFileName(ParamStr(0))+' %1');
     Reg.CloseKey;
   finally
     Reg.Free;
@@ -376,8 +381,13 @@ begin
     Reg.OpenKey(ext+'\DefaultIcon',True);
     Reg.WriteString('',ParamStr(0)+',1');
     Reg.CloseKey;
-  finally
     Reg.Free;
+  except
+    Reg.Free;
+    if Win32MajorVersion > 5 then
+      raise Exception.Create(stNeedElevated)
+    else
+      raise;
   end;
 end;
 
@@ -534,8 +544,9 @@ begin
 
     NoCheckCbx:=TCheckBox.Create(Form);
     NoCheckCbx.Parent:=Form;
-    NoCheckCbx.Caption:='Do not perform this check in future.';
-    NoCheckCbx.Width:=200;
+    NoCheckCbx.Caption:='Do not perform this check in the future.';
+    //NoCheckCbx.Width:=200;
+    NoCheckCbx.Width:=NoCheckCbx.Parent.Width - NoCheckCbx.Left;
 
     for i:=0 to Form.ComponentCount-1 do begin
       if Form.Components[i] is TLabel then begin
@@ -990,10 +1001,11 @@ end;
 { TRegistryConfigStorage }
 
 constructor TRegistryConfigStorage.Create(const RootKey: HKEY; const ARootPath: string);
+{Removed 25.05.2011 T.Karlovic
 var
   i: integer;
   Idents: TStrings;
-  Account: TAccount;
+  Account: TAccount;}
 begin
   inherited Create;
   FrootPath:=Norm(ArootPath);
@@ -1003,6 +1015,7 @@ begin
 
   LoadAccounts;
   // Import compat accounts ////////////////////////////////////////////////////
+  { Removed 25.05.2011 T.Karlovic
   Idents:=TStringList.Create;
   GetValueNames(ACCOUNTS_PREFIX, Idents);
   for i:=0 to Idents.Count-1 do begin
@@ -1010,22 +1023,25 @@ begin
     if Account=nil then Account:=AddAccount(Idents[i]);
     CompatImportAccount(Account);
   end;
-  Idents.Free;
+  Idents.Free;}
   //////////////////////////////////////////////////////////////////////////////
 end;
 
 destructor TRegistryConfigStorage.Destroy;
+{Removed 25.05.2011 T.Karlovic
 var
-  i: integer;
+  i: integer;}
 begin
   // Export compat accounts ////////////////////////////////////////////////////
+  { Removed 25.05.2011 T.Karlovic
   for i:=0 to AccountsCount-1 do
-    CompatExportAccount(Accounts[i]);
+    CompatExportAccount(Accounts[i]);}
   //////////////////////////////////////////////////////////////////////////////
   FRegistry.Free;
   inherited;
 end;
 
+{Removed 25.05.2011 T.Karlovic
 procedure TRegistryConfigStorage.CompatImportAccount(Account: TAccount);
 var
   Buffer: PByteArray;
@@ -1147,7 +1163,7 @@ begin
    WrInteger(0);
 
    Account.WriteBinaryData('', Buffer[0], length(Buffer));
-end;
+end;}
 
 function TRegistryConfigStorage.GetKeyName(Ident: string): string;
 begin
@@ -1193,17 +1209,21 @@ end;
 
 procedure TRegistryConfigStorage.SetAccountName(Parent, OldName, NewName: string);
 begin
+  // Compat - TODO - Remove later
   FRegistry.OpenKey(FrootPath+Norm(Parent), false);
   FRegistry.RenameValue(OldName, NewName);
   FRegistry.CloseKey;
+  // Compat ends
   FRegistry.MoveKey(FrootPath+Norm(Parent)+Norm(OldName), FrootPath+Norm(Parent)+Norm(NewName), true);
 end;
 
 procedure TRegistryConfigStorage.Delete(Ident: string);
 begin
+  // Compat - TODO - Remove later
   FRegistry.OpenKey(FrootPath+GetKeyName(Ident), false);
   FRegistry.DeleteValue(GetValName(Ident));
   FRegistry.CloseKey;
+  // Compat ends
   FRegistry.DeleteKey(FRootPath+Norm(Ident));
 end;
 
@@ -1585,6 +1605,16 @@ end;
 procedure TFakeAccount.SetLdapVersion(const Value: integer);
 begin
   FLdapVersion:=Value;
+end;
+
+procedure TFakeAccount.SetAuthMethod(const Value: TLdapAuthMethod);
+begin
+  FAuthMethod := Value;
+end;
+
+function  TFakeAccount.GetAuthMethod: TLdapAuthMethod;
+begin
+  REsult := FAuthMethod;
 end;
 
 function TFakeAccount.GetPort: integer;

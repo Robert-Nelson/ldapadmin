@@ -1,5 +1,5 @@
   {      LDAPAdmin - Passdlg.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,8 +23,8 @@ unit PassDlg;
 
 interface
 
-uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-     Buttons, LdapClasses, Password, Samba, ExtCtrls;
+uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls, Buttons,
+     LdapClasses, Password, Samba, ExtCtrls;
 
 const
   sUserPassword = 'userPassword';
@@ -47,6 +47,7 @@ type
     fEntry: TLdapEntry;
     fSamba: TSamba3Account;
     fPasswordAttribute: string;
+    fDefaultHashType: Integer;
   public
     constructor Create(AOwner: TComponent; Entry: TLdapEntry; const AttributeName: string = sUserPassword); reintroduce;
   end;
@@ -58,13 +59,16 @@ implementation
 
 {$R *.DFM}
 
-uses Constant;
+uses Config, Constant;
 
 constructor TPasswordDlg.Create(AOwner: TComponent; Entry: TLdapEntry; const AttributeName: string = sUserPassword);
 begin
   inherited Create(AOwner);
   fPasswordAttribute := AttributeName;
-  cbMethod.ItemIndex := 5;
+  fDefaultHashType := AccountConfig.ReadInteger(rPosixPwdHashType, Integer(chSha1));
+  if (fDefaultHashType < 0) or (fDefaultHashType >= cbMethod.Items.Count) then
+    fDefaultHashType := Integer(chSha1);
+  cbMethod.ItemIndex := fDefaultHashType;
   fEntry := Entry;
   if (AnsiCompareText(AttributeName, sUserPassword) = 0) and
      (Entry.AttributesByName['objectclass'].IndexOf('sambasamaccount') <> -1) then
@@ -86,6 +90,8 @@ begin
     begin
       fSamba := TSamba3Account.Create(fEntry);
       try
+        if AccountConfig.ReadBool(rSambaLMPasswords) then
+          fSamba.LMPasswords := true;
         fSamba.SetUserPassword(Password.Text);
       finally
         fSamba.Free;
@@ -93,6 +99,8 @@ begin
     end;
     if cbPosixPassword.Checked then
       fEntry.AttributesByName[fPasswordAttribute].AsString := GetPasswordString(THashType(cbMethod.ItemIndex), Password.Text);
+    if fDefaultHashType <> cbMethod.ItemIndex then
+      AccountConfig.WriteInteger(rPosixPwdHashType, cbMethod.ItemIndex);
   end;
 end;
 

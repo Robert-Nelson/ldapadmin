@@ -1,5 +1,5 @@
   {      LDAPAdmin - User.pas
-  *      Copyright (C) 2003-2006 Tihomir Karlovic
+  *      Copyright (C) 2003-2011 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -149,6 +149,7 @@ type
     CheckListBox: TCheckListBox;
     Bevel1: TBevel;
     title: TEdit;
+    cbxGroups: TComboBox;
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure AddMailBtnClick(Sender: TObject);
     procedure EditMailBtnClick(Sender: TObject);
@@ -187,6 +188,7 @@ type
     procedure PageControlResize(Sender: TObject);
     procedure PageControlChanging(Sender: TObject;
       var AllowChange: Boolean);
+    procedure cbxGroupsChange(Sender: TObject);
   private
     ParentDn: string;
     Entry: TLdapEntry;
@@ -218,6 +220,7 @@ type
     procedure SetShadowTime;
     procedure GetShadowTime;
     procedure CheckSchema;
+    function GetGroupQuery(const Invert: Boolean = false): string;
     procedure PopulateGroupList;
     procedure MailButtons(Enable: Boolean);
     procedure CopyGroups;
@@ -470,12 +473,11 @@ begin
      else
        DomainData := DomList.Items[i];
      try
-       cbPwdCantChange.Checked := PwdCanChange = 2147483647;
+       cbPwdCantChange.Checked := PwdCanChange
      except end; // not critical
      try
-       cbPwdMustChange.Checked := PwdMustChange = 0;
+       cbPwdMustChange.Checked := PwdMustChange;
      except end; // not critical
-     //cbAccntDisabled.Checked := Disabled;
      SetCheckbox(cbAccntDisabled, Disabled or Autolocked);
    end;
 end;
@@ -591,6 +593,7 @@ procedure TUserDlg.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 var
   uidnr: Integer;
   newdn: string;
+  idType: Integer;
 begin
   if ModalResult = mrOk then
   begin
@@ -602,11 +605,17 @@ begin
         PosixAccount.Cn := InetOrgPerson.DisplayName
       else
         PosixAccount.Cn := PosixAccount.Uid;
-      uidnr := Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID), AccountConfig.ReadInteger(rposixLastUID, LAST_UID));
-      if cbSamba.Checked then
-        SambaAccount.UidNumber := uidnr
-      else
-        PosixAccount.UidNumber := uidnr;
+      idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+      if idType <> POSIX_ID_NONE then
+      begin
+        uidnr := Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
+                                          AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
+                                          IdType = POSIX_ID_SEQUENTIAL);
+        if cbSamba.Checked then
+          SambaAccount.UidNumber := uidnr
+        else
+          PosixAccount.UidNumber := uidnr;
+      end;
     end
     else
     if uid.Modified then
@@ -623,6 +632,7 @@ begin
     if GroupList.Tag = 1 then
       SaveGroups;
   end;
+  AccountConfig.WriteInteger(rLastMemberOf, cbxGroups.ItemIndex);
 end;
 
 procedure TUserDlg.MailButtons(Enable: Boolean);
@@ -711,6 +721,8 @@ begin
         end;
     end;
   end;
+  GroupList.SmallImages := MainFrm.ImageList;
+  cbxGroups.ItemIndex := AccountConfig.ReadInteger(rLastMemberOf, 0);
   originalPanelWindowProc := ImagePanel.WindowProc;
   ImagePanel.WindowProc := PanelWindowProc;
   DragAcceptFiles(ImagePanel.Handle,true) ;
@@ -720,7 +732,10 @@ procedure TUserDlg.AddMailBtnClick(Sender: TObject);
 var
   s: string;
 begin
-  s := '';
+  if (uid.Text <> '') and (AccountConfig.ReadString(rpostfixMailAddress) <> '') then
+    s := FormatString(AccountConfig.ReadString(rpostfixMailAddress))
+  else
+    s := '';
   if InputDlg(cAddAddress, cSmtpAddress, s) then
   begin
     mail.Items.Add(s);
@@ -759,6 +774,25 @@ begin
   end;
 end;
 
+function TUserDlg.GetGroupQuery(const Invert: Boolean = false): string;
+var
+  ix: Integer;
+begin
+  ix := cbxGroups.ItemIndex;
+  if Invert then ix := ix + 100;
+  case ix of
+      1: Result := Format(sMY_AUTHGROUPS, [uid.Text, ParentDn]);
+      2: Result := Format(sMY_SAMBAGROUPS, [uid.Text, ParentDn]);
+      3: Result := Format(sMY_MAILGROUPS, [uid.Text]);
+    100: Result := Format(sNMY_GROUPS, [uid.Text, ParentDn]);
+    101: Result := Format(sNMY_AUTHGROUPS, [uid.Text, ParentDn]);
+    102: Result := Format(sNMY_SAMBAGROUPS, [uid.Text, ParentDn]);
+    103: Result := Format(sNMY_MAILGROUPS, [uid.Text]);
+  else
+    Result := Format(sMY_GROUPS, [uid.Text, ParentDn]);
+  end;
+end;
+
 { Note: Item.Caption = cn, Item.Data = dn, Subitem[0] = description }
 
 procedure TUserDlg.PopulateGroupList;
@@ -766,22 +800,30 @@ var
   i: Integer;
   EntryList: TLdapEntryList;
   ListItem: TListItem;
+  c: Boolean;
+  ImageIndex: Integer;
 begin
 
   EntryList := TLdapEntryList.Create;
   try
-    Session.Search(Format(sMY_GROUP,[uid.Text, ParentDn]), Session.Base, LDAP_SCOPE_SUBTREE,
-                   ['cn', 'description'], false, EntryList);
+    GroupList.Items.BeginUpdate;
+    GroupList.Items.Clear;
+    Session.Search(GetGroupQuery, Session.Base, LDAP_SCOPE_SUBTREE,
+                   ['cn', 'description', 'objectclass'], false, EntryList);
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
       ListItem := GroupList.Items.Add;
-      ListItem.Caption := Attributes[0].AsString;
+      ListItem.Caption := AttributesByName['cn'].AsString;
       ListItem.Data := StrNew(PChar(Dn));
       if Attributes.Count > 1 then
-        ListItem.SubItems.Add(Attributes[1].AsString);
+        ListItem.SubItems.Add(AttributesByName['description'].AsString);
+      ClassifyLdapEntry(EntryList[i], c, ImageIndex);
+      ListItem.ImageIndex := ImageIndex;
     end;
+    GroupList.AlphaSort;
   finally
     EntryList.Free;
+    GroupList.Items.EndUpdate;
   end;
 
   if GroupList.Items.Count > 0 then
@@ -798,7 +840,6 @@ begin
       if uid.Text <> '' then
       begin
         PopulateGroupList;
-        GroupList.AlphaSort;
         GroupSheet.Tag := 1;
       end;
     end;
@@ -913,14 +954,13 @@ end;
 procedure TUserDlg.AddGroupBtnClick(Sender: TObject);
 var
   GroupItem: TListItem;
-  i: integer;
+  i, idx: integer;
+  b: Boolean;
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
     Columns[1].Caption:='Description';
-    Populate(Session, sGROUPS, ['cn', 'description']);
-    {Images:=MainFrm.ImageList;
-    ImageIndex:=bmGroup;}
+    Populate(Session, GetGroupQuery(true), ['cn', 'description']);
 
     if ShowModal=MrOK then begin
       CopyGroups;
@@ -931,6 +971,8 @@ begin
         GroupItem.Data := StrNew(pchar(Selected[i].DN));
         GroupItem.Caption := selected[i].AttributesByName['cn'].AsString;
         GroupItem.SubItems.Add(selected[i].AttributesByName['description'].AsString);
+        ClassifyLdapEntry(selected[i], b, idx);
+        GroupItem.ImageIndex := idx;
         HandleGroupModify(PChar(selected[i].dn), GRP_ADD);
       end;
       GroupList.Tag := 1;
@@ -1032,7 +1074,7 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
     Columns[1].Caption:='Description';
-    Populate(Session, sGROUPS, ['cn', 'description']);
+    Populate(Session, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;
 
@@ -1161,24 +1203,16 @@ end;
 
 procedure TUserDlg.cbPwdMustChangeClick(Sender: TObject);
 begin
+  SambaAccount.PwdMustChange := cbPwdMustChange.Checked;
   if cbPwdMustChange.Checked then
-  begin
-    SambaAccount.PwdMustChange := 0;
     cbPwdCantChange.Checked := false;
-  end
-  else
-    SambaAccount.PwdMustChange := 2147483647;
 end;
 
 procedure TUserDlg.cbPwdCantChangeClick(Sender: TObject);
 begin
+  SambaAccount.PwdCanChange := not cbPwdCantChange.Checked;
   if cbPwdCantChange.Checked then
-  begin
     cbPwdMustChange.Checked := false;
-    SambaAccount.PwdCanChange := 2147483647;
-  end
-  else
-    SambaAccount.PwdCanChange := 0;
 end;
 
 procedure TUserDlg.RadioGroup1Click(Sender: TObject);
@@ -1228,7 +1262,6 @@ end;
 
 procedure TUserDlg.sambaHomeDriveChange(Sender: TObject);
 begin
-  //TODO -> combo change?//
   SambaAccount.HomeDrive := sambaHomeDrive.Text;
 end;
 
@@ -1255,7 +1288,6 @@ begin
     end;
     Disabled := false;
   end;
-  //SambaAccount.Disabled := cbAccntDisabled.Checked;
 end;
 
 procedure TUserDlg.DateTimePickerChange(Sender: TObject);
@@ -1424,6 +1456,11 @@ begin
     SambaPreset;
     MailPreset;
   end;
+end;
+
+procedure TUserDlg.cbxGroupsChange(Sender: TObject);
+begin
+  PopulateGroupList;
 end;
 
 end.

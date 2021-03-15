@@ -28,7 +28,7 @@ function md5_crypt(pw, salt: PChar): string;
 
 implementation
 
-uses MessageDigests, Sysutils;
+uses DECHash, Sysutils;
 
 const
  itoa64: array[0..63] of Char =		{ 0 ... 63 => ascii - 64 }
@@ -79,18 +79,20 @@ var
 	final: array[0..15] of Byte;
 	pl,i: Integer;
 	l: Cardinal;
-        md1, md2: TMessageDigest;
+        md1, md2: THash_MD5;
         s1, s2: string;
 begin
 
-	md1 := TMD5.Create;
-        md2 := TMD5.Create;
+	md1 := THash_MD5.Create;
+        md2 := THash_MD5.Create;
 
         s1 := pw + magic + salt;
         s2 := '' + pw + salt + pw;
-        md2.TransformString(s2);
-	md2.Complete;
-        Move(md2.HashValueBytes^, final, md2.DigestSize);
+        md2.Init;
+        md2.Calc(s2[1], Length(s2));
+        md2.Done;
+
+        Move(md2.Digest^, final, md2.DigestSize);
         pl := strlen(pw);
         while pl > 0 do
         begin
@@ -115,9 +117,11 @@ begin
                 i := i shr 1;
         end;
 
-        md1.TransformString(s1);
-	md1.Complete;
-        Move(md1.HashValueBytes^, final, md1.DigestSize);
+        md1.Init;
+        md1.Calc(s1[1], Length(s1));
+        md1.Done;
+
+        Move(md1.Digest^, final, md1.DigestSize);
 
        	{/*
 	 * and now, just to make sure things don't run too fast
@@ -127,7 +131,7 @@ begin
 	for i:=0 to 999 do
         begin
                 s2 := '';
-		md2.Clear;
+                md2.Init;
 		if i and 1 <> 0 then
                         s2 := s2 + pw
 		else
@@ -143,9 +147,9 @@ begin
                         Concat(s2, @final, 16)
 		else
                         s2 := s2 + pw;
-                md2.TransformString(s2);
-                md2.Complete;
-                Move(md2.HashValueBytes^, final, md2.DigestSize);
+                md2.Calc(s2[1], Length(s2));
+                md2.Done;
+                Move(md2.Digest^, final, md2.DigestSize);
 	end;
 
         p := passwd;
