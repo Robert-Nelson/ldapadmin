@@ -177,6 +177,7 @@ type
   public
     constructor Create(const AOwner: TComponent; const adn: string;
                        const ASession: TLDAPSession; const Mode: TEditMode); reintroduce; overload;
+    procedure   SessionDisconnect(Sender: TObject);
   end;
 
 var
@@ -477,6 +478,12 @@ begin
   end;
   FButtonWidth := GetSystemMetrics(SM_CXVSCROLL);
   edDn.Width := Panel2.Width - edDn.Left - FButtonWidth - 4;
+  ASession.OnDisconnect.Add(SessionDisconnect);
+end;
+
+procedure TEditEntryFrm.SessionDisconnect(Sender: TObject);
+begin
+  Close;
 end;
 
 procedure TEditEntryFrm.RefreshAttributeList(const Autodelete: Boolean);
@@ -817,7 +824,7 @@ begin
     raise Exception.Create(stNoRdn);
   end;
   if Assigned(ActiveControl.Parent) then
-    TInplaceAttribute(ActiveControl).Parent.SetFocus; // Force OnExit for TInplacexx and TTemplatexx controls
+    TInplaceAttribute(ActiveControl).Parent.Parent.SetFocus; // Force OnExit for TInplacexx and TTemplatexx controls
   if esNew in Entry.State then
     Entry.Dn := cbRdn.Text + ',' + edDn.Text;
   Entry.Write;
@@ -1140,6 +1147,7 @@ begin
     MainFrm.ActRefreshExecute(nil);
   Action := caFree;
   AccountConfig.WriteBool(rEditorSchemaHelp, SchemaCheckBtn.Down);
+  Entry.Session.OnDisconnect.Delete(SessionDisconnect);
 end;
 
 procedure TEditEntryFrm.PageControl1Change(Sender: TObject);

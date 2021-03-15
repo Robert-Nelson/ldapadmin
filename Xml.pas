@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Schema.pas
+  {      LDAPAdmin - Xml.pas
   *      Copyright (C) 2005 Alexander Sokoloff
   *
   *      Author: Alexander Sokoloff
@@ -17,6 +17,9 @@
   * You should have received a copy of the GNU General Public License
   * along with this program; if not, write to the Free Software
   * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+
+    @Version 2006/03/18  v1.0.0. Initial revision.
+    @Version 2006/09/13  v1.1.0. Added TXmlNode.CoptTo function
   }
 
 unit Xml;
@@ -49,7 +52,8 @@ type
     property    Name: string read FName write FName;
     property    Parent: TXmlNode read FParent write SetParent;
     property    Content: string read FContent write FContent;
-    function    Add(const Name: string=''; const Content: string=''): TXmlNode;
+    function    Add(const AName: string=''; const AContent: string=''; const AAttributes: TstringList=nil): TXmlNode;
+    function    Clone(const Recurse: boolean): TxmlNode;
     procedure   Delete(Index: integer);
     function    NodeByName(AName: string; CaseSensitive: boolean=true): TXmlNode;
     property    CaseSensitive: boolean read GetCaseSens;
@@ -64,7 +68,7 @@ type
     procedure   ParsePath(const Path: string; Result: TStrings);
     function    DoGetNode(var Path: TStrings): TXmlNode;
     procedure   SetCaseSens(const Value: boolean);
-    function GetCaseSens: boolean;
+    function    GetCaseSens: boolean;
   public
     constructor Create; reintroduce;
     destructor  Destroy; override;
@@ -115,12 +119,12 @@ begin
   result:=FNodes.Count;
 end;
 
-
-function TXmlNode.Add(const Name, Content: string): TXmlNode;
+function TXmlNode.Add(const AName, AContent: string; const AAttributes: TstringList): TXmlNode;
 begin
   result:=TXmlNode.Create(self);
-  result.Name:=Name;
-  result.Content:=Content;
+  result.Name:=AName;
+  result.Content:=AContent;
+  if AAttributes<>nil then Attributes.Assign(AAttributes);
 end;
 
 function TXmlNode.NodeByName(AName: string; CaseSensitive: boolean=true): TXmlNode;
@@ -160,6 +164,24 @@ begin
   else result:=FParent.CaseSensitive;
 end;
 
+function TXmlNode.Clone(const Recurse: boolean): TxmlNode;
+  function DoAdd(Src, Dest: TXmlNode): TXmlNode;
+  var
+    i: integer;
+  begin
+    result:=TXmlNode.Create(Dest);
+    result.Name:=Src.Name;
+    result.Content:=Src.Content;
+    result.Attributes.Assign(Src.Attributes);
+    if Recurse then
+      for i:=0 to Src.Count-1 do DoAdd(Src.Nodes[i], result);
+  end;
+
+begin
+  result:=DoAdd(self, nil);
+end;
+
+
 { TXmlTree }
 
 constructor TXmlTree.Create;
@@ -176,11 +198,12 @@ end;
 
 function TXmlTree.GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
 type
-  TState=(tsContent, tsTag, tsAttrs, tsEnd, tsSkip);
+  TState=(tsContent, tsTag, tsAttrs, tsEnd, tsSkip, tsComment);
 var
   c: char;
   State: TState;
   quota: boolean;
+  CommentState: byte;
 begin
   result:=false;
   PrevContent:='';
@@ -189,6 +212,7 @@ begin
   TagType:=tt_Open;
   State:=tsContent;
   quota:=false;
+  CommentState:=0;
   while (Stream.Position<Stream.Size) do begin
     Stream.ReadBuffer(c, sizeof(c));
     case State of
@@ -211,6 +235,12 @@ begin
                     ' ':  if quota then TagName:=TagName+c
                           else State:=tsAttrs;
                     '?':  if TagName='' then State:=tsSkip;
+                    '-':  if TagName='!-' then begin
+                            CommentState:=0;
+                            TagName:='';
+                            State:=tsComment;
+                          end
+                          else TagName:=TagName+c;
                     else  TagName:=TagName+c;
                   end;
      //////////////////////////////////////////////////////////////////////////
@@ -224,6 +254,12 @@ begin
      //////////////////////////////////////////////////////////////////////////
      tsSkip:      case c of
                     '>':  State:=tsContent;
+                  end;
+     //////////////////////////////////////////////////////////////////////////
+     tsComment:   case c of
+                    '-':  inc(CommentState);
+                    '>':  if CommentState=2 then State:=tsContent;
+                    else  CommentState:=0;  
                   end;
     ////////////////////////////////////////////////////////////////////////////
     end;
@@ -459,5 +495,7 @@ function TXmlTree.GetCaseSens: boolean;
 begin
   result:=Froot.CaseSensitive;
 end;
+
+
 
 end.

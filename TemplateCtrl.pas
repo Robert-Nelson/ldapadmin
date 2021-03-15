@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Main.pas
+  {      LDAPAdmin - TemplateCtrl.pas
   *      Copyright (C) 2006 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
@@ -24,7 +24,7 @@ unit TemplateCtrl;
 interface
 
 uses Classes, Forms, Controls, ComCtrls, StdCtrls, ExtCtrls, Templates, LdapClasses,
-     Graphics, Windows, Constant;
+     Graphics, Windows, Contnrs, Constant;
 
 const
   CT_LEFT_BORDER     = 8;
@@ -46,6 +46,7 @@ type
 
   TTemplatePanel = class(TScrollBox)
   private
+    fControls: TObjectList;
     fEntry: TLdapEntry;
     fTemplate: TTemplate;
     fEventHandler: TEventHandler;
@@ -62,7 +63,6 @@ type
     procedure InstallHandlers;
     procedure RemoveHandlers;
     procedure LoadTemplate; virtual;
-    procedure Clear; virtual;
     procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -91,7 +91,7 @@ type
     procedure   MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
   public
     constructor Create(AOwner: TComponent); override;
-    destructor  Destroy; override;
+    //destructor  Destroy; override;
     procedure   Paint; override;
     procedure   AdjustHeight;
     property    CaptionHeight: integer read FCaptionHeight write SetCaptionHeight;
@@ -151,7 +151,7 @@ type
 
 implementation
 
-uses SysUtils, Misc;
+uses SysUtils, Misc, Config;
 
 { TEventHandler }
 
@@ -242,7 +242,7 @@ begin
   if fTemplate = Template then Exit;
   LockControl(Self, true);
   try
-    Clear;
+    fControls.Clear;
     fTemplate := Template;
     LoadTemplate;
   finally
@@ -266,7 +266,7 @@ end;
 
 procedure TTemplatePanel.InstallHandlers;
 var
-  i, j: Integer;
+  i: Integer;
 
   function ParseParameters(Line: string; Control: TTemplateControl): Boolean;
   var
@@ -287,12 +287,10 @@ begin
 
   if fHandlerInstalled or not (Assigned(fEventHandler) and Assigned(fTemplate)) then Exit;
 
-  for i := 0 to Template.AttributeCount-1 do with Template.Attributes[i] do
-  for j := 0 to ControlCount - 1 do with Controls[j] do
+  for i := 0 to fControls.Count - 1 do with TTemplateControl(fControls[i]) do
   begin
     { Set hooks }
-    if Assigned(LdapValue) and (LdapValue.DataSize = 0) and (j < ValuesCount) then
-      ParseParameters(Values[j].AsString, Controls[j]);
+    ParseParameters(DefaultValue, TTemplateControl(fControls[i]));
     { Set event handlers }
     OnChange := OnControlChange;
     OnExit := OnControlExit;
@@ -311,13 +309,12 @@ end;
 
 procedure TTemplatePanel.RemoveHandlers;
 var
-  i, j: Integer;
+  i: Integer;
 begin
   if fHandlerInstalled then
   begin
-    for i := 0 to Template.AttributeCount-1 do with Template.Attributes[i] do
-    for j := 0 to ControlCount - 1 do
-      fEventHandler.RemoveEvent('', Controls[j]);
+    for i := 0 to fControls.Count - 1 do
+      fEventHandler.RemoveEvent('', TTemplateControl(Controls[i]));
     fHandlerInstalled := false;
   end;
 end;
@@ -327,76 +324,79 @@ var
   Attribute: TLdapAttribute;
   L: TLabel;
   i, j, YPos, vCnt: Integer;
-
+  TemplateControl: TTemplateControl;
+  Oc: TLdapAttribute;
+  Active: Boolean;
 begin
   if not (Assigned(fTemplate) and Assigned(fEntry)) then
     Exit;
+
   yPos := fFixTop;
+  
+  { If template matches existing objectclasses of the entry we set the flag to
+  { avoid setting default values to attributes which are deliberatly left empty }
+  Oc := fEntry.AttributesByName['objectclass'];
+  Active := Assigned(OC) and Template.Matches(OC);
   for i := 0 to Template.AttributeCount-1 do with Template.Attributes[i] do
   begin
-    {if Name = 'objectclass' then
-      Continue;}
     Attribute := fEntry.AttributesByName[Name];
     vCnt := Attribute.ValueCount;
-    for j := 0 to ControlCount - 1 do with Controls[j] do
+    for j := 0 to ControlCount - 1 do
     begin
-      OnChange := nil; // TODO - InitControl?
-      OnExit := nil;
+
+      TemplateControl := CreateControl(ControlTemplates[j]);
+      fControls.Add(TemplateControl);
+
+      if not Assigned(TemplateControl) then Continue;
 
       { Set values }
       if j < vCnt then
-        LdapValue := Attribute.Values[j]
-      else begin
-        LdapValue := Attribute.AddValue;
-        if (j < ValuesCount) and not IsParametrized(Values[j].AsString) and (vCnt = 0) then
-          SetValue(Values[j])
-        else
-          LdapValue.Delete;
+        TemplateControl.LdapValue := Attribute.Values[j]
+      else
+      begin
+        TemplateControl.LdapValue := Attribute.AddValue;
+        if not Active and (j < ValuesCount) then
+        begin
+          TemplateControl.DefaultValue := Values[j].AsString;
+          if not IsParametrized(Values[j].AsString) then
+            TemplateControl.SetValue(Values[j]);
+        end;
       end;
 
       { Position the control }
-      if Template.AutoarrangeControls then
+      with TemplateControl do
       begin
-        L := TLabel.Create(Self);
-        if Control is TWinControl then
-          L.FocusControl := TWinControl(Control);
-        if Description <> '' then
-          L.Caption := Description
-        else
-          L.Caption := Name;
-        L.Caption := L.Caption + ':';
+        if Template.AutoarrangeControls then
+        begin
+          L := TLabel.Create(Self);
+          if Control is TWinControl then
+            L.FocusControl := TWinControl(Control);
+          if Description <> '' then
+            L.Caption := Description
+          else
+            L.Caption := Name;
+          L.Caption := L.Caption + ':';
 
-        L.Left := fLeftBorder;
-        L.Top := yPos;
-        L.Width := Width - fLeftBorder - fRightBorder;
-        inc(yPos, L.Height + fGroupSpacing);
-        Control.Left := fLeftBorder;
-        Control.Top := yPos;
-        if Control is TImage then
-          (Control as TImage).AutoSize := true
-        else
-          Control.Width := L.Width;
-        inc(yPos, Control.Height + fSpacing);
-        L.Parent := Self;
+          L.Left := fLeftBorder;
+          L.Top := yPos;
+          L.Width := Width - fLeftBorder - fRightBorder;
+          inc(yPos, L.Height + fGroupSpacing);
+          Control.Left := fLeftBorder;
+          Control.Top := yPos;
+          if Control is TImage then
+            (Control as TImage).AutoSize := true
+          else
+            Control.Width := L.Width;
+          inc(yPos, Control.Height + fSpacing);
+          L.Parent := Self;
+        end;
+        Control.Parent := Self;
       end;
-      Control.Parent := Self;
-
     end;
   end;
 
   InstallHandlers;
 
-end;
-
-procedure TTemplatePanel.Clear;
-var
-  i: Integer;
-begin
-  for I := ComponentCount - 1 downto 0 do
-    Components[i].Free;
-  RemoveHandlers;
-  for I := ControlCount - 1 downto 0 do
-    Controls[i].Parent := nil;
 end;
 
 procedure TTemplatePanel.Resize;
@@ -408,7 +408,7 @@ end;
 constructor TTemplatePanel.Create(AOwner: TComponent);
 begin
   inherited;
-  //fEventHandler := TEventHandler.Create;
+  fControls := TObjectList.Create;
   fLeftBorder := CT_LEFT_BORDER;
   fRightBorder := CT_RIGHT_BORDER;
   fFixTop := CT_FIX_TOP;
@@ -418,8 +418,7 @@ end;
 
 destructor TTemplatePanel.Destroy;
 begin
-  Clear;
-  //fEventHandler.Free;
+  fControls.Free;
   inherited;
 end;
 
@@ -465,19 +464,16 @@ begin
   inherited;
   FCaptionHeight:=21;
   FRolled:=false;
-  {FCaptionFont:=TFont.Create;
-  FCaptionFont.Assign(Font);}
   Canvas.Font.Color:=clWhite;
   Canvas.Font.Style:=[fsBold];
   Canvas.Font.Size:=9;
   Canvas.Pen.Color := Canvas.Font.Color;
 end;
 
-destructor THeaderPanel.Destroy;
+{destructor THeaderPanel.Destroy;
 begin
-  //FCaptionFont.Free;
   inherited;
-end;
+end;}
 
 procedure THeaderPanel.SetCaptionHeight(const Value: integer);
 begin
@@ -514,8 +510,7 @@ begin
   // Calc button rect //////////////////////////////////////////////////////////
   FBtnRect.Top:=1;
   FBtnRect.Bottom:=FCaptionHeight;
-  //FBtnRect.Bottom:=Height;
-  FBtnRect.Right:=Width;//-fLeftBorder;
+  FBtnRect.Right:=Width;
   InflateRect(FBtnRect, -3, -3);
   if odd(FBtnRect.Bottom-FBtnRect.Top) then FBtnRect.Top:=FBtnRect.Top-1;
   FBtnRect.Left:=FBtnRect.Right-(FBtnRect.Bottom-FBtnRect.Top);
@@ -524,25 +519,17 @@ begin
   //////////////////////////////////////////////////////////////////////////////
 
   Canvas.Brush.Color:=clAppWorkSpace;
-  //Canvas.FillRect(rect(fLeftBorder, 1, Width-fLeftBorder, FCaptionHeight));
   Canvas.FillRect(rect(1, 1, Width, FCaptionHeight));
-  //Canvas.FillRect(rect(1, 1, Width, Height));
-
-  //Canvas.Font:=CaptionFont;
-  //TxtRect:=rect(fLeftBorder+2, 1, FBtnRect.Left-4, FCaptionHeight);
   TxtRect:=rect(2, 1, FBtnRect.Left-4, FCaptionHeight);
-  //TxtRect:=rect(2, 1, FBtnRect.Left-4, Height);
   DrawText(Canvas.Handle, pchar(TemplatePanel.Template.Name), -1, TxtRect, DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX or DT_END_ELLIPSIS);
 
   // Draw button rectangle /////////////////////////////////////////////////////
-  //Canvas.Pen.Color:=CaptionFont.Color;
   Canvas.Polyline([point(FBtnRect.Left+1, FBtnRect.Top),point(FBtnRect.Right-1, FBtnRect.Top)]);
   Canvas.Polyline([point(FBtnRect.Right-1, FBtnRect.Top+1),point(FBtnRect.Right-1, FBtnRect.Bottom-1)]);
   Canvas.Polyline([point(FBtnRect.Left+1, FBtnRect.Bottom-1),point(FBtnRect.Right-1, FBtnRect.Bottom-1)]);
   Canvas.Polyline([point(FBtnRect.Left, FBtnRect.Top+1),point(FBtnRect.Left, FBtnRect.Bottom-1)]);
 
   // Draw button sign //////////////////////////////////////////////////////////
-  //p:=CenterPoint(FBtnRect);
   p.x := FBtnRect.Left + (FBtnRect.Right - FBtnRect.Left) div 2;
   p.y := FBtnRect.Top + (FBtnRect.Bottom - FBtnRect.Top) div 2;
   Canvas.Polyline([point(FBtnRect.Left+len, p.Y), point(FBtnRect.Right-len, p.Y)]);
@@ -658,7 +645,7 @@ begin
 
     pnl:=THeaderPanel.Create(self);
     pnl.Parent:=Self;
-    pnl.Align := alBottom; // push ut to the end
+    pnl.Align := alBottom; // push it to the end
     pnl.Align := alTop;    // then allign on the top of the last panel
     pnl.TemplatePanel := TemplatePanel;
     TemplatePanel.Anchors := [akLeft, akRight, akTop];
@@ -717,9 +704,10 @@ end;
 
 procedure TTemplateForm.OKBtnClick(Sender: TObject);
 var
-  i, j: Integer;
+  i, j, k: Integer;
   S: TStringList;
   ardn, aval: string;
+  LdapAttr: TLdapAttribute;
 begin
   if esNew in fEntry.State then
   begin
@@ -727,10 +715,15 @@ begin
     try
       for i := 0 to fTemplates.Count - 1 do with fTemplates[i] do
       begin
-        { add objectclasses }
-        with fEntry.AttributesByName['objectclass'] do
-          for j := 0 to ObjectclassCount - 1 do
-            AddValue(Objectclasses[j]);
+        { Set values of hidden attributes (those without controls) }
+        for j := 0 to AttributeCount - 1 do with Attributes[j] do
+        if ControlCount = 0 then
+        begin
+          LdapAttr := fEntry.AttributesByName[Name];
+          for k := 0 to ValuesCount - 1 do
+            LdapAttr.AddValue(FormatValue(Values[k].AsString, fEntry));
+        end;
+
         { designated rdn }
         if Rdn <> '' then
         begin
@@ -749,7 +742,12 @@ begin
       S.Free;
     end;
   end;
-  fEntry.Write;
+  try
+    fEntry.Write;
+  except
+    ModalResult := mrNone;
+    raise;
+  end;
   CancelBtnClick(nil); // Close form if not modal
 end;
 
@@ -778,8 +776,8 @@ begin
   else
     Caption := cNewEntry;
 
-  Height := 540;
-  Width := 440;
+  Height := GlobalConfig.ReadInteger(rTemplateFormHeight, 540);
+  Width := GlobalConfig.ReadInteger(rTemplateFormWidth, 440);
   Position := poOwnerFormCenter;
 
   Panel := TPanel.Create(Self);
@@ -822,6 +820,12 @@ begin
     PageControl.Pages[0].Free;
   fEventHandler.Free;
   fTemplates.Free;
+
+  try
+    GlobalConfig.WriteInteger(rTemplateFormHeight, Height);
+    GlobalConfig.WriteInteger(rTemplateFormWidth, Width);
+  except end; // just in case
+
   inherited;
 end;
 

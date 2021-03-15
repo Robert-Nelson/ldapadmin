@@ -1,5 +1,5 @@
   {      LDAPAdmin - LDAPClasses.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2006 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,7 +23,7 @@ unit LDAPClasses;
 
 interface
 
-uses Windows, Sysutils, WinLDAP, Classes, Constant;
+uses Windows, Sysutils, WinLDAP, Classes, Events, Constant;
 
 const
   LdapOpRead            = $FFFFFFFF;
@@ -32,6 +32,11 @@ const
   LdapOpReplace         = LDAP_MOD_REPLACE;
   LdapOpDelete          = LDAP_MOD_DELETE;
 
+  SESS_TIMEOUT          = 0;
+  SESS_SIZE_LIMIT       = 0;
+  SESS_PAGE_SIZE        = 100;
+  SESS_REFF_HOP_LIMIT   = 32;
+  
 type
   ErrLDAP = class(Exception);
   PBytes = array of Byte;
@@ -141,8 +146,16 @@ type
     ldapVersion: Integer;
     ldapBase: string;
     ldapSSL: Boolean;
-    fNoPagedQueries: Boolean;
-    procedure LDAPCheck(err: ULONG);
+    fTimeLimit: Integer;
+    fSizeLimit: Integer;
+    fPagedSearch: Boolean;
+    fPageSize: Integer;
+    fDerefAliases: Integer;
+    fChaseReferrals: Boolean;
+    fReferralHops: Integer;
+    fOnConnect: TNotifyEvents;
+    fOnDisconnect: TNotifyEvents;
+    procedure LDAPCheck(const err: ULONG; const Critical: Boolean = true);
     procedure SetServer(Server: string);
     procedure SetUser(User: string);
     procedure SetPassword(Password: string);
@@ -150,10 +163,17 @@ type
     procedure SetVersion(Version: Integer);
     procedure SetConnect(DoConnect: Boolean);
     procedure SetSSL(SSL: Boolean);
+    procedure SetTimeLimit(const Value: Integer);
+    procedure SetSizeLimit(const Value: Integer);
+    procedure SetDerefAliases(const Value: Integer);
+    procedure SetChaseReferrals(const Value: boolean);
+    procedure SetReferralHops(const Value: Integer);
     function ISConnected: Boolean;
     procedure ProcessSearchEntry(const plmEntry: PLDAPMessage; Attributes: TLdapAttributeList);
     procedure ProcessSearchMessage(const plmSearch: PLDAPMessage; const NoValues: LongBool; Result: TLdapEntryList);
   public
+    constructor Create;
+    destructor Destroy; override;
     procedure Connect;
     procedure Disconnect;
     property pld: PLDAP read ldappld;
@@ -164,6 +184,13 @@ type
     property Version: Integer read ldapVersion write SetVersion;
     property SSL: Boolean read ldapSSL write SetSSL;
     property Base: string read ldapBase write ldapBase;
+    property TimeLimit: Integer read fTimeLimit write SetTimeLimit;
+    property SizeLimit: Integer read fSizeLimit write SetSizeLimit;
+    property PagedSearch: Boolean read fPagedSearch write fPagedSearch;
+    property PageSize: Integer read fPageSize write fPageSize;
+    property DereferenceAliases: Integer read fDerefAliases write SetDerefAliases;
+    property ChaseReferrals: Boolean read fChaseReferrals write SetChaseReferrals;
+    property ReferralHops: Integer read fReferralHops write SetReferralHops;
     property Connected: Boolean read IsConnected write SetConnect;
     function Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
     function GetDn(sFilter: string): string;
@@ -179,7 +206,8 @@ type
     procedure WriteEntry(Entry: TLdapEntry);
     procedure ReadEntry(Entry: TLdapEntry);
     procedure DeleteEntry(const adn: string);
-
+    property  OnConnect: TNotifyEvents read FOnConnect;
+    property  OnDisconnect: TNotifyEvents read FOnDisconnect;
   end;
 
   TLDAPEntry = class
@@ -447,18 +475,22 @@ end;
 
 { TLdapSession }
 
-procedure TLdapSession.LDAPCheck(err: ULONG);
+procedure TLdapSession.LDAPCheck(const err: ULONG; const Critical: Boolean = true);
 var
   ErrorEx: PChar;
+  msg: string;
 begin
   if (err = LDAP_SUCCESS) then exit;
   if ((ldap_get_option(pld, LDAP_OPT_SERVER_ERROR, @ErrorEx)=LDAP_SUCCESS) and Assigned(ErrorEx)) then
   begin
-    raise ErrLDAP.Create(Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]));
+    msg := Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]);
     ldap_memfree(ErrorEx);
   end
   else
+    msg := Format(stLdapError, [ldap_err2string(err)]);
+  if Critical then
     raise ErrLDAP.Create(Format(stLdapError, [ldap_err2string(err)]));
+  MessageDlg(msg, mtError, [mbOk], 0);
 end;
 
 procedure TLdapSession.ProcessSearchEntry(const plmEntry: PLDAPMessage; Attributes: TLdapAttributeList);
@@ -486,7 +518,7 @@ begin
         Inc(I);
       end;
     finally
-      LDAPCheck(ldap_value_free_len(ppBer));
+      LDAPCheck(ldap_value_free_len(ppBer), false);
     end;
     ber_free(pbe, 0);
     pszAttr := ldap_next_attribute(pld, plmEntry, pbe);
@@ -523,7 +555,7 @@ begin
     end;
   finally
     // free search results
-    LDAPCheck(ldap_msgfree(plmSearch));
+    LDAPCheck(ldap_msgfree(plmSearch), false);
   end;
 end;
 
@@ -540,7 +572,7 @@ var
   AbortSearch: Boolean;
 begin
 
-  if fNoPagedQueries then
+  if not fPagedSearch then
   begin
     Err := ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch);
     if Err = LDAP_SIZELIMIT_EXCEEDED then
@@ -561,7 +593,7 @@ begin
     Err := LdapGetLastError;
     if Err <> LDAP_NOT_SUPPORTED then
       LdapCheck(Err); // raises exception
-    fNoPagedQueries := true;
+    fPagedSearch := false;
     LdapCheck(ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch)); // try ordinary search
     ProcessSearchMessage(plmSearch, NoValues, Result);
     Exit;
@@ -570,11 +602,11 @@ begin
   Timeout.tv_sec := 60;
   while true do
   begin
-    Err := ldap_get_next_page_s(pld, hsrch, Timeout, 100, TotalCount, plmSearch);
+    Err := ldap_get_next_page_s(pld, hsrch, Timeout, fPageSize, TotalCount, plmSearch);
     case Err of
-      LDAP_UNAVAILABLE_CRIT_EXTENSION:
+      LDAP_UNAVAILABLE_CRIT_EXTENSION, LDAP_UNWILLING_TO_PERFORM:
           begin
-            fNoPagedQueries := true;
+            fPagedSearch := false;
             ldap_search_abandon_page(pld, hsrch);
             LdapCheck(ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch)); // try ordinary search
             ProcessSearchMessage(plmSearch, NoValues, Result);
@@ -762,7 +794,7 @@ begin
        ProcessSearchEntry(plmEntry, Entry.Attributes);
   finally
     // free search results
-    LDAPCheck(ldap_msgfree(plmEntry));
+    LDAPCheck(ldap_msgfree(plmEntry), false);
   end;
 end;
 
@@ -833,12 +865,12 @@ begin
           if Assigned(ppcVals) then
             Result := pchararray(ppcVals)[0];
         finally
-          LDAPCheck(ldap_value_free(ppcVals));
+          LDAPCheck(ldap_value_free(ppcVals), false);
         end;
       end;
     finally
       // free search results
-      LDAPCheck(ldap_msgfree(plmSearch));
+      LDAPCheck(ldap_msgfree(plmSearch), false);
     end;
 end;
 
@@ -860,7 +892,7 @@ begin
         Result := ldap_get_dn(pld, plmEntry);
     finally
       // free search results
-      LDAPCheck(ldap_msgfree(plmSearch));
+      LDAPCheck(ldap_msgfree(plmSearch), false);
     end;
 end;
 
@@ -900,6 +932,64 @@ begin
   ldapSSL := SSL;
 end;
 
+procedure TLDAPSession.SetTimeLimit(const Value: Integer);
+begin
+  if Value <> fTimeLimit then
+  begin
+    fTimeLimit := Value;
+    if Connected then
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_TIMELIMIT,@Value), false);
+  end;
+end;
+
+procedure TLDAPSession.SetSizeLimit(const Value: Integer);
+begin
+  if Value <> fSizeLimit then
+  begin
+    fSizeLimit := Value;
+    if Connected then
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_SIZELIMIT,@Value), false);
+  end;
+end;
+
+procedure TLDAPSession.SetDerefAliases(const Value: Integer);
+begin
+  if Value <> fDerefAliases then
+  begin
+    fDerefAliases := Value;
+    if Connected then
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_DEREF,@Value), false);
+  end;
+end;
+
+procedure TLDAPSession.SetChaseReferrals(const Value: boolean);
+var
+  v: Pointer;
+begin
+  if Value <> fChaseReferrals then
+  begin
+    fChaseReferrals := Value;
+    if Connected then
+    begin
+      if Value then
+        v := LDAP_OPT_ON
+      else
+        v := LDAP_OPT_OFF;
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_SIZELIMIT, @v), false);
+    end;
+  end;
+end;
+
+procedure TLDAPSession.SetReferralHops(const Value: Integer);
+begin
+  if Value <> fReferralHops then
+  begin
+    fReferralHops := Value;
+    if Connected then
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_REFERRAL_HOP_LIMIT,@Value), false);
+  end;
+end;
+
 procedure TLDAPSession.SetConnect(DoConnect: Boolean);
 begin
   if not Connected then
@@ -911,9 +1001,34 @@ begin
   Result := Assigned(pld);
 end;
 
+constructor TLDAPSession.Create;
+begin
+  inherited Create;
+  ldapPort := LDAP_PORT;
+  ldapVersion := LDAP_VERSION3;
+  ldapSSL := false;
+  fTimeLimit := SESS_TIMEOUT;
+  fSizeLimit := SESS_SIZE_LIMIT;
+  fPagedSearch := true;
+  fPageSize := SESS_PAGE_SIZE;
+  fDerefAliases := LDAP_DEREF_NEVER;
+  fChaseReferrals := true;
+  fReferralHops := SESS_REFF_HOP_LIMIT;
+  fOnConnect := TNotifyEvents.Create;
+  fOnDisconnect := TNotifyEvents.Create;
+end;
+
+destructor TLDAPSession.Destroy;
+begin
+  fOnConnect.Free;
+  fOnDisconnect.Free;
+  inherited;
+end;
+
 procedure TLDAPSession.Connect;
 var
   res: Cardinal;
+  v: Pointer;
 begin
   if (ldapUser<>'') and (ldapPassword='') then
     if not InputDlg(cEnterPasswd, Format(stPassFor, [ldapUser]), ldapPassword, '*', true) then Abort;
@@ -924,32 +1039,50 @@ begin
   if Assigned(pld) then
   try
     LdapCheck(ldap_set_option(pld,LDAP_OPT_PROTOCOL_VERSION,@ldapVersion));
-    res := ldap_set_option(pld, LDAP_OPT_SERVER_CERTIFICATE, @VerifyCert);
-    if (res <> LDAP_SUCCESS) and (res <> LDAP_PARAM_ERROR) then
-      LdapCheck(res);
+    if ldapSSL then
+    begin
+      res := ldap_set_option(pld, LDAP_OPT_SERVER_CERTIFICATE, @VerifyCert);
+      if (res <> LDAP_SUCCESS) and (res <> LDAP_LOCAL_ERROR) then
+        LdapCheck(res);
+      CertServerName := PChar(ldapServer);
+    end;
     CertUserAbort := false;
-    CertServerName := PChar(ldapServer);
     res := ldap_simple_bind_s(ldappld, PChar(ldapUser), PChar(ldapPassword));
     if CertUserAbort then
       Abort;
     LdapCheck(res);
     if ldapVersion < 3 then
-      fNoPagedQueries := false;
+      fPagedSearch := false;
+    // set options
+    if fTimeLimit <> SESS_TIMEOUT then
+      LdapCheck(ldap_set_option(pld,LDAP_OPT_TIMELIMIT,@fTimeLimit), false);
+    if fSizeLimit <> SESS_SIZE_LIMIT then
+      LdapCheck(ldap_set_option(pld,LDAP_OPT_SIZELIMIT,@fSizeLimit), false);
+    if fDerefAliases <> LDAP_DEREF_NEVER then
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_DEREF,@fDerefAliases), false);
+    if not fChaseReferrals then
+    begin
+      v := LDAP_OPT_OFF;
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_SIZELIMIT, @v), false);
+    end;
+    if fReferralHops <> SESS_REFF_HOP_LIMIT then
+      LdapCheck(ldap_set_option(pld, LDAP_OPT_REFERRAL_HOP_LIMIT,@fReferralHops), false);
   except
     // close connection
-    LdapCheck(ldap_unbind_s(pld));
+    LdapCheck(ldap_unbind_s(pld), false);
     ldappld := nil;
     raise;
   end;
+  fOnConnect.Execute(self);
 end;
 
 procedure TLDAPSession.Disconnect;
 begin
   if Connected then
   begin
-    LdapCheck(ldap_unbind_s(pld));
+    fOnDisconnect.Execute(self);
+    LdapCheck(ldap_unbind_s(pld), false);
     ldappld := nil;
-    fNoPagedQueries := false;
   end;
 end;
 
@@ -1088,7 +1221,6 @@ var
   i: Integer;
 begin
   if (fModOp = LdapOpNoop) then Exit;
-  //if (fModOp = LDAP_MOD_ADD) or (fModOp = LDAP_MOD_REPLACE) then
   if fModOp = LDAP_MOD_ADD then
     fModOp := LdapOpNoop
   else
@@ -1149,7 +1281,6 @@ function TLdapAttribute.AddValue: TLdapAttributeData;
 begin
   Result := TLdapAttributeData.Create(Self);
   fValues.Add(Result);
-  //fState := fState - [asDeleted];
 end;
 
 procedure TLdapAttribute.AddValue(const AValue: string);
@@ -1241,7 +1372,6 @@ begin
     fEntry.fState := fEntry.fState + [esModified];
   end;
   for i := 0 to fValues.Count - 1 do
-    //TLdapAttributeData(fValues[i]).fModOp := LdapOpDelete;
     TLdapAttributeData(fValues[i]).Delete;
 end;
 

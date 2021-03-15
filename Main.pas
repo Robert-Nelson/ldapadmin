@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, Menus, ImgList, ToolWin, WinLdap, StdCtrls, ExtCtrls, Posix, Samba,
-  LDAPClasses, Clipbrd, ActnList;
+  LDAPClasses, Clipbrd, ActnList, Config;
 
 const
   ScrollAccMargin  = 40;
@@ -172,6 +172,8 @@ type
     pbViewCopy: TMenuItem;
     pbViewCopyName: TMenuItem;
     pbViewCopyValue: TMenuItem;
+    mbNewGoUN: TMenuItem;
+    pbGroupOfUN: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LDAPTreeExpanding(Sender: TObject; Node: TTreeNode;
@@ -264,7 +266,7 @@ type
     function  PickEntry(const ACaption: string): string;
     function  LocateEntry(const dn: string; const Select: Boolean): TTreeNode;
     procedure EditProperty(AOwner: TControl; const Index: Integer; const dn: string);
-    procedure ServerConnect(AServer, ABase, AUser, APassword: string; ASSL: boolean; APort, AVersion: integer);
+    procedure ServerConnect(Account: TAccount);
     procedure ServerDisconnect;
     procedure ReadConfig;
   end;
@@ -276,7 +278,7 @@ implementation
 
 uses EditEntry, Group, User, Computer, PassDlg, ConnList, Transport, Search, Ou,
      Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs,
-     LdapCopy, Schema, uSchemaDlg, BinView, Misc, Input, Config, ConfigDlg,
+     LdapCopy, Schema, uSchemaDlg, BinView, Misc, Input, ConfigDlg,
      Templates, TemplateCtrl, About;
 
 {$R *.DFM}
@@ -325,9 +327,12 @@ end;
 procedure TMainFrm.SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
 begin
   if GetTickCount > FTickCount then
+  begin
     Screen.Cursor := crHourGlass;
-  StatusBar.Panels[3].Text := Format(stRetrieving, [Sender.Count]);
-  StatusBar.Repaint;
+    StatusBar.Panels[3].Width := 20000;
+    StatusBar.Panels[3].Text := Format(stRetrieving, [Sender.Count]);
+    StatusBar.Repaint;
+  end;
   if PeekKey = VK_ESCAPE then
     AbortSearch := true;
 end;
@@ -463,19 +468,26 @@ begin
   end;
 end;
 
-procedure TMainFrm.ServerConnect(AServer, ABase, AUser, APassword: string; ASSL: boolean; APort, AVersion: integer);
+procedure TMainFrm.ServerConnect(Account: TAccount);
 begin
   Application.ProcessMessages;
   Screen.Cursor := crHourGlass;
   with ldapSession do
   try
-    Server    :=  AServer;
-    Base      :=  ABase;
-    User      :=  AUser;
-    Password  :=  APassword;
-    SSL       :=  ASSL;
-    Port      :=  APort;
-    Version   :=  AVersion;
+    Server             := Account.Server;
+    Base               := Account.Base;
+    User               := Account.User;
+    Password           := Account.Password;
+    SSL                := Account.SSL;
+    Port               := Account.Port;
+    Version            := Account.LdapVersion;
+    TimeLimit          := Account.TimeLimit;
+    SizeLimit          := Account.SizeLimit;
+    PagedSearch        := Account.PagedSearch;
+    PageSize           := Account.PageSize;
+    DereferenceAliases := Account.DereferenceAliases;
+    ChaseReferrals     := Account.ChaseReferrals;
+    ReferralHops       := Account.ReferralHops;
     Connect;
   finally
     Screen.Cursor := crDefault;
@@ -543,11 +555,17 @@ begin
 end;
 
 procedure TMainFrm.InitStatusBar;
+var
+ s: string;
 begin
   if (ldapSession <> nil) and (ldapSession.Connected) then begin
+    s := ' Server: ' + ldapSession.Server;
     StatusBar.Panels[1].Style := psOwnerDraw;
-    StatusBar.Panels[0].Text := ' Server: ' + ldapSession.Server;
-    StatusBar.Panels[2].Text := ' User: ' + ldapSession.User;
+    StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(s) + 16;
+    StatusBar.Panels[0].Text := s;
+    s := ' User: ' + ldapSession.User;
+    StatusBar.Panels[2].Width := StatusBar.Canvas.TextWidth(s) + 16;
+    StatusBar.Panels[2].Text := s;
   end
   else begin
     StatusBar.Panels[1].Style := psText;
@@ -578,11 +596,26 @@ begin
 end;
 
 procedure TMainFrm.RefreshStatusBar;
+var
+  s3, s4: string;
 begin
-  if LDAPTree.Selected <> nil then
-    StatusBar.Panels[3].Text := ' ' + PChar(LDAPTree.Selected.Data)
+  s4 := '';
+  if LDAPTree.Selected <> nil then with LDAPTree.Selected do
+  begin
+    s3 := ' ' + PChar(Data);
+    //StatusBar.Panels[3].Width := StatusBar.Canvas.TextWidth(s3) + 16;
+    if (Count=0) or (Integer(Item[0].Data) <> ncDummyNode) then
+    begin
+      s4 := Format(stCntSubentries, [Count]);
+      StatusBar.Panels[3].Width := StatusBar.Canvas.TextWidth(s3) + 16;
+    end
+    else
+      StatusBar.Panels[3].Width := 20000;
+  end
   else
-    StatusBar.Panels[3].Text := '';
+    s3 := '';
+  StatusBar.Panels[3].Text := s3;
+  StatusBar.Panels[4].Text := s4;
   Application.ProcessMessages;
 end;
 
@@ -997,12 +1030,13 @@ begin
        end;
     2: TUserDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
     3: TComputerDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
-    4: TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
+    4: TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD, true, AccountConfig.ReadBool(rPosixGroupOfUnames, false)).ShowModal;
     5: TMailGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
     6: TTransportDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
     7: TOuDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
     8: THostDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
     9: TLocalityDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD).ShowModal;
+   10: TGroupDlg.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession, EM_ADD, false, true).ShowModal;
   else
     Exit;
   end;
@@ -1015,7 +1049,7 @@ begin
   try
     if ShowModal = mrOk then
     begin
-      ServerConnect(AccountConfig.Server, AccountConfig.Base, AccountConfig.User, AccountConfig.Password, AccountConfig.SSL, AccountConfig.Port, AccountConfig.LdapVersion);
+      ServerConnect(AccountConfig);
       MainFrm.Caption := cAppName + ': ' + AccountConfig.Name;
     end;
   finally
@@ -1092,7 +1126,7 @@ end;
 
 procedure TMainFrm.ActExportExecute(Sender: TObject);
 begin
-  TExportDlg.Create(Self, PChar(SelectedNode.Data), ldapSession).ShowModal;
+  TExportDlg.Create(PChar(SelectedNode.Data), ldapSession).ShowModal;
 end;
 
 procedure TMainFrm.ActPreferencesExecute(Sender: TObject);
@@ -1191,14 +1225,15 @@ begin
     case Index of
       bmSamba2User,
       bmSamba3User,
-      bmPosixUser:   TUserDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmGroup:       TGroupDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmMailGroup:   TMailGroupDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmComputer:    TComputerDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmTransport:   TTransportDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmOu:          TOuDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmLocality:    TLocalityDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
-      bmHost:        THostDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmPosixUser:    TUserDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmGroup,
+      bmGrOfUnqNames: TGroupDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmMailGroup:    TMailGroupDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmComputer:     TComputerDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmTransport:    TTransportDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmOu:           TOuDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmLocality:     TLocalityDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
+      bmHost:         THostDlg.Create(AOwner, dn, ldapSession, EM_MODIFY).ShowModal;
     else
       with TTemplateForm.Create(AOwner, dn, ldapSession, EM_MODIFY) do
       try
@@ -1414,22 +1449,35 @@ end;
 
 procedure TMainFrm.FormShow(Sender: TObject);
 var
-  proto, user, password, host, base: string;
-  port, i:     integer;
+  aproto, auser, apassword, ahost, abase: string;
+  aport, i:     integer;
   SessionName, StorageName: string;
   AStorage: TConfigStorage;
+  FakeAccount: TFakeAccount;
 begin
   DoTemplateMenu;
   GlobalConfig.CheckProtocol;
   // ComandLine params /////////////////////////////////////////////////////////
   if ParamCount <> 0 then
   begin
-    proto:='ldap';
-    port:=LDAP_PORT;
-    user:='';
-    password:='';
-    ParseURL(ParamStr(1), proto, user, password, host, base, port);
-    ServerConnect(host, base, user, password, proto='ldaps', port, LDAP_VERSION3);
+    aproto:='ldap';
+    aport:=LDAP_PORT;
+    auser:='';
+    apassword:='';
+    ParseURL(ParamStr(1), aproto, auser, apassword, ahost, abase, aport);
+    FakeAccount := TFakeAccount.Create(nil, 'FAKE');
+    with FakeAccount do try
+      Server := ahost;
+      Port := aport;
+      Base := abase;
+      User := auser;
+      Password := apassword;
+      SSL := aproto='ldaps';
+      LdapVersion := LDAP_VERSION3;
+      ServerConnect(FakeAccount);
+    finally
+      FakeAccount.Free;
+    end;
     Exit;
   end;
   // Autostart
@@ -1445,7 +1493,7 @@ begin
       if Assigned(AStorage) then
       begin
         SetAccount(AStorage.AccountByName(SessionName));
-        ServerConnect(AccountConfig.Server, AccountConfig.Base, AccountConfig.User, AccountConfig.Password, AccountConfig.SSL, AccountConfig.Port, AccountConfig.LdapVersion);
+        ServerConnect(AccountConfig);
       end;
     end;
   end;

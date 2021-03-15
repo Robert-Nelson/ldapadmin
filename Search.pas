@@ -148,6 +148,7 @@ type
     procedure Search(const Filter: string);
   public
     constructor Create(AOwner: TComponent; const dn: string; const Session: TLDAPSession); reintroduce;
+    procedure   SessionDisconnect(Sender: TObject);
   end;
 
 var
@@ -274,34 +275,40 @@ var
   i, w: integer;
   attrs: array of string;
   CallBackProc: TSearchCallback;
+  sdref: Integer;
 begin
   if Assigned(fStatusBar) then
     CallbackProc := SearchCallback
   else
     CallbackProc := nil;
-  ldap_set_option(Session.pld, LDAP_OPT_DEREF, @fDerefAliases);
-  Session.Search(FFilter, FBase, FSearchLevel, attrs, false, FEntries, CallbackProc);
+  sdref := Session.DereferenceAliases;
+  Session.DereferenceAliases := fDerefAliases;
   try
-    FListView.Items.BeginUpdate;
-    FListView.Columns.BeginUpdate;
-    setlength(attrs, FAttributes.Count+1);
-    w := Width;
-    if FAttributes.Count > 0 then
-      w := (w - 400) div FAttributes.Count;
-    if w < 40 then w := 40;
-    for i:=0 to FAttributes.Count-1 do begin
-      with FListView.Columns.Add do begin
-        Caption:=FAttributes[i];
-        Width:=w;
-        Tag:=i;
+    Session.Search(FFilter, FBase, FSearchLevel, attrs, false, FEntries, CallbackProc);
+    try
+      FListView.Items.BeginUpdate;
+      FListView.Columns.BeginUpdate;
+      setlength(attrs, FAttributes.Count+1);
+      w := Width;
+      if FAttributes.Count > 0 then
+        w := (w - 400) div FAttributes.Count;
+      if w < 40 then w := 40;
+      for i:=0 to FAttributes.Count-1 do begin
+        with FListView.Columns.Add do begin
+          Caption:=FAttributes[i];
+          Width:=w;
+          Tag:=i;
+        end;
+        attrs[i]:=FAttributes[i];
       end;
-      attrs[i]:=FAttributes[i];
+      FListView.Columns[0].Width := 400;
+      attrs[length(attrs)-1]:='objectClass';
+    finally
+      FListView.Columns.EndUpdate;
+      FListView.Items.EndUpdate;
     end;
-    FListView.Columns[0].Width := 400;
-    attrs[length(attrs)-1]:='objectClass';
   finally
-    FListView.Columns.EndUpdate;
-    FListView.Items.EndUpdate;
+    Session.DereferenceAliases := sdref;
   end;
   {ldap_set_option(Session.pld, LDAP_OPT_DEREF, @fDerefAliases);
   Session.Search(FFilter, FBase, FSearchLevel, attrs, false, FEntries, CallbackProc);}
@@ -377,10 +384,12 @@ begin
     cbSearchLevel.ItemIndex := ReadInteger(rSearchScope, 2);
     cbDerefAliases.ItemIndex := ReadInteger(rSearchDerefAliases, 0);
   end;
+  Self.Session.OnDisconnect.Add(SessionDisconnect);
 end;
 
 procedure TSearchFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  Session.OnDisconnect.Delete(SessionDisconnect);
   Action := caFree;
   RList.Free;
   with AccountConfig do begin
@@ -389,6 +398,11 @@ begin
     WriteInteger(rSearchScope, cbSearchLevel.ItemIndex);
     WriteInteger(rSearchDerefAliases, cbDerefAliases.ItemIndex);
   end;
+end;
+
+procedure TSearchFrm.SessionDisconnect(Sender: TObject);
+begin
+  Close;
 end;
 
 procedure TSearchFrm.PickListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);

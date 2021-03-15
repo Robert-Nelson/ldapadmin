@@ -41,6 +41,8 @@ const
   bmLockedSel      = 28;
   bmUnlocked       = 29;
   bmUnlockedSel    = 29;
+  bmGrOfUnqNames   = 35;
+  bmGrOfUnqNamesSel= 35;
 
   ncDummyNode      = -1;
 
@@ -100,6 +102,7 @@ const
   rPosixHomeDir       = 'Posix\HomeDir';
   rPosixLoginShell    = 'Posix\LoginShell';
   rPosixGroup         = 'Posix\Group';
+  rPosixGroupOfUnames = 'Posix\PosixGroupOfUniqueNames';
   rSambaNetbiosName   = 'Samba\NetbiosName';
   rSambaDomainName    = 'Samba\DomainName';
   rSambaHomeShare     = 'Samba\HomeShare';
@@ -112,6 +115,8 @@ const
   rSearchAttributes   = 'Search\Attributes';
   rSearchScope        = 'Search\Scope';
   rSearchDerefAliases = 'Search\DereferenceAliases';
+  rTemplateFormHeight = 'TemplateForm\Height';
+  rTemplateFormWidth  = 'TemplateForm\Width';
 
 // Search filters
 
@@ -168,8 +173,9 @@ const
   cValue            = 'Value';
   cObjectclass      = 'Objectclass';
   cNewValue         = '<<new>>';
-
-  cRegistryCfgName  = 'Private'; 
+  cSetPassword      = 'Set password...';
+  cRegistryCfgName  = 'Private';
+  sConnectSuccess   = 'Connection is successful.'; 
   
 // Messages
   stOverwrite       = 'Do you want to overwrite?';
@@ -226,6 +232,7 @@ const
   stDisplaying      = 'Displaying first %d results.';
   stSorting         = 'Sorting...';
   stCntObjects      = '%d object(s) retrieved.';
+  stCntSubentries   = '%d subentries';
 
   stDuplicateEntry  = 'EntryList does not allow duplicates';
   stCantStorPass    = 'This storage does not allow to keep the password';

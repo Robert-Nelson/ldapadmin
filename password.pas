@@ -28,7 +28,6 @@ uses LdapClasses, MessageDigests;
 type
   THashType = (chCrypt, chMd5Crypt, chMd2, chMd4, chMd5, chSha1, chRipemd);
 
-
 const
   HashClasses: array [chMd2..chRipemd] of TMessageDigestClass = (
    TMD2, TMD4, TMD5, TSHA1, TRIPEMD160
@@ -36,22 +35,7 @@ const
   IdStrings: array [chCrypt..chRipemd] of string = (
   '{CRYPT}','{CRYPT}','{MD2}','{MD4}','{MD5}','{SHA}','{RMD160}');
 
-  sUserPassword: string = 'userPassword';
-
-type
-  TPasswordObject = class
-  private
-    fEntry: TLdapEntry;
-    fHashType: THashType;
-    procedure SetPassword(AValue: string);
-    function  GetPassword: string;
-    function Digest(const AValue: string): string;
-    function Crypt(const AValue: string): string;
-  public
-    constructor Create(const Entry: TLdapEntry);
-    property HashType: THashType read fHashType write fHashType;
-    property Password: string read GetPassword write SetPassword;
-  end;
+function GetPasswordString(const HashType: THashType; const Password: string): string;
 
 implementation
 
@@ -69,13 +53,13 @@ begin
     Result[i] := SaltChars[Random(64)];
 end;
 
-function TPasswordObject.Digest(const AValue: string): string;
+function Digest(const HashType: THashType; const Password: string): string;
 var
   md: TMessageDigest;
 begin
-  md := HashClasses[fHashType].Create;
+  md := HashClasses[HashType].Create;
   try
-    md.TransformString(AValue);
+    md.TransformString(Password);
     md.Complete;
     SetLength(Result, Base64encSize(md.DigestSize));
     Base64Encode(md.HashValueBytes^, md.DigestSize, Result[1]);
@@ -84,10 +68,7 @@ begin
   end;
 end;
 
-function TPasswordObject.Crypt(const AValue: string): string;
-const
-  SaltChars: array[0..63] of AnsiChar =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./';
+function Crypt(const AValue: string): string;
 var
   Buff : array[0..30] of char;
 begin
@@ -95,28 +76,17 @@ begin
   Result := StrPas(Buff);
 end;
 
-procedure TPasswordObject.SetPassword(AValue: string);
+function GetPasswordString(const HashType: THashType; const Password: string): string;
 var
   passwd: string;
 begin
-  case fHashType of
-    chCrypt:     passwd := Crypt(AValue);
-    chMd5Crypt:  passwd := md5_crypt(PChar(AValue), PChar(GetSalt(8)));
+  case HashType of
+    chCrypt:     passwd := Crypt(Password);
+    chMd5Crypt:  passwd := md5_crypt(PChar(Password), PChar(GetSalt(8)));
   else
-    passwd := Digest(AValue);
+    passwd := Digest(HashType, PAssword);
   end;
-  fEntry.AttributesByName[sUserPassword].AsString := IdStrings[fHashType] + passwd;
-end;
-
-function TPasswordObject.GetPassword: string;
-begin
-  Result := fEntry.AttributesByName[sUserPassword].AsString;
-end;
-
-constructor TPasswordObject.Create(const Entry: TLdapEntry);
-begin
-  fEntry := Entry;
-  fHashType := chSha1;
+  Result := IdStrings[HashType] + passwd;
 end;
 
 end.

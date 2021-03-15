@@ -101,9 +101,9 @@ object PrefDlg: TPrefDlg
       end
       object GroupBox3: TGroupBox
         Left = 16
-        Top = 136
+        Top = 128
         Width = 513
-        Height = 193
+        Height = 209
         Caption = 'Defaults:'
         TabOrder = 2
         object Label5: TLabel
@@ -184,6 +184,14 @@ object PrefDlg: TPrefDlg
           Width = 353
           Height = 21
           TabOrder = 0
+        end
+        object cbxPosixGroupOfUniqueNames: TCheckBox
+          Left = 120
+          Top = 184
+          Width = 353
+          Height = 17
+          Caption = 'Extend Posix groups with GroupOfUniqueNames'
+          TabOrder = 6
         end
       end
     end
@@ -317,7 +325,7 @@ object PrefDlg: TPrefDlg
           Width = 353
           Height = 21
           Style = csDropDownList
-          ItemHeight = 0
+          ItemHeight = 13
           TabOrder = 1
         end
       end

@@ -26,6 +26,9 @@ interface
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
      Buttons, LdapClasses, Password, Samba, ExtCtrls;
 
+const
+  sUserPassword = 'userPassword';
+
 type
   TPasswordDlg = class(TForm)
     Label1: TLabel;
@@ -42,10 +45,10 @@ type
     procedure cbPosixPasswordClick(Sender: TObject);
   private
     fEntry: TLdapEntry;
-    fPassword: TPasswordObject;
     fSamba: TSamba3Account;
+    fPasswordAttribute: string;
   public
-    constructor Create(AOwner: TComponent; Entry: TLdapEntry); reintroduce;
+    constructor Create(AOwner: TComponent; Entry: TLdapEntry; const AttributeName: string = sUserPassword); reintroduce;
   end;
 
 var
@@ -57,12 +60,14 @@ implementation
 
 uses Constant;
 
-constructor TPasswordDlg.Create(AOwner: TComponent; Entry: TLdapEntry);
+constructor TPasswordDlg.Create(AOwner: TComponent; Entry: TLdapEntry; const AttributeName: string = sUserPassword);
 begin
   inherited Create(AOwner);
+  fPasswordAttribute := AttributeName;
   cbMethod.ItemIndex := 5;
   fEntry := Entry;
-  if Entry.AttributesByName['objectclass'].IndexOf('sambasamaccount') <> -1 then
+  if (AnsiCompareText(AttributeName, sUserPassword) = 0) and
+     (Entry.AttributesByName['objectclass'].IndexOf('sambasamaccount') <> -1) then
   begin
     cbPosixPassword.Visible := true;
     cbSambaPassword.Visible := true;
@@ -87,15 +92,7 @@ begin
       end;
     end;
     if cbPosixPassword.Checked then
-    begin
-      fPassword := TPasswordObject.Create(fEntry);
-      try
-        fPassword.HashType := THashType(cbMethod.ItemIndex);
-        fPassword.Password := Password.Text;
-      finally
-        fPassword.Free;
-      end;
-    end;
+      fEntry.AttributesByName[fPasswordAttribute].AsString := GetPasswordString(THashType(cbMethod.ItemIndex), Password.Text);
   end;
 end;
 

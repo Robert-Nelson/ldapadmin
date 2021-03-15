@@ -52,12 +52,15 @@ type
     cbTemplateExtensions: TCheckBox;
     cbTemplateAutoload: TCheckBox;
     cbTemplateProperties: TCheckBox;
+    Button1: TButton;
+    CheckAssocCbk: TCheckBox;
     procedure btnAddClick(Sender: TObject);
     procedure btnDelClick(Sender: TObject);
     procedure cbConnectClick(Sender: TObject);
     procedure cbIdObjectClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
   private
     cbStartupConnection: TLAComboBox;
     procedure cbStartupConnectionDrawItem(Control: TWinControl;
@@ -104,6 +107,7 @@ begin
     cbTemplateExtensions.Checked := ReadBool(rTemplateExtensions, true);
     cbTemplateAutoload.Checked := ReadBool(rTemplateAutoload, true);
     cbTemplateProperties.Checked := ReadBool(rTemplateProperties, true);
+    CheckAssocCbk.Checked:= not ReadBool(rDontCheckProto, false);
 
     s := ReadString(rStartupSession);
     with cbStartupConnection do
@@ -178,6 +182,7 @@ begin
     WriteBool(rTemplateAutoload, cbTemplateAutoload.Checked);
     WriteBool(rTemplateProperties, cbTemplateProperties.Checked);
     WriteString(rTemplateDir, TemplateList.Items.CommaText);
+    WriteBool(rDontCheckProto, not CheckAssocCbk.Checked);
     with cbStartupConnection do
     begin
       if ItemIndex = -1 then
@@ -235,6 +240,12 @@ begin
     Beep;
     CanCloseUp := false;
   end;
+end;
+
+procedure TConfigDlg.Button1Click(Sender: TObject);
+begin
+  RegProtocol('LDAP');
+  RegProtocol('LDAPS');  
 end;
 
 end.

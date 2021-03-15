@@ -1,5 +1,5 @@
   {      LDAPAdmin - Group.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2006 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Constant;
+  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Core, Constant;
 
 type
   TGroupDlg = class(TForm)
@@ -74,6 +74,7 @@ type
     Entry: TLdapEntry;
     PosixGroup: TPosixGroup;
     SambaGroup: TSamba3Group;
+    GroupOfUniqueNames: TGroupOfUniqueNames;
     IsSambaGroup: Boolean;
     ColumnToSort: Integer;
     Descending: Boolean;
@@ -84,7 +85,7 @@ type
     procedure Save;
     function GetGroupType: Integer;
   public
-    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Boolean = false); reintroduce;
   end;
 
 var
@@ -125,21 +126,36 @@ var
   i: Integer;
 begin
   Entry.Read;
-  edName.Text := PosixGroup.Cn;
-  edDescription.Text := PosixGroup.Description;
-  for i := 0 to PosixGroup.MembersCount - 1 do
-  begin
-    ListItem := UserList.Items.Add;
-    ListItem.Caption := PosixGroup.Members[i];
-    ListItem.Data := StrNew(PChar(Session.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
-    ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
+  with Entry.AttributesByName['objectclass'] do begin
+    IsSambaGroup := IndexOf('sambagroupmapping') <> -1;
+    if IndexOf('posixgroup') <> -1 then
+      PosixGroup := TPosixGroup.Create(Entry);
+    if IndexOf('groupofuniquenames') <> -1 then
+      GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry);
   end;
+  edName.Text := Entry.AttributesByName['cn'].AsString;
+  edDescription.Text := Entry.AttributesByName['description'].AsString;
+  if Assigned(GroupOfUniqueNames) then
+    for i := 0 to GroupOfUniqueNames.MembersCount - 1 do
+    begin
+      ListItem := UserList.Items.Add;
+      ListItem.Caption := GroupOfUniqueNames.Members[i];
+      ListItem.Data := StrNew(PChar(ListItem.Caption));
+      ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
+    end
+  else
+    for i := 0 to PosixGroup.MembersCount - 1 do
+    begin
+      ListItem := UserList.Items.Add;
+      ListItem.Caption := PosixGroup.Members[i];
+      ListItem.Data := StrNew(PChar(Session.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
+      ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
+    end;
   if UserList.Items.Count > 0 then
     RemoveUserBtn.Enabled := true;
-  IsSambaGroup := Entry.AttributesByName['objectclass'].IndexOf('sambagroupmapping') <> -1;
 end;
 
-constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
+constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Boolean = false);
 var
   n: Integer;
 begin
@@ -147,10 +163,12 @@ begin
   ParentDn := dn;
   Self.Session := Session;
   Entry := TLdapEntry.Create(Session, dn);
-  PosixGroup := TPosixGroup.Create(Entry);
   if Mode = EM_MODIFY then
   begin
     Load;
+    if not Assigned(PosixGroup) then
+      TabSheet2.TabVisible := false
+    else
     if IsSambaGroup then
     begin
       //SambaGroup := TSamba3Group.Create(Entry); -> happens in cbSambaGroupOnCheck
@@ -176,8 +194,18 @@ begin
     Caption := Format(cPropertiesOf, [edName.Text]);
     UserList.AlphaSort;
   end
-  else
-    PosixGroup.New;
+  else begin
+    if APosixGroup then
+    begin
+      PosixGroup := TPosixGroup.Create(Entry);
+      PosixGroup.New;
+    end;
+    if AGroupOfUniqueNames then
+    begin
+      GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry);
+      GroupOfUniqueNames.New;
+    end;
+  end;
 end;
 
 procedure TGroupDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -193,7 +221,7 @@ begin
     raise Exception.Create(stGroupNameReq);
   if cbSambaGroup.Checked and Assigned(DomList) and (cbSambaDomain.ItemIndex = -1) then
     raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
-  if esNew in Entry.State then
+  if Assigned(PosixGroup) and (esNew in Entry.State) then
   begin
     PosixGroup.GidNumber := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, START_GID), AccountConfig.ReadInteger(rposixLastGID, LAST_GID));
     edRidChange(nil);  // Update sambaSid
@@ -231,9 +259,16 @@ begin
 
       UserItem := UserList.Items.Add;
       UserItem.Data := StrNew(pchar(Selected[i].DN));
-      UserItem.Caption := selected[i].AttributesByName['uid'].AsString;
       UserItem.SubItems.Add(CanonicalName(GetDirFromDN(Selected[i].DN)));
-      PosixGroup.AddMember(GetNameFromDN(Selected[i].DN));
+      if Assigned(GroupOfUniqueNames) then
+      begin
+        GroupOfUniqueNames.AddMember(Selected[i].DN);
+        UserItem.Caption := selected[i].DN;
+      end
+      else begin
+        PosixGroup.AddMember(GetNameFromDN(Selected[i].DN));
+        UserItem.Caption := selected[i].AttributesByName['uid'].AsString;
+      end;
     end;
     Free;
   end;
@@ -247,7 +282,10 @@ begin
   If Assigned(Selected) then
   begin
     idx := Selected.Index;
-    PosixGroup.RemoveMember(Selected.Caption);
+    if Assigned(GroupOfUniqueNames) then
+      GroupOfUniqueNames.RemoveMember(Selected.Caption)
+    else
+      PosixGroup.RemoveMember(Selected.Caption);
     Selected.Delete;
     OkBtn.Enabled := true;
     if idx = Items.Count then
@@ -341,7 +379,7 @@ procedure TGroupDlg.cbSambaDomainChange(Sender: TObject);
 var
   AlgRidBase: Integer;
 begin
-  if (PosixGroup.gidNumber <> 0) and (cbSambaDomain.ItemIndex <> -1) then
+  if Assigned(PosixGroup) and (PosixGroup.gidNumber <> 0) and (cbSambaDomain.ItemIndex <> -1) then
   begin
     RadioGroup1.Enabled := true;
     if cbBuiltin.ItemIndex = -1 then
@@ -419,7 +457,7 @@ begin
   if Assigned(SambaGroup) then
   begin
     if edDisplayName.Text = '' then
-      edDisplayName.Text := PosixGroup.Cn;
+      edDisplayName.Text := Entry.AttributesByName['cn'].AsString;
     cbSambaDomainChange(nil); // Refresh Rid
   end;
 end;
@@ -428,13 +466,13 @@ procedure TGroupDlg.edNameChange(Sender: TObject);
 begin
   if esNew in Entry.State then
     Entry.Dn := 'cn=' + edName.Text + ',' + ParentDn;
-  PosixGroup.Cn := edName.Text;
+  Entry.AttributesByName['cn'].AsString := edName.Text;
   OkBtn.Enabled := edName.Text <> '';
 end;
 
 procedure TGroupDlg.edDescriptionChange(Sender: TObject);
 begin
-  PosixGroup.Description := edDescription.Text;
+  Entry.AttributesByName['description'].AsString := edDescription.Text;
   OkBtn.Enabled := edName.Text <> '';
 end;
 
@@ -464,6 +502,8 @@ end;
 procedure TGroupDlg.FormDestroy(Sender: TObject);
 begin
   Entry.Free;
+  PosixGroup.Free;
+  GroupOfUniqueNames.Free;
 end;
 
 end.

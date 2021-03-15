@@ -24,7 +24,7 @@ unit ConnProp;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-     Buttons, ExtCtrls, Config;
+     Buttons, ExtCtrls, Config, ComCtrls;
 
 type
   TConnPropDlg = class(TForm)
@@ -38,7 +38,7 @@ type
     Label5:       TLabel;
     PasswordEd:   TEdit;
     AnonimousCbx: TCheckBox;
-    GroupBox3:    TGroupBox;
+    ConnectionBox: TGroupBox;
     Label2:       TLabel;
     ServerEd:     TEdit;
     Label3:       TLabel;
@@ -49,14 +49,36 @@ type
     Label6:       TLabel;
     FetchDnBtn:   TBitBtn;
     Panel1:       TPanel;
-    Bevel1:       TBevel;
     BaseEd:       TComboBox;
     TestBtn:      TButton;
+    Panel2: TPanel;
+    ButtonsPnl: TPanel;
+    PageControl1: TPageControl;
+    TabSheet1: TTabSheet;
+    TabSheet2: TTabSheet;
+    GroupBox1: TGroupBox;
+    Label15: TLabel;
+    Label14: TLabel;
+    edTimeLimit: TEdit;
+    Label13: TLabel;
+    edSizeLimit: TEdit;
+    cbxPagedSearch: TCheckBox;
+    edPageSize: TEdit;
+    GroupBox2: TGroupBox;
+    Label10: TLabel;
+    Label11: TLabel;
+    cbReferrals: TComboBox;
+    edReferralHops: TEdit;
+    Label8: TLabel;
+    cbDerefAliases: TComboBox;
     procedure     cbSSLClick(Sender: TObject);
     procedure     AnonimousCbxClick(Sender: TObject);
     procedure     FetchDnBtnClick(Sender: TObject);
     procedure     VersionComboChange(Sender: TObject);
     procedure     TestBtnClick(Sender: TObject);
+    procedure     ValidateInput(Sender: TObject);
+    procedure cbxPagedSearchClick(Sender: TObject);
+    procedure cbReferralsClick(Sender: TObject);
   private
     FUser:        string;
     FPass:        string;
@@ -76,8 +98,22 @@ type
     function      GetSSL: boolean;
     procedure     SetSSL(const Value: boolean);
     function      GetName: string;
+    function      GetTimeLimit: Integer;
+    procedure     SetTimeLimit(const Value: Integer);
+    function      GetSizeLimit: Integer;
+    procedure     SetSizeLimit(const Value: Integer);
+    function      GetPagedSearch: boolean;
+    procedure     SetPagedSearch(const Value: boolean);
+    function      GetPageSize: Integer;
+    procedure     SetPageSize(const Value: Integer);
+    function      GetDerefAliases: Integer;
+    procedure     SetDerefAliases(const Value: Integer);
+    function      GetReferrals: boolean;
+    procedure     SetReferrals(const Value: boolean);
+    function      GetReferralHops: Integer;
+    procedure     SetReferralHops(const Value: Integer);
     procedure     SetConnectionName(const Value: string);
-    procedure SetPassEnable(const Value: boolean);
+    procedure     SetPassEnable(const Value: boolean);
   protected
     procedure     DoShow; override;
   public
@@ -91,6 +127,13 @@ type
     property      Base: string read GetBase write SetBase;
     property      Password: string read GetPassword write SetPassword;
     property      PasswordEnable: boolean read FPassEnable write SetPassEnable;
+    property      TimeLimit: Integer read GetTimeLimit write SetTimeLimit;
+    property      SizeLimit: Integer read GetSizeLimit write SetSizeLimit;
+    property      PagedSearch: Boolean read GetPagedSearch write SetPagedSearch;
+    property      PageSize: Integer read GetPageSize write SetPageSize;
+    property      DereferenceAliases: Integer read GetDerefAliases write SetDerefAliases;
+    property      ChaseReferrals: Boolean read GetReferrals write SetReferrals;
+    property      ReferralHops: Integer read GetReferralHops write SetReferralHops;
   end;
 
 var
@@ -105,8 +148,15 @@ uses WinLDAP, Constant, LDAPClasses, Math, Dialogs;
 constructor TConnPropDlg.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  Port:=LDAP_PORT;
-  LdapVersion:=LDAP_VERSION3;
+  Port               := LDAP_PORT;
+  LdapVersion        := LDAP_VERSION3;
+  TimeLimit          := SESS_TIMEOUT;
+  SizeLimit          := SESS_SIZE_LIMIT;
+  PagedSearch        := true;
+  PageSize           := SESS_PAGE_SIZE;
+  ChaseReferrals     := true;
+  ReferralHops       := SESS_REFF_HOP_LIMIT;
+  DereferenceAliases := LDAP_DEREF_NEVER;
 end;
 
 procedure TConnPropDlg.DoShow;
@@ -196,6 +246,85 @@ begin
   cbSSL.Checked:=Value;
 end;
 
+function TConnPropDlg.GetTimeLimit: Integer;
+begin
+  Result := StrToInt(edTimeLimit.Text);
+end;
+
+procedure TConnPropDlg.SetTimeLimit(const Value: Integer);
+begin
+  edTimeLimit.Text := IntToStr(Value);
+end;
+
+function TConnPropDlg.GetSizeLimit: Integer;
+begin
+  Result := StrToInt(edSizeLimit.Text);
+end;
+
+procedure TConnPropDlg.SetSizeLimit(const Value: Integer);
+begin
+  edSizeLimit.Text := IntToStr(Value);
+end;
+
+function TConnPropDlg.GetPagedSearch: boolean;
+begin
+  Result := cbxPagedSearch.Checked;
+  cbxPagedSearchClick(nil);
+end;
+
+procedure TConnPropDlg.SetPagedSearch(const Value: boolean);
+begin
+  cbxPagedSearch.Checked := Value;
+  cbxPagedSearchClick(nil);
+end;
+
+function TConnPropDlg.GetPageSize: Integer;
+begin
+  Result := StrToInt(edPageSize.Text);
+end;
+
+procedure TConnPropDlg.SetPageSize(const Value: Integer);
+begin
+  edPageSize.Text := IntToStr(Value);
+end;
+
+function TConnPropDlg.GetDerefAliases: Integer;
+begin
+  Result := cbDerefAliases.ItemIndex;
+end;
+
+procedure TConnPropDlg.SetDerefAliases(const Value: Integer);
+begin
+  cbDerefAliases.ItemIndex := Value;
+end;
+
+function TConnPropDlg.GetReferrals: boolean;
+begin
+  result := cbReferrals.ItemIndex = 0;
+  cbReferralsClick(nil);
+end;
+
+procedure TConnPropDlg.SetReferrals(const Value: boolean);
+begin
+  cbReferrals.ItemIndex := Ord(not Value);
+  cbReferralsClick(nil);
+end;
+
+function TConnPropDlg.GetReferralHops: Integer;
+begin
+  Result := StrToInt(edReferralHops.Text);
+end;
+
+procedure TConnPropDlg.SetReferralHops(const Value: Integer);
+begin
+  edReferralHops.Text := IntToStr(Value);
+end;
+
+procedure TConnPropDlg.ValidateInput(Sender: TObject);
+begin
+  StrToInt((Sender as TEdit).Text);
+end;
+
 procedure TConnPropDlg.cbSSLClick(Sender: TObject);
 begin
   if cbSSL.Checked then PortEd.Text := IntToStr(LDAP_SSL_PORT)
@@ -277,8 +406,7 @@ begin
 
     Screen.Cursor:=crHourGlass;
     Asession.Connect;
-    //if Asession.Connected then
-    Application.MessageBox('Connection is successful.', pchar(Application.Title), MB_ICONINFORMATION+ MB_OK);
+    Application.MessageBox(sConnectSuccess, pchar(Application.Title), MB_ICONINFORMATION+ MB_OK);
   finally
     Screen.Cursor:=crDefault;
     Asession.Free;
@@ -292,6 +420,32 @@ begin
   PasswordEd.Visible:=Value;
   if Value then Label5.Caption:= 'Password:'
   else Label5.Caption:=stCantStorPass;
+end;
+
+procedure TConnPropDlg.cbxPagedSearchClick(Sender: TObject);
+begin
+  if cbxPagedSearch.Checked then
+  begin
+    edPageSize.Enabled := true;
+    edPageSize.Color := clWindow;
+  end
+  else begin
+    edPageSize.Enabled := false;
+    edPageSize.Color := clBtnFace;
+  end;
+end;
+
+procedure TConnPropDlg.cbReferralsClick(Sender: TObject);
+begin
+  if cbReferrals.ItemIndex = 0 then
+  begin
+    edReferralHops.Enabled := true;
+    edReferralHops.Color := clWindow;
+  end
+  else begin
+    edReferralHops.Enabled := false;
+    edReferralHops.Color := clBtnFace;
+  end;
 end;
 
 end.

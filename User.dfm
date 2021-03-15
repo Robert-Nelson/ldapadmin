@@ -562,115 +562,85 @@ object UserDlg: TUserDlg
       ImageIndex = 7
       object Label15: TLabel
         Left = 208
-        Top = 216
+        Top = 208
         Width = 31
         Height = 13
         Caption = 'P&ager:'
       end
-      object Label16: TLabel
-        Left = 16
-        Top = 312
-        Width = 47
-        Height = 13
-        Caption = '&Web Site:'
-      end
       object Label18: TLabel
         Left = 16
-        Top = 72
+        Top = 64
         Width = 31
         Height = 13
         Caption = '&Street:'
       end
       object Label19: TLabel
         Left = 16
-        Top = 216
+        Top = 208
         Width = 75
         Height = 13
         Caption = 'State/&Province:'
       end
-      object Label20: TLabel
-        Left = 208
-        Top = 264
-        Width = 52
-        Height = 13
-        Caption = 'IP-&Telefon:'
-      end
       object Label22: TLabel
         Left = 208
-        Top = 120
+        Top = 112
         Width = 34
         Height = 13
         Caption = 'P&hone:'
       end
       object Label24: TLabel
         Left = 112
-        Top = 216
+        Top = 208
         Width = 46
         Height = 13
         Caption = '&Zip Code:'
       end
       object Label25: TLabel
         Left = 208
-        Top = 72
+        Top = 64
         Width = 31
         Height = 13
         Caption = '&Office:'
       end
       object Label27: TLabel
         Left = 208
-        Top = 24
+        Top = 16
         Width = 40
         Height = 13
         Caption = 'P&osition:'
       end
       object Label29: TLabel
         Left = 16
-        Top = 24
+        Top = 16
         Width = 47
         Height = 13
         Caption = 'C&ompany:'
       end
       object Label30: TLabel
         Left = 208
-        Top = 168
+        Top = 160
         Width = 20
         Height = 13
         Caption = '&Fax:'
       end
       object Label31: TLabel
         Left = 16
-        Top = 168
+        Top = 160
         Width = 20
         Height = 13
         Caption = '&City:'
       end
-      object Label32: TLabel
-        Left = 16
-        Top = 264
-        Width = 39
-        Height = 13
-        Caption = 'Countr&y:'
-      end
       object pager: TEdit
         Left = 208
-        Top = 232
+        Top = 224
         Width = 161
         Height = 21
-        TabOrder = 9
+        TabOrder = 8
         OnChange = EditChange
-      end
-      object URL: TEdit
-        Left = 16
-        Top = 328
-        Width = 353
-        Height = 21
-        Color = clBtnFace
-        Enabled = False
-        TabOrder = 11
       end
       object postalAddress: TMemo
         Left = 16
-        Top = 88
+        Top = 80
         Width = 177
         Height = 73
         TabOrder = 1
@@ -678,32 +648,23 @@ object UserDlg: TUserDlg
       end
       object st: TEdit
         Left = 16
-        Top = 232
+        Top = 224
         Width = 89
         Height = 21
         TabOrder = 3
         OnChange = EditChange
       end
-      object IPPhone: TEdit
-        Left = 208
-        Top = 280
-        Width = 161
-        Height = 21
-        Color = clBtnFace
-        Enabled = False
-        TabOrder = 10
-      end
       object telephoneNumber: TEdit
         Left = 208
-        Top = 136
+        Top = 128
         Width = 161
         Height = 21
-        TabOrder = 7
+        TabOrder = 6
         OnChange = EditChange
       end
       object postalCode: TEdit
         Left = 112
-        Top = 232
+        Top = 224
         Width = 81
         Height = 21
         TabOrder = 4
@@ -711,15 +672,15 @@ object UserDlg: TUserDlg
       end
       object physicalDeliveryOfficeName: TEdit
         Left = 208
-        Top = 88
+        Top = 80
         Width = 161
         Height = 21
-        TabOrder = 6
+        TabOrder = 5
         OnChange = EditChange
       end
       object o: TEdit
         Left = 16
-        Top = 40
+        Top = 32
         Width = 177
         Height = 21
         TabOrder = 0
@@ -727,35 +688,26 @@ object UserDlg: TUserDlg
       end
       object facsimileTelephoneNumber: TEdit
         Left = 208
-        Top = 184
+        Top = 176
         Width = 161
         Height = 21
-        TabOrder = 8
+        TabOrder = 7
         OnChange = EditChange
       end
       object l: TEdit
         Left = 16
-        Top = 184
+        Top = 176
         Width = 177
         Height = 21
         TabOrder = 2
         OnChange = EditChange
       end
-      object c: TEdit
-        Left = 16
-        Top = 280
-        Width = 177
-        Height = 21
-        Color = clBtnFace
-        Enabled = False
-        TabOrder = 5
-      end
       object title: TEdit
         Left = 208
-        Top = 40
+        Top = 32
         Width = 161
         Height = 21
-        TabOrder = 12
+        TabOrder = 9
         OnChange = EditChange
       end
     end

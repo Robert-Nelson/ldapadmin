@@ -29,8 +29,9 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Posix, Shadow,
-  InetOrg, Postfix, Samba, PropertyObject, Constant, ExtDlgs, TemplateCtrl, 
+  InetOrg, Postfix, Samba, PropertyObject, Constant, ExtDlgs, TemplateCtrl,
   CheckLst;
+
 
 const
 
@@ -82,10 +83,8 @@ type
     DelMailBtn: TButton;
     OfficeSheet: TTabSheet;
     Label15: TLabel;
-    Label16: TLabel;
     Label18: TLabel;
     Label19: TLabel;
-    Label20: TLabel;
     Label22: TLabel;
     Label24: TLabel;
     Label25: TLabel;
@@ -93,19 +92,15 @@ type
     Label29: TLabel;
     Label30: TLabel;
     Label31: TLabel;
-    Label32: TLabel;
     pager: TEdit;
-    URL: TEdit;
     postalAddress: TMemo;
     st: TEdit;
-    IPPhone: TEdit;
     telephoneNumber: TEdit;
     postalCode: TEdit;
     physicalDeliveryOfficeName: TEdit;
     o: TEdit;
     facsimileTelephoneNumber: TEdit;
     l: TEdit;
-    c: TEdit;
     PrivateSheet: TTabSheet;
     Label17: TLabel;
     Label23: TLabel;
@@ -507,7 +502,7 @@ begin
   try
     if (uid.Text) = '' then
       raise Exception.Create(Format(stReqNoEmpty, [cUsername]));
-    if (sn.text) = '' then
+    if InetOrgPerson.Activated and (sn.text = '') then
       raise Exception.Create(Format(stReqNoEmpty, [cSurname]));
     if (homeDirectory.text) = '' then
       raise Exception.Create(Format(stReqNoEmpty, [cHomeDir]));
@@ -632,6 +627,11 @@ begin
   else begin
     //Fill out the form
     Entry.Read;
+    if not InetOrgPerson.Activated then
+    begin
+      OfficeSheet.TabVisible := false;
+      PrivateSheet.TabVisible := false;
+    end;
     PosixPreset;
     if ShadowAccount.Activated then
       cbShadow.Checked := true;
@@ -729,25 +729,73 @@ end;
 
 procedure TUserDlg.PageControlChange(Sender: TObject);
 begin
-  if (PageControl.ActivePage = GroupSheet) and (GroupSheet.Tag = 0) then  // Tag = 0: list not yet populated
+  if PageControl.ActivePage = GroupSheet then
   begin
-    edGidNumber.Text := Session.GetDN(Format(sGROUPBYGID, [PosixAccount.GidNumber]));
-    if uid.Text <> '' then
+    if GroupSheet.Tag = 0 then  // Tag = 0: list not yet populated
     begin
-      PopulateGroupList;
-      GroupList.AlphaSort;
-      GroupSheet.Tag := 1;
+      edGidNumber.Text := Session.GetDN(Format(sGROUPBYGID, [PosixAccount.GidNumber]));
+      if uid.Text <> '' then
+      begin
+        PopulateGroupList;
+        GroupList.AlphaSort;
+        GroupSheet.Tag := 1;
+      end;
     end;
   end
   else
-  if (PageControl.ActivePage = PrivateSheet) and not Assigned(Image1.Picture.Graphic) then
+  if PageControl.ActivePage = PrivateSheet then
   begin
-    Image1.Picture.Graphic := InetOrgPerson.JPegPhoto;
-    if Assigned(Image1.Picture.Graphic) then
+    if not Assigned(Image1.Picture.Graphic) then
     begin
-      DeleteJpegBtn.Enabled := true;
-      Panel2.Caption := '';
+      Image1.Picture.Graphic := InetOrgPerson.JPegPhoto;
+      if Assigned(Image1.Picture.Graphic) then
+      begin
+        DeleteJpegBtn.Enabled := true;
+        Panel2.Caption := '';
+      end;
     end;
+  end
+  else
+  if PageControl.ActivePage = OfficeSheet then
+  begin
+    Label11.Top := 256;
+    Label11.Left := 16;
+    AddMailBtn.Left := 296;
+    AddMailBtn.Top := 272;
+    EditMailBtn.Left := AddMailBtn.Left;
+    EditMailBtn.Top := 304;
+    DelMailBtn.Left := AddMailBtn.Left;
+    DelMailBtn.Top := 336;
+    mail.Top := 272;
+    mail.Left := 16;
+    mail.Width := 273;
+    mail.Height := 89;
+    Label11.Parent := OfficeSheet;
+    mail.Parent := OfficeSheet;
+    AddMailBtn.Parent := OfficeSheet;
+    EditMailBtn.pArent := OfficeSheet;
+    DelMailBtn.Parent := OfficeSheet;
+  end
+  else
+  if PageControl.ActivePage = MailSheet then
+  begin
+    Label11.Top := 64;
+    Label11.Left := 16;
+    AddMailBtn.Left := 16;
+    AddMailBtn.Top := 336;
+    EditMailBtn.Left := 96;
+    EditMailBtn.Top := AddMailBtn.Top;
+    DelMailBtn.Left := 176;
+    DelMailBtn.Top := AddMailBtn.Top;
+    mail.Top := 80;
+    mail.Left := 16;
+    mail.Width := 353;
+    mail.Height := 249;
+    Label11.Parent := MailSheet;
+    mail.Parent := MailSheet;
+    AddMailBtn.Parent := MailSheet;
+    EditMailBtn.pArent := MailSheet;
+    DelMailBtn.Parent := MailSheet;
   end;
 end;
 
@@ -1237,7 +1285,6 @@ begin
         if SafeDelete(Name) then
           Entry.AttributesByName[Name].Delete;
       end;
-      //xxx
       Exit;
     end;
     Template := TTemplate(Items.Objects[ItemIndex]);

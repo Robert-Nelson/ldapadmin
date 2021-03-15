@@ -234,12 +234,14 @@ type
     FMatchingRules:       TLDAPSchemaMatchingRules;
     FMatchingRuleUses:    TLDAPSchemaMatchingRuleUses;
     FLoaded:              boolean;
+    FDn:                  string;
     procedure             Load;
   public
     constructor           Create(const ASession: TLDAPSEssion); reintroduce;
     destructor            Destroy; override;
     procedure             Clear;
     property              Session: TLDAPSession read FSession;
+    property              DN: string read Fdn;
     property              ObjectClasses: TLDAPSchemaClasses read FObjectClasses;
     property              Attributes: TLDAPSchemaAttributes read FAttributes;
     property              Syntaxes: TLDAPSchemaSyntaxes read FSyntaxes;
@@ -581,6 +583,7 @@ begin
   FSyntaxes:=TLDAPSchemaSyntaxes.Create(self);
   FMatchingRules:=TLDAPSchemaMatchingRules.Create(self);
   FMatchingRuleUses:=TLDAPSchemaMatchingRuleUses.Create(self);
+  FDn:='';
   Load;
 end;
 
@@ -605,7 +608,7 @@ end;
 
 procedure TLDAPSchema.Load;
 var
-  SubschemaSubentry: string;
+//  SubschemaSubentry: string;
   SearchResult: TLdapEntryList;
 begin
   FLoaded:=false;
@@ -616,13 +619,13 @@ begin
   try
     // Search path to schema ///////////////////////////////////////////////////
     FSession.Search('objectclass=*','',LDAP_SCOPE_BASE,['subschemaSubentry'],false,SearchResult);
-    SubschemaSubentry:=SearchResult[0].AttributesByName['subschemaSubentry'].AsString;
-    if SubschemaSubentry='' then raise Exception.Create('Can''t find SubschemaSubentry');
+    FDn:=SearchResult[0].AttributesByName['subschemaSubentry'].AsString;
+    if FDn='' then raise Exception.Create('Can''t find SubschemaSubentry');
 
 
     // Get schema values ///////////////////////////////////////////////////////
     SearchResult.Clear;
-    FSession.Search('(objectClass=*)', SubschemaSubentry, LDAP_SCOPE_BASE,
+    FSession.Search('(objectClass=*)', FDn, LDAP_SCOPE_BASE,
                     ['ldapSyntaxes', 'attributeTypes', 'objectclasses', 'matchingRules', 'matchingRuleUse'],
                     false, SearchResult);
 

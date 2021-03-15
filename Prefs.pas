@@ -78,6 +78,7 @@ type
     Label16: TLabel;
     Label17: TLabel;
     BtnWizard: TButton;
+    cbxPosixGroupOfUniqueNames: TCheckBox;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure SetBtnClick(Sender: TObject);
     procedure PageControl1Change(Sender: TObject);
@@ -121,6 +122,7 @@ begin
     edProfilePath.Text  := ReadString(rsambaProfilePath, '');
     edMailAddress.Text  := ReadString(rpostfixMailAddress, '');
     edMaildrop.Text     := ReadString(rpostfixMaildrop, '');
+    cbxPosixGroupOfUniqueNames.Checked := ReadBool(rPosixGroupOfUnames, false);
   end;
 end;
 
@@ -145,6 +147,7 @@ begin
     WriteString (rsambaProfilePath,   edProfilePath.Text);
     WriteString (rpostfixMailAddress, edMailAddress.Text);
     WriteString (rpostfixMaildrop,    edMaildrop.Text);
+    WriteBool   (rPosixGroupOfUnames, cbxPosixGroupOfUniqueNames.Checked);
   end;
 end;
 

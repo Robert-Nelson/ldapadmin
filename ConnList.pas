@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, StdCtrls, Menus, ImgList, ExtCtrls, Buttons, Config, ToolWin,
-  ActnList;
+  ActnList, LDAPClasses;
 
 type
   TConnListFrm = class(TForm)
@@ -224,6 +224,7 @@ var
 begin
   with TConnPropDlg.Create(self) do begin
     PasswordEnable:=FStorage.PasswordCanSave;
+
     if ShowModal=mrOK then begin
       if Name='' then Name:=Server+'/'+Base;
       AName:=Name;
@@ -315,16 +316,23 @@ begin
   if (AccountsView.Selected=nil) or (AccountsView.Selected.Data=nil) then exit;
   Account:=TAccount(AccountsView.Selected.Data);
   with TConnPropDlg.Create(Self) do begin
-    Name          := Account.Name;
-    Base          := Account.Base;
-    SSL           := Account.SSl;
-    Port          := Account.Port;
-    LdapVersion   := Account.LdapVersion;
-    User          := Account.User;
-    Server        := Account.Server;
-    Password      := Account.Password;
-    PasswordEnable:= FStorage.PasswordCanSave;
-    
+    Name           := Account.Name;
+    Base           := Account.Base;
+    SSL            := Account.SSl;
+    Port           := Account.Port;
+    LdapVersion    := Account.LdapVersion;
+    User           := Account.User;
+    Server         := Account.Server;
+    Password       := Account.Password;
+    PasswordEnable := FStorage.PasswordCanSave;
+    TimeLimit      := Account.Timelimit;
+    SizeLimit      := Account.SizeLimit;
+    PagedSearch    := Account.PagedSearch;
+    PageSize       := Account.PageSize;
+    DereferenceAliases := Account.DereferenceAliases;
+    ChaseReferrals := Account.ChaseReferrals;
+    ReferralHops   := Account.ReferralHops;
+
     if ShowModal=mrOK then begin
       Account.Name          := Name;
       Account.Base          := Base;
@@ -334,6 +342,13 @@ begin
       Account.User          := User;
       Account.Server        := Server;
       Account.Password      := Password;
+      Account.TimeLimit     := Timelimit;
+      Account.SizeLimit     := SizeLimit;
+      Account.PagedSearch   := PagedSearch;
+      Account.PageSize      := PageSize;
+      Account.DereferenceAliases := DereferenceAliases;
+      Account.ChaseReferrals:= ChaseReferrals;
+      Account.ReferralHops  := ReferralHops;
     end;
   end;
   RefreshAccountsView;

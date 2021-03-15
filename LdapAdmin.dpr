@@ -53,7 +53,9 @@ uses
   ConfigDlg in 'ConfigDlg.pas' {ConfigDlg},
   PickAttr in 'PickAttr.pas' {PickAttributesDlg},
   uAccountCopyDlg in 'uAccountCopyDlg.pas' {AccountCopyDlg},
-  LAControls in 'LAControls.pas';
+  LAControls in 'LAControls.pas',
+  Events in 'Events.pas',
+  Core in '\\SRV-K-SVC01\tihomir.karlovic\Eigene Dateien\Projects\LdapAdminOS\Core.pas';
 
 {$R *.RES}
 

@@ -104,7 +104,11 @@ begin
     host:=copy(AURL,1,n2-1);
     port:=StrToIntDef(copy(AURL,n2+1,n1-n2-1),-1);
   end
-  else host:=copy(AURL,1,n1-1);
+  else begin
+    host:=copy(AURL,1,n1-1);
+    if proto='ldaps' then
+      port := 636;
+  end;
 
   Delete(AURL,1,n1);
 
@@ -242,6 +246,11 @@ begin
     else if s = 'posixgroup' then
     begin
       ImageIndex := bmGroup;
+      Container := false;
+    end
+    else if s = 'groupofuniquenames' then
+    begin
+      ImageIndex := bmGrOfUnqNames;
       Container := false;
     end
     else if s = 'transporttable' then
@@ -476,8 +485,8 @@ begin
         ClientHeight:=TButton(Components[i]).Top+TButton(Components[i]).Height+16;
       end;
     end;
+    ActiveControl := Combo;
     Result := ShowModal;
-    Combo.SetFocus;
     Text := Combo.Text;
   finally
     Form.Free;

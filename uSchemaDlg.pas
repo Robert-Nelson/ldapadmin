@@ -67,6 +67,8 @@ type
     pmOpen:         TMenuItem;
     Bevel1:         TBevel;
     pmUndo:         TMenuItem;
+    SpeedButton1: TSpeedButton;
+    Bevel2: TBevel;
     procedure       TreeChange(Sender: TObject; Node: TTreeNode);
     procedure       SearchEditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure       ViewMouseMove(Sender: TObject; Shift: TShiftState; X,  Y: Integer);
@@ -87,6 +89,7 @@ type
     function        GetNodeAt(X, Y: Integer): TTreeNode;
     procedure       pmUndoClick(Sender: TObject);
     function        GetLinkRect(Node: TTreeNode): TRect;
+    procedure       SpeedButton1Click(Sender: TObject);
   private
     FSchema:        TLDAPSchema;
     FLastSerched:   string;
@@ -109,11 +112,12 @@ type
   public
     constructor     Create(const ASession: TLDAPSession); reintroduce;
     destructor      Destroy; override;
+    procedure       SessionDisconnect(Sender: TObject);
   end;
 
 implementation
 
-uses Math;
+uses Math, Export, WinLdap;
 
 const
   FOLDER_IMG          = 0;
@@ -160,6 +164,9 @@ begin
   AddSchemaItems(FSchema.MatchingRuleUses, 'Matching Rule Use', MATCHINGRULEUSE_IMG);
 
   if Tree.Items.Count>0 then Tree.Items[0].Selected:=true;
+
+  ASession.OnDisconnect.Add(SessionDisconnect);
+
   Show;
 end;
 
@@ -172,6 +179,11 @@ begin
 
   inherited;
   FSchema.Free;
+end;
+
+procedure TSchemaDlg.SessionDisconnect(Sender: TObject);
+begin
+  Close;
 end;
 
 procedure TSchemaDlg.TreeChange(Sender: TObject; Node: TTreeNode);
@@ -523,6 +535,7 @@ end;
 procedure TSchemaDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Action:=caFree;
+  FSchema.Session.OnDisconnect.Delete(SessionDisconnect);
 end;
 
 procedure TSchemaDlg.WmGetSysCommand(var Message: TMessage);
@@ -703,6 +716,11 @@ end;
 function TTabInfo.GetIsRedo: boolean;
 begin
   result:=FRedo.Count>0;
+end;
+
+procedure TSchemaDlg.SpeedButton1Click(Sender: TObject);
+begin
+  TExportDlg.Create(FSchema.Dn, FSchema.Session, ['ldapSyntaxes', 'attributeTypes', 'objectclasses', 'matchingRules', 'matchingRuleUse'], false).ShowModal;
 end;
 
 end.

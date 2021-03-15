@@ -27,6 +27,7 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, Dialogs, WinLdap, LDAPClasses, ComCtrls;
 
 type
+
   TExportDlg = class(TForm)
     OKBtn: TButton;
     CancelBtn: TButton;
@@ -36,7 +37,7 @@ type
     Label1: TLabel;
     BrowseBtn: TSpeedButton;
     edFileName: TEdit;
-    CheckBox1: TCheckBox;
+    SubDirsCbk: TCheckBox;
     Label2: TLabel;
     ProgressBar: TProgressBar;
     Label3: TLabel;
@@ -47,12 +48,16 @@ type
     procedure BrowseBtnClick(Sender: TObject);
     procedure edFileNameChange(Sender: TObject);
     procedure OKBtnClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
-    dn: string;
-    Session: TLDAPSession;
-    function DumpTree(const Filter: string; UnixWrite: Boolean): Integer;
+    dn:           string;
+    FAttributes:  array of string;
+    FScope:       Cardinal;
+    Session:      TLDAPSession;
+    function      DumpTree(const Filter: string; UnixWrite: Boolean): Integer;
   public
-    constructor Create(AOwner: TComponent; const adn: string; const ASession: TLDAPSession); reintroduce;
+    constructor   Create(const adn: string; const ASession: TLDAPSession; const CanSubDirs: boolean=true); reintroduce; overload;
+    constructor   Create(const adn: string; const ASession: TLDAPSession; const Attributes: array of string; const CanSubDirs: boolean=true); reintroduce; overload;
   end;
 
 var
@@ -82,14 +87,27 @@ begin
   end;
 end;
 
-constructor TExportDlg.Create(AOwner: TComponent; const adn: string; const ASession: TLDAPSession);
+constructor TExportDlg.Create(const adn: string; const ASession: TLDAPSession; const CanSubDirs: boolean=true);
 begin
-  inherited Create(AOwner);
+  Create(Adn, Asession, [], CanSubDirs);
+end;
+
+constructor TExportDlg.Create(const adn: string; const ASession: TLDAPSession; const Attributes: array of string; const CanSubDirs: boolean=true);
+var
+  i: integer;
+begin
+  inherited Create(nil);
   dn := adn;
   Session := ASession;
   ExportingLabel.Caption := TrimPath(dn, 40);
   Label4.Caption := Label4.Caption + ExportingLabel.Caption;
   Label4.Hint := dn;
+
+  SubDirsCbk.Checked:=CanSubDirs;
+  SubDirsCbk.Enabled:=CanSubDirs;
+
+  setlength(FAttributes, length(Attributes));
+  for i:=0 to length(Attributes)-1 do FAttributes[i]:=Attributes[i];
 end;
 
 procedure TExportDlg.BrowseBtnClick(Sender: TObject);
@@ -109,7 +127,7 @@ begin
   try
     EntryList := TLdapEntryList.Create;
     try
-      Session.Search(Filter, dn, LDAP_SCOPE_SUBTREE, nil, false, EntryList);
+      Session.Search(Filter, dn, FScope, FAttributes, false, EntryList);
       ProgressBar.Max := EntryList.Count;
       Result := 0;
       for i := 0 to EntryList.Count - 1 do
@@ -147,6 +165,11 @@ begin
   CancelBtn.Caption := '&Close';
   CancelBtn.Left := (Width - CancelBtn.Width) div 2;
   CancelBtn.Default := true;
+end;
+
+procedure TExportDlg.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  Action:=CaFree;
 end;
 
 end.

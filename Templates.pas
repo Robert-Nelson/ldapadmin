@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Main.pas
+  {      LDAPAdmin - Templates.pas
   *      Copyright (C) 2006 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
@@ -35,6 +35,8 @@ type
   TTemplateAttribute = class;
   TTemplateAttributeValue = class;
 
+  TTControl = class of TTemplateControl;
+
   { Template Controls }
 
   TTemplateControl = class
@@ -42,6 +44,7 @@ type
     fControl:     TControl;
     fTemplateAttribute: TTemplateAttribute;
     fLdapValue:   TLdapAttributeData;
+    fDefaultValue: string;
     fChangeProc:  TNotifyEvent;
     fExitProc:    TNotifyEvent;
     procedure     OnChangeProc(Sender: TObject);
@@ -50,51 +53,54 @@ type
     procedure     SetOnChange(Event: TNotifyEvent); virtual;
     procedure     SetOnExit(Event: TNotifyEvent); virtual;
     procedure     SetLdapValue(Value: TLdapAttributeData);
+    procedure     LoadProc(XmlNode: TXmlNode); virtual; abstract;
   public
     constructor   Create(Attribute: TTemplateAttribute); virtual;
+    destructor    Destroy; override;
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); virtual; abstract;
     procedure     SetValue(AValue: TTemplateAttributeValue); virtual; abstract;
     procedure     Read; virtual; abstract;
     procedure     Write; virtual; abstract;
-    procedure     Load(XmlNode: TXmlNode); virtual; abstract;
+    procedure     Load(XmlNode: TXmlNode);
     property      Control: TControl read fControl;
     property      OnChange: TNotifyEvent write SetOnChange;
     property      OnExit: TNotifyEvent write SetOnExit;
     property      TemplateAttribute: TTemplateAttribute read fTemplateAttribute;
     property      LdapValue: TLdapAttributeData read fLdapValue write SetLdapValue;
+    property      DefaultValue: string read fDefaultValue write fDefaultValue;
   end;
 
   TTemplateEdit=class(TTemplateControl)
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
   public
     constructor   Create(Attribute: TTemplateAttribute); override;
-    destructor    Destroy; override;
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
     procedure     SetValue(AValue: TTemplateAttributeValue); override;
     procedure     Read; override;
     procedure     Write; override;
-    procedure     Load(XmlNode: TXmlNode); override;
   end;
 
   TTemplateCombo=class(TTemplateControl)
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
   public
     constructor   Create(Attribute: TTemplateAttribute); override;
-    destructor    Destroy; override;
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
     procedure     SetValue(AValue: TTemplateAttributeValue); override;
     procedure     Read; override;
     procedure     Write; override;
-    procedure     Load(XmlNode: TXmlNode); override;
   end;
 
   TTemplateImage=class(TTemplateControl)
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
   public
     constructor   Create(Attribute: TTemplateAttribute); override;
-    destructor    Destroy; override;
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
     procedure     SetValue(AValue: TTemplateAttributeValue); override;
     procedure     Read; override;
     procedure     Write; override;
-    procedure     Load(XmlNode: TXmlNode); override;
   end;
 
   TEditGrid = class(TStringGrid)
@@ -108,14 +114,27 @@ type
   end;
 
   TTemplateGrid=class(TTemplateControl)
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
   public
     constructor   Create(Attribute: TTemplateAttribute); override;
-    destructor    Destroy; override;
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
     procedure     SetValue(AValue: TTemplateAttributeValue); override;
     procedure     Read; override;
     procedure     Write; override;
-    procedure     Load(XmlNode: TXmlNode); override;
+  end;
+
+  TTemplatePasswordButton = class(TTemplateControl)
+  private
+    procedure     ButtonClick(Sender: TObject);
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+    procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
+    procedure     SetValue(AValue: TTemplateAttributeValue); override;
+    procedure     Read; override;
+    procedure     Write; override;
   end;
 
   { Template classes }
@@ -140,20 +159,22 @@ type
     FDescription: string;
     FName:        string;
     FValues:      TObjectList;
-    FControls:    TObjectList;
-    function      GetControls(Index: Integer): TTemplateControl;
+    FControlTemplates:    TObjectList;
+    FDefaultControlClass: TTControl;
+    function      GetControlTemplates(Index: Integer): TXmlNode;
     function      GetControlCount: integer;
     function      GetValues(Index: Integer): TTemplateAttributeValue;
     function      GetValuesCount: integer;
   public
     constructor   Create(XmlNode: TXmlNode); reintroduce;
     destructor    Destroy; override;
+    function      CreateControl(ControlTemplate: TXmlNode): TTemplateControl;
     property      Name: string read FName;
     property      Description: string read FDescription;
     property      Required: Boolean read FRequired;
     property      Values[Index: Integer]: TTemplateAttributeValue read GetValues;
     property      ValuesCount: integer read GetValuesCount;
-    property      Controls[Index: Integer]: TTemplateControl read GetControls;
+    property      ControlTemplates[Index: Integer]: TXmlNode read GetControlTemplates;
     property      ControlCount: integer read GetControlCount;
   end;
 
@@ -229,19 +250,22 @@ type
 
 function GetParameter(var P: PChar): string;
 function IsParametrized(s: string): Boolean;
+function FormatValue(const AValue: string; Entry: TLdapEntry): string;
 
 var
   TemplateParser: TTemplateParser;
 
 implementation
 
-uses base64, SysUtils, Misc, Config;
-
-type TTControl = class of TTemplateControl;
+uses base64, SysUtils, Misc, Config, PassDlg, Constant;
 
 const
-  CONTROLS_CLASSES: array[0..3] of TTControl = (TTemplateEdit, TTemplateCombo, TTemplateImage, TTemplateGrid);
-  DEFAULT_CONTROL_CLASS: TTControl = TTemplateEdit;
+  CONTROLS_CLASSES: array[0..4] of TTControl = ( TTemplateEdit,
+                                                 TTemplateCombo,
+                                                 TTemplateImage,
+                                                 TTemplateGrid,
+                                                 TTemplatePasswordButton);
+  //DEFAULT_CONTROL_CLASS: TTControl = TTemplateEdit;
 
 function GetXmlTypeByClass(AClass: TTControl): string;
 const
@@ -268,6 +292,15 @@ begin
       exit;
     end;
   end;
+end;
+
+function GetDefaultXmlType(XmlType: string): TTControl;
+begin
+  Result := nil;
+  if XmlType = '' then
+    exit;
+  if Lowercase(XmlType) = 'text' then
+    Result := GetClassByXmlType('edit');
 end;
 
 function ScanParam(const p: PChar): PChar;
@@ -386,6 +419,27 @@ begin
   Read;
 end;
 
+procedure TTemplateControl.Load(XmlNode: TXmlNode);
+var
+  NotParented: boolean;
+begin
+
+  NotParented:=(fControl.Parent=nil);
+
+  if NotParented then begin
+    //If not parent not set and we try to set Items have exception "Control has no parent window" .
+    fControl.Visible:=false;
+    fControl.Parent:=Application.MainForm;
+  end;
+
+  LoadProc(XmlNode);
+
+  if NotParented then begin
+    fControl.Parent:=nil;
+    fControl.Visible:=true;
+  end;
+end;
+
 procedure TTemplateControl.SetOnChange(Event: TNotifyEvent);
 begin
   fChangeProc := Event;
@@ -399,6 +453,12 @@ end;
 constructor TTemplateControl.Create(Attribute: TTemplateAttribute);
 begin
   fTemplateAttribute := Attribute;
+end;
+
+destructor TTemplateControl.Destroy;
+begin
+  fControl.Free;
+  inherited;
 end;
 
 { TTemplateEdit }
@@ -420,7 +480,7 @@ begin
     fLdapValue.AsString := (fControl as TEdit).Text;
 end;
 
-procedure TTemplateEdit.Load(XmlNode: TXmlNode);
+procedure TTemplateEdit.LoadProc(XmlNode: TXmlNode);
 begin
 
 end;
@@ -440,18 +500,14 @@ begin
   TEdit(fControl).OnExit := OnExitProc;
 end;
 
-destructor TTemplateEdit.Destroy;
-begin
-  fControl.Free;
-  inherited;
-end;
-
-
 { TTemplateCombo }
 
 procedure TTemplateCombo.SetValue(AValue: TTemplateAttributeValue);
 begin
-  (fControl as TComboBox).Text := AValue.AsString;
+  with (fControl as TComboBox) do begin
+    Text := AValue.AsString;
+    OnChange(fControl);
+  end;
 end;
 
 procedure TTemplateCombo.Read;
@@ -474,36 +530,15 @@ begin
   TComboBox(fControl).OnExit := OnExitProc;
 end;
 
-destructor TTemplateCombo.Destroy;
-begin
-  fControl.Free;
-  inherited;  
-end;
-
-procedure TTemplateCombo.Load(XmlNode: TXmlNode);
+procedure TTemplateCombo.LoadProc(XmlNode: TXmlNode);
 var
   i: integer;
   ItemsNode: TXmlNode;
-  NotParented: boolean;
 begin
   ItemsNode:=XmlNode.NodeByName('items');
   if ItemsNode=nil then exit;
-
-  NotParented:=(fControl.Parent=nil);
-
-  if NotParented then begin
-    //If not parent not set and we try to set Items have exception "Control has no parent window" .
-    fControl.Visible:=false;
-    fControl.Parent:=Application.MainForm;
-  end;
-
   for i:=0 to ItemsNode.Count-1 do
     if ItemsNode[i].Name='item' then TComboBox(fControl).Items.Add(ItemsNode[i].Content);
-
-  if NotParented then begin
-    fControl.Parent:=nil;
-    fControl.Visible:=true;
-  end;
 end;
 
 procedure TTemplateCombo.EventProc(Attribute: TLdapAttribute; Event: TEventType);
@@ -540,12 +575,6 @@ begin
   fControl := TImage.Create(nil);
 end;
 
-destructor TTemplateImage.Destroy;
-begin
-  fControl.Free;
-  inherited;  
-end;
-
 procedure TTemplateImage.Read;
 var
   ji: TJpegImage;
@@ -567,7 +596,7 @@ begin
      StreamCopy(Picture.Graphic.SaveToStream, fLdapValue.LoadFromStream);
 end;
 
-procedure TTemplateImage.Load(XmlNode: TXmlNode);
+procedure TTemplateImage.LoadProc(XmlNode: TXmlNode);
 begin
 
 end;
@@ -687,9 +716,16 @@ begin
   end;
 end;
 
-procedure TTemplateGrid.Load(XmlNode: TXmlNode);
+procedure TTemplateGrid.LoadProc(XmlNode: TXmlNode);
+var
+  Node: TXmlNode;
 begin
-
+  Node:=XmlNode.NodeByName('rows');
+  if Assigned(Node) then with TEditGrid(fControl) do
+  begin
+    RowCount := StrToInt(Node.Content);
+    Height := RowCount * (DefaultRowHeight + GridLineWidth) + DefaultRowHeight div 2;
+  end;
 end;
 
 procedure TTemplateGrid.EventProc(Attribute: TLdapAttribute; Event: TEventType);
@@ -719,10 +755,55 @@ begin
   TEditGrid(fControl).OnExit := OnChangeProc;
 end;
 
-destructor TTemplateGrid.Destroy;
+{ TTemplatePasswordButton }
+
+procedure TTemplatePasswordButton.ButtonClick(Sender: TObject);
 begin
-  fControl.Free;
+  with TPasswordDlg.Create(Sender as TControl, fLdapValue.Attribute.Entry, fLdapValue.Attribute.Name) do
+  try
+    ShowModal;
+  finally
+    Free;
+  end;
+end;
+
+procedure TTemplatePasswordButton.SetValue(AValue: TTemplateAttributeValue);
+begin
+
+end;
+
+procedure TTemplatePasswordButton.Read;
+begin
+
+end;
+
+procedure TTemplatePasswordButton.Write;
+begin
+
+end;
+
+procedure TTemplatePasswordButton.LoadProc(XmlNode: TXmlNode);
+var
+  Node: TXmlNode;
+begin
+  Node:=XmlNode.NodeByName('caption');
+  if Assigned(Node) then TButton(fControl).Caption := Node.Content;
+end;
+
+procedure TTemplatePasswordButton.EventProc(Attribute: TLdapAttribute; Event: TEventType);
+begin
+
+end;
+
+constructor TTemplatePasswordButton.Create(Attribute: TTemplateAttribute);
+begin
   inherited;
+  fControl := TButton.Create(nil);
+  with TButton(fControl) do begin
+    OnExit := OnExitProc;
+    OnClick := ButtonClick;
+    Caption := cSetPassword;
+  end;
 end;
 
 { TTemplateList }
@@ -971,26 +1052,20 @@ end;
 constructor TTemplateAttribute.Create(XmlNode: TXmlNode);
 var
   i: integer;
-  AClass: TTControl;
-  idx: integer;
   AValue: TTemplateAttributeValue;
 begin
   inherited Create;
-  FControls:=TObjectList.Create;
+  FControlTemplates:=TObjectList.Create;
   FValues:=TObjectList.Create;
+  FDefaultControlClass := GetDefaultXmlType(XmlNode.Attributes.Values['type']);
 
   for i:=0 to XmlNode.Count-1 do with XmlNode[i] do begin
     if Name='name'  then FName:=Content
     else
     if Name='description' then FDescription := Content
     else
-    if Name='control' then begin
-      AClass:=GetClassByXmlType(Attributes.Values['type']);
-      if AClass=nil then AClass:=DEFAULT_CONTROL_CLASS;
-
-      idx:=FControls.Add(AClass.Create(Self));
-      Controls[idx].Load(XmlNode[i]);
-    end
+    if Name='control' then
+      FControlTemplates.Add(Clone(true))
     else
     if Name='value' then begin
       Avalue:=TTemplateAttributeValue.Create;
@@ -998,29 +1073,29 @@ begin
       AValue.Value:=Content;
       FValues.Add(AValue)
     end;
-
   end;
-
-  if (ControlCount=0) and (Name <> 'objectclass') then
-    FControls.Add(DEFAULT_CONTROL_CLASS.Create(Self));
-
 end;
 
 destructor TTemplateAttribute.Destroy;
 begin
-  FControls.Free;
+  FControlTemplates.Free;
   FValues.Free;
   inherited;
 end;
 
-function TTemplateAttribute.GetControls(Index: Integer): TTemplateControl;
+function TTemplateAttribute.GetControlTemplates(Index: Integer): TXmlNode;
 begin
-  Result := FControls[Index] as TTemplateControl;
+  if Index < FControlTemplates.Count then
+    Result := FControlTemplates[Index] as TXmlNode
+  else
+    Result := nil;
 end;
 
 function TTemplateAttribute.GetControlCount: integer;
 begin
-  result:=FControls.Count;
+  Result:=FControlTemplates.Count;
+  if (Result = 0) and Assigned(FDefaultControlClass) then
+    Result := 1;
 end;
 
 function TTemplateAttribute.GetValues(Index: Integer): TTemplateAttributeValue;
@@ -1031,6 +1106,27 @@ end;
 function TTemplateAttribute.GetValuesCount: integer;
 begin
   result:=FValues.Count;
+end;
+
+function TTemplateAttribute.CreateControl(ControlTemplate: TXmlNode): TTemplateControl;
+var
+  AClass: TTControl;
+begin
+  AClass := nil;
+
+  if Assigned(ControlTemplate) then
+    AClass:=GetClassByXmlType(ControlTemplate.Attributes.Values['type']);
+
+  if not Assigned(AClass) then
+    AClass := FDefaultControlClass;
+
+  if Assigned(AClass) then
+  begin
+    Result := AClass.Create(Self);
+    Result.Load(ControlTemplate);
+  end
+  else
+    Result := nil;
 end;
 
 { TTemplateAttributeValue }

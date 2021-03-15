@@ -96,6 +96,20 @@ type
     function      GetServer: string; virtual;
     function      GetUser: string; virtual;
     function      GetSSL: boolean; virtual;
+    function      GetTimeLimit: Integer;
+    procedure     SetTimeLimit(const Value: Integer);
+    function      GetSizeLimit: Integer;
+    procedure     SetSizeLimit(const Value: Integer);
+    function      GetPagedSearch: boolean;
+    procedure     SetPagedSearch(const Value: boolean);
+    function      GetPageSize: Integer;
+    procedure     SetPageSize(const Value: Integer);
+    function      GetDerefAliases: Integer;
+    procedure     SetDerefAliases(const Value: Integer);
+    function      GetReferrals: boolean;
+    procedure     SetReferrals(const Value: boolean);
+    function      GetReferralHops: Integer;
+    procedure     SetReferralHops(const Value: Integer);
     procedure     ReadCredentials; virtual;
     procedure     WriteCredentials; virtual;
   public
@@ -110,6 +124,13 @@ type
     property      Server: string read GetServer write SetServer;
     property      Base: string read GetBase write SetBase;
     property      Password: string read GetPassword write SetPassword;
+    property      TimeLimit: Integer read GetTimeLimit write SetTimeLimit;
+    property      SizeLimit: Integer read GetSizeLimit write SetSizeLimit;
+    property      PagedSearch: Boolean read GetPagedSearch write SetPagedSearch;
+    property      PageSize: Integer read GetPageSize write SetPageSize;
+    property      DereferenceAliases: Integer read GetDerefAliases write SetDerefAliases;
+    property      ChaseReferrals: Boolean read GetReferrals write SetReferrals;
+    property      ReferralHops: Integer read GetReferralHops write SetReferralHops;
   end;
 
   TFakeAccount=class(TAccount)
@@ -269,24 +290,35 @@ var
   AccountConfig: TAccount;
 
 const
-  ACCOUNTS_PREFIX = 'Accounts';
-  CONFIG_PREFIX   = 'Config';
-  CONNECT_PREFIX  = 'Connection\';
-  CONNECT_SERVER  = CONNECT_PREFIX + 'Server';
-  CONNECT_BASE    = CONNECT_PREFIX + 'Base';
-  CONNECT_CREDIT  = CONNECT_PREFIX + 'Credentials';
-  CONNECT_PORT    = CONNECT_PREFIX + 'Port';
-  CONNECT_VERSION = CONNECT_PREFIX + 'Version';
-  CONNECT_SSL     = CONNECT_PREFIX + 'SSL';
+  ACCOUNTS_PREFIX         = 'Accounts';
+  CONFIG_PREFIX           = 'Config';
+  CONNECT_PREFIX          = 'Connection\';
+  CONNECT_SERVER          = CONNECT_PREFIX + 'Server';
+  CONNECT_BASE            = CONNECT_PREFIX + 'Base';
+  CONNECT_CREDIT          = CONNECT_PREFIX + 'Credentials';
+  CONNECT_PORT            = CONNECT_PREFIX + 'Port';
+  CONNECT_VERSION         = CONNECT_PREFIX + 'Version';
+  CONNECT_SSL             = CONNECT_PREFIX + 'SSL';
+  CONNECT_TIME_LIMIT      = CONNECT_PREFIX + 'TimeLimit';
+  CONNECT_SIZE_LIMIT      = CONNECT_PREFIX + 'SizeLimit';
+  CONNECT_PAGED_SEARCH    = CONNECT_PREFIX + 'PagedSearch';
+  CONNECT_PAGE_SIZE       = CONNECT_PREFIX + 'PageSize';
+  CONNECT_DEREF_ALIASES   = CONNECT_PREFIX + 'DereferenceAliases';
+  CONNECT_CHASE_REFFERALS = CONNECT_PREFIX + 'ChaseReferrals';
+  CONNECT_REFFERAL_HOPS   = CONNECT_PREFIX + 'ReferralHops';
+
 
 
   LAC_ROOTNAME    = 'LDAPAccounts';
   LAC_NOTLAC      = 'The file "%s" is not a Ldap Admin accounts file';
 
 procedure SetAccount(Account: TAccount);
+procedure RegProtocol(Ext: string);
 
 implementation
-uses Constant, WinLdap, Dialogs, Forms, StdCtrls, Controls, ComObj, Base64, Math;
+
+uses Constant, WinLdap, Dialogs, Forms, StdCtrls, Controls, ComObj, Base64,
+     Math, LdapClasses;
 
 var
   FakeAccount: TAccount;
@@ -620,6 +652,76 @@ end;
 procedure TAccount.SetSSL(const Value: boolean);
 begin
   WriteBool(CONNECT_SSL, Value);
+end;
+
+function TAccount.GetTimeLimit: Integer;
+begin
+  result:=ReadInteger(CONNECT_TIME_LIMIT, SESS_TIMEOUT);
+end;
+
+procedure TAccount.SetTimeLimit(const Value: Integer);
+begin
+  WriteInteger(CONNECT_TIME_LIMIT, Value);
+end;
+
+function TAccount.GetSizeLimit: Integer;
+begin
+  result:=ReadInteger(CONNECT_SIZE_LIMIT, SESS_SIZE_LIMIT);
+end;
+
+procedure TAccount.SetSizeLimit(const Value: Integer);
+begin
+  WriteInteger(CONNECT_SIZE_LIMIT, Value);
+end;
+
+function TAccount.GetPagedSearch: boolean;
+begin
+  result:=ReadBool(CONNECT_PAGED_SEARCH, true);
+end;
+
+procedure TAccount.SetPagedSearch(const Value: boolean);
+begin
+  WriteBool(CONNECT_PAGED_SEARCH, Value);
+end;
+
+function TAccount.GetPageSize: Integer;
+begin
+  result:=ReadInteger(CONNECT_PAGE_SIZE, SESS_PAGE_SIZE);
+end;
+
+procedure TAccount.SetPageSize(const Value: Integer);
+begin
+  WriteInteger(CONNECT_PAGE_SIZE, Value);
+end;
+
+function TAccount.GetDerefAliases: Integer;
+begin
+  result:=ReadInteger(CONNECT_DEREF_ALIASES, LDAP_DEREF_NEVER);
+end;
+
+procedure TAccount.SetDerefAliases(const Value: Integer);
+begin
+  WriteInteger(CONNECT_DEREF_ALIASES, Value);
+end;
+
+function TAccount.GetReferrals: boolean;
+begin
+  result:=ReadBool(CONNECT_CHASE_REFFERALS, true);
+end;
+
+procedure TAccount.SetReferrals(const Value: boolean);
+begin
+  WriteBool(CONNECT_CHASE_REFFERALS, Value);
+end;
+
+function TAccount.GetReferralHops: Integer;
+begin
+  result:=ReadInteger(CONNECT_REFFERAL_HOPS, SESS_REFF_HOP_LIMIT);
+end;
+
+procedure TAccount.SetReferralHops(const Value: Integer);
+begin
+  WriteInteger(CONNECT_REFFERAL_HOPS, Value);
 end;
 
 procedure TAccount.ReadCredentials;
