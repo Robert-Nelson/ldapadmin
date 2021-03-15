@@ -48,8 +48,8 @@ type
     ToolButton2: TToolButton;
     ToolButton3: TToolButton;
     ActSave: TAction;
-    ToolButton1: TToolButton;
-    ToolButton4: TToolButton;
+    btnToFile: TToolButton;
+    btnFromFile: TToolButton;
     ActSaveToFile: TAction;
     ActLoadFromFile: TAction;
     ToolButton5: TToolButton;

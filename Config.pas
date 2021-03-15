@@ -326,7 +326,6 @@ const
 
 
   LAC_ROOTNAME    = 'LDAPAccounts';
-  LAC_NOTLAC      = 'The file "%s" is not an Ldap Admin accounts file';
 
 procedure RegProtocol(Ext: string);
 
@@ -539,7 +538,7 @@ begin
 
     NoCheckCbx:=TCheckBox.Create(Form);
     NoCheckCbx.Parent:=Form;
-    NoCheckCbx.Caption:='Do not perform this check in the future.';
+    NoCheckCbx.Caption:=stNoMoreChecks;
     //NoCheckCbx.Width:=200;
     NoCheckCbx.Width:=NoCheckCbx.Parent.Width - NoCheckCbx.Left;
 
@@ -1057,7 +1056,7 @@ begin
                         FRegistry.WriteBinaryData(DestName, Buffer^, i);
                         FreeMem(buffer, i);
                       end;
-      rdUnknown:  raise Exception.Create('Unknown value type.'+#10+ 'key:'+Parent+ #10+'value:'+SrcName+'"');
+      rdUnknown:  raise Exception.CreateFmt(stUnknownValueType, [Parent, SrcName]);
     end;
   end;
   FRegistry.CloseKey;

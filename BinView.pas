@@ -81,6 +81,8 @@ var
 
 implementation
 
+uses Constant;
+
 {$R *.DFM}
 
 procedure THexView.ShowMemoryWindow;
@@ -251,9 +253,9 @@ begin
   pbHex.Checked := not DecimalView;
   pbDecimal.Checked := DecimalView;
   if DecimalView then
-    Label1.Caption := 'Hex:'
+    Label1.Caption := cHex
   else
-    Label1.Caption := 'Decimal:';
+    Label1.Caption := cDecimal;
   ShowCellStatus(HexGrid.Col, HexGrid.Row);
   ShowMemoryWindow;
 end;

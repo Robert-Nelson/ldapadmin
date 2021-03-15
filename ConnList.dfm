@@ -18,7 +18,7 @@ object ConnListFrm: TConnListFrm
   TextHeight = 13
   object Panel1: TPanel
     Left = 0
-    Top = 311
+    Top = 318
     Width = 577
     Height = 42
     Align = alBottom
@@ -103,7 +103,7 @@ object ConnListFrm: TConnListFrm
       ImageIndex = 1
       Style = tbsSeparator
     end
-    object ToolButton3: TToolButton
+    object ViewBtn: TToolButton
       Left = 157
       Top = 0
       Hint = 'Change view style'
@@ -111,14 +111,14 @@ object ConnListFrm: TConnListFrm
       DropdownMenu = ViewStyleMenu
       ImageIndex = 5
       Style = tbsDropDown
-      OnClick = ToolButton3Click
+      OnClick = ViewBtnClick
     end
   end
   object Panel2: TPanel
     Left = 0
     Top = 30
     Width = 577
-    Height = 281
+    Height = 288
     Align = alClient
     BevelOuter = bvNone
     BorderWidth = 1
@@ -128,7 +128,7 @@ object ConnListFrm: TConnListFrm
       Left = 122
       Top = 1
       Width = 3
-      Height = 279
+      Height = 286
       Cursor = crHSplit
       OnMoved = Splitter1Moved
     end
@@ -136,7 +136,7 @@ object ConnListFrm: TConnListFrm
       Left = 125
       Top = 1
       Width = 451
-      Height = 279
+      Height = 286
       Align = alClient
       Columns = <
         item
@@ -178,7 +178,7 @@ object ConnListFrm: TConnListFrm
       Left = 1
       Top = 1
       Width = 121
-      Height = 279
+      Height = 286
       Align = alLeft
       BorderStyle = bsNone
       Color = clAppWorkSpace
@@ -635,25 +635,25 @@ object ConnListFrm: TConnListFrm
     OnPopup = ViewStyleMenuPopup
     Left = 216
     Top = 47
-    object Icons1: TMenuItem
+    object vmSmall: TMenuItem
       Caption = 'Small icons'
       Checked = True
       RadioItem = True
       OnClick = ViewStyleChange
     end
-    object Largeicons1: TMenuItem
+    object vmLarge: TMenuItem
       Tag = 1
       Caption = 'Large icons'
       RadioItem = True
       OnClick = ViewStyleChange
     end
-    object List1: TMenuItem
+    object vmList: TMenuItem
       Tag = 2
       Caption = 'List'
       RadioItem = True
       OnClick = ViewStyleChange
     end
-    object able1: TMenuItem
+    object vmTable: TMenuItem
       Tag = 3
       Caption = 'Table'
       RadioItem = True
@@ -1547,13 +1547,13 @@ object ConnListFrm: TConnListFrm
     object ActOpenStorage: TAction
       Category = 'Storages'
       Caption = 'ActOpenStorage'
-      Hint = 'Open exist file storage'
+      Hint = 'Open existing file storage'
       ImageIndex = 3
       OnExecute = ActOpenStorageExecute
     end
     object ActCopyAccount: TAction
       Category = 'Accounts'
-      Caption = '&Copy'
+      Caption = '&Copy...'
       Hint = 'Copy account'
       OnExecute = ActCopyAccountExecute
     end

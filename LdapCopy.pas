@@ -154,7 +154,7 @@ begin
   edName.Text := v;
   MainConnectionIdx := cbConnections.Items.IndexOf(Connection.Account.Name);
   if MainConnectionIdx = -1 then
-    raise Exception.Create('Connection error: could not locate active connection!');
+    raise Exception.Create(stNoActiveConn);
   cbConnections.Items.Objects[MainConnectionIdx] := Connection;
   fExpandNode := ExpandNode;
   fSortProc := SortProc;

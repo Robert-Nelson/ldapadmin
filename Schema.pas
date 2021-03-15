@@ -23,6 +23,7 @@
 unit Schema;
 
 interface
+
 uses Classes, LDAPClasses, WinLDAP, SysUtils, Contnrs;
 
 type
@@ -254,7 +255,7 @@ type
 
 implementation
 
-uses TypInfo;
+uses TypInfo, Constant;
 
 
 { Procedures }
@@ -604,7 +605,7 @@ begin
     // Search path to schema ///////////////////////////////////////////////////
     FSession.Search('objectclass=*','',LDAP_SCOPE_BASE,['subschemaSubentry'],false,SearchResult);
     FDn:=SearchResult[0].AttributesByName['subschemaSubentry'].AsString;
-    if FDn='' then raise Exception.Create('Can''t find SubschemaSubentry');
+    if FDn='' then raise Exception.Create(stSchemaNoSubentry);
 
 
     // Get schema values ///////////////////////////////////////////////////////

@@ -48,7 +48,7 @@ procedure ParseError(AType: TMsgDlgType; AOwner: TComponent; const FileName, Err
 
 implementation
 
-uses Misc, MMSystem;
+uses Misc, MMSystem, Constant;
 
 {$R *.DFM}
 
@@ -126,15 +126,15 @@ begin
     with Image1.Picture.Icon do
     case AType of
       mtError: begin
-                 typeMsg := 'Error';
+                 typeMsg := cError;
                  Handle := LoadIcon(0, IDI_ERROR);
                end;
       mtWarning: begin
-                   typeMsg := 'Warning';
+                   typeMsg := cWarning;
                    Handle := LoadIcon(0, IDI_WARNING);
                  end;
       mtInformation: begin
-                       typeMsg := 'Information';
+                       typeMsg := cInformation;
                        Handle := LoadIcon(0, IDI_INFORMATION);
                      end;
     else

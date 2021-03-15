@@ -385,8 +385,8 @@ var
 begin
   with TPickupDlg.Create(self) do
   try
-    Caption := cPickAccounts;
-    ColumnNames := 'Name,DN';
+    Caption := cPickMembers;
+    ColumnNames := cColumnNames;
     Populate(Connection, sUSERS, ['uid', PSEUDOATTR_PATH]);
     if ShowModal = mrOk then
     try

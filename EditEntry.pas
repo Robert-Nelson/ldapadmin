@@ -46,8 +46,8 @@ type
     ExitBtn: TToolButton;
     ToolButton6: TToolButton;
     MainMenu1: TMainMenu;
-    Start1: TMenuItem;
-    Bearbeiten1: TMenuItem;
+    mbFile: TMenuItem;
+    mbEdit: TMenuItem;
     mbSave: TMenuItem;
     N1: TMenuItem;
     mbExit: TMenuItem;

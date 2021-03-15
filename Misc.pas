@@ -796,34 +796,12 @@ const
       if CONTROLs_CLASSES[i].ClassName = ClassName then
         Result := CONTROLS_CLASSES[i];
     if not Assigned(Result) then
-      raise EClassNotFound.CreateFmt('Class %s not found!', [ClassName]);
+      raise EClassNotFound.CreateFmt(stClassNotFound, [ClassName]);
   end;
 
 begin
   Result := TComponentClass(ClassByName(ClassName)).Create(Owner);
 end;
-
-{procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
-var
-  Pt: TPoint;
-begin
-  GetCursorPos(pt);
-  pt := TreeView.ScreenToClient(pt);
-  if (pt.y < -ScrollAccMargin) or (pt.y > TreeView.ClientHeight + ScrollAccMargin) then
-  begin
-    if ScrollTimer.Interval <> 10 then
-      ScrollTimer.Interval := 10 // accelerate
-  end
-  else begin
-    if ScrollTimer.Interval <> 100 then
-      ScrollTimer.Interval := 100 // deccelerate
-  end;
-  if pt.y < 0 then
-    SendMessage(TreeView.Handle, WM_VSCROLL, SB_LINEUP, 0)
-  else
-  if pt.y > TreeView.ClientHeight then
-    SendMessage(TreeView.Handle, WM_VSCROLL, SB_LINEDOWN, 0);
-end;}
 
 procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
 var

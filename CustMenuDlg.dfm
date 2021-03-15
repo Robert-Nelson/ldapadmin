@@ -22,14 +22,14 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 313
     Top = 0
     Width = 11
-    Height = 448
+    Height = 456
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 0
   end
   object Panel3: TPanel
     Left = 0
-    Top = 448
+    Top = 456
     Width = 687
     Height = 46
     Align = alBottom
@@ -60,7 +60,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 681
     Top = 0
     Width = 6
-    Height = 448
+    Height = 456
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 2
@@ -69,7 +69,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 0
     Top = 0
     Width = 6
-    Height = 448
+    Height = 456
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 3
@@ -78,7 +78,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 324
     Top = 0
     Width = 357
-    Height = 448
+    Height = 456
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 4
@@ -86,7 +86,7 @@ object CustomMenuDlg: TCustomMenuDlg
       Left = 0
       Top = 0
       Width = 357
-      Height = 448
+      Height = 456
       Align = alClient
       BevelInner = bvLowered
       BevelOuter = bvNone
@@ -125,7 +125,7 @@ object CustomMenuDlg: TCustomMenuDlg
         object rbDisabled: TRadioButton
           Left = 24
           Top = 32
-          Width = 65
+          Width = 105
           Height = 17
           Caption = '&Disabled'
           TabOrder = 0
@@ -134,7 +134,7 @@ object CustomMenuDlg: TCustomMenuDlg
         object rbDefaultAction: TRadioButton
           Left = 24
           Top = 72
-          Width = 89
+          Width = 105
           Height = 17
           Caption = 'Defaul&t action'
           TabOrder = 1
@@ -143,16 +143,16 @@ object CustomMenuDlg: TCustomMenuDlg
         object rbTemplate: TRadioButton
           Left = 24
           Top = 112
-          Width = 89
+          Width = 105
           Height = 17
           Caption = '&Template'
           TabOrder = 2
           OnClick = rbClick
         end
         object cbTemplate: TComboBox
-          Left = 120
+          Left = 128
           Top = 110
-          Width = 193
+          Width = 185
           Height = 22
           Style = csOwnerDrawFixed
           Enabled = False
@@ -162,9 +162,9 @@ object CustomMenuDlg: TCustomMenuDlg
           OnDrawItem = cbTemplateDrawItem
         end
         object cbDefaultAction: TComboBox
-          Left = 120
+          Left = 128
           Top = 70
-          Width = 193
+          Width = 185
           Height = 22
           Style = csOwnerDrawFixed
           ItemHeight = 16
@@ -242,7 +242,7 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 6
     Top = 0
     Width = 307
-    Height = 448
+    Height = 456
     Align = alClient
     DragCursor = crDefault
     DragMode = dmAutomatic

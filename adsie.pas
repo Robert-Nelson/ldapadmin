@@ -31,7 +31,7 @@ procedure ADOpenObject(const LdapPath, UserName, Password: WideString; const rii
 
 implementation
 
-uses ComObj;
+uses ComObj, Constant;
 
 var
   ActiveDSHandle : THandle;
@@ -61,7 +61,7 @@ begin
   Result := GetProcAddress(ActiveDSHandle, PAnsiChar(@ProcName[1]));
   {$ENDIF}
   if not Assigned(Result) then
-    raise Exception.Create('Cannot GetProcAddress of ' + ProcName);
+    raise Exception.CreateFmt(stGetProcAddrErr, [ProcName]);
 end;
 
 function ADsOpenObject(LdapPath, UserName, Password: PWideChar; Reserved:DWORD; const riid:TGUID; out ppObject):HRESULT;

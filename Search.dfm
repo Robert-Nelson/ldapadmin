@@ -24,7 +24,7 @@ object SearchFrm: TSearchFrm
   TextHeight = 13
   object StatusBar: TStatusBar
     Left = 0
-    Top = 484
+    Top = 491
     Width = 722
     Height = 19
     Panels = <
@@ -356,7 +356,7 @@ object SearchFrm: TSearchFrm
     Left = 0
     Top = 193
     Width = 722
-    Height = 291
+    Height = 298
     Align = alClient
     BorderWidth = 3
     TabOrder = 2
@@ -480,7 +480,7 @@ object SearchFrm: TSearchFrm
     end
     object ActSave: TAction
       Caption = '&Save'
-      Hint = 'Save search results in LDIF file'
+      Hint = 'Save search results'
       ImageIndex = 31
       OnExecute = ActSaveExecute
     end

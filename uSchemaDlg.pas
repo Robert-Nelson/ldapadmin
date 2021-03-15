@@ -53,23 +53,25 @@ type
     Tree:           TTreeView;
     ImageList1:     TImageList;
     Splitter1:      TSplitter;
-    Label1:         TLabel;
-    SearchEdit:     TEdit;
     View:           TTreeView;
-    UndoBtn:        TSpeedButton;
-    RedoBtn:        TSpeedButton;
     PopupMenu:      TPopupMenu;
     pmCopy:         TMenuItem;
     StatusBar:      TStatusBar;
-    WholeWordsCbx:  TCheckBox;
     Tabs:           TTabControl;
     pmOpenNewTab:   TMenuItem;
     N1:             TMenuItem;
     pmOpen:         TMenuItem;
-    Bevel1:         TBevel;
     pmUndo:         TMenuItem;
-    SpeedButton1: TSpeedButton;
+    Panel1: TPanel;
+    UndoBtn: TSpeedButton;
+    RedoBtn: TSpeedButton;
+    Label1: TLabel;
+    btnSave: TSpeedButton;
     Bevel2: TBevel;
+    btnClose: TSpeedButton;
+    Bevel3: TBevel;
+    SearchEdit: TEdit;
+    WholeWordsCbx: TCheckBox;
     procedure       TreeChange(Sender: TObject; Node: TTreeNode);
     procedure       SearchEditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure       ViewMouseMove(Sender: TObject; Shift: TShiftState; X,  Y: Integer);
@@ -90,8 +92,9 @@ type
     function        GetNodeAt(X, Y: Integer): TTreeNode;
     procedure       pmUndoClick(Sender: TObject);
     function        GetLinkRect(Node: TTreeNode): TRect;
-    procedure       SpeedButton1Click(Sender: TObject);
+    procedure       btnSaveClick(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
+    procedure btnCloseClick(Sender: TObject);
   private
     FSchema:        TLDAPSchema;
     FLastSerched:   string;
@@ -158,7 +161,7 @@ begin
   inherited Create(Application.MainForm);
 
   FSchema:=TLDAPSchema.Create(ASession);
-  if not FSchema.Loaded then raise Exception.Create('Can''t load LDAP schema');
+  if not FSchema.Loaded then raise Exception.Create(stNoSchema);
 
   AddSchemaItems(FSchema.OBjectClasses,    'Object Classes',    CLASS_IMG);
   AddSchemaItems(FSchema.Attributes,       'Attribute Types',   ATTRIBUTE_IMG);
@@ -731,7 +734,7 @@ begin
   result:=FRedo.Count>0;
 end;
 
-procedure TSchemaDlg.SpeedButton1Click(Sender: TObject);
+procedure TSchemaDlg.btnSaveClick(Sender: TObject);
 begin
   TExportDlg.Create(FSchema.Dn, FSchema.Session, ['ldapSyntaxes', 'attributeTypes', 'objectclasses', 'matchingRules', 'matchingRuleUse'], false).ShowModal;
 end;
@@ -739,6 +742,11 @@ end;
 procedure TSchemaDlg.FormDeactivate(Sender: TObject);
 begin
   RevealWindow(Self, False, False);
+end;
+
+procedure TSchemaDlg.btnCloseClick(Sender: TObject);
+begin
+  Close;
 end;
 
 end.

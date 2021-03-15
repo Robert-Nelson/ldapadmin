@@ -334,9 +334,9 @@ begin
     Result := true
   else
   begin
-    uiDlg := TUIDlg.Create(pSub, CERT_STORE_CERTIFICATE_CONTEXT, 'Certificate');
+    uiDlg := TUIDlg.Create(pSub, CERT_STORE_CERTIFICATE_CONTEXT, cCert);
     if Assigned(UIDlg.OnClickProc) then
-      cap := '&View...'
+      cap := cView
     else
       cap := '';
     if MessageDlgEx(Format(stCertConfirmConn, [errStr]), mtWarning, [mbYes, mbNo, mbHelp], ['','',cap], [nil,nil,uiDlg.OnClickProc]) = mrYes then

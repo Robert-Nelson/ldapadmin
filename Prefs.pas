@@ -29,64 +29,64 @@ uses
 
 type
   TPrefDlg = class(TForm)
-    PageControl1: TPageControl;
-    TabSheet1: TTabSheet;
-    TabSheet2: TTabSheet;
-    TabSheet3: TTabSheet;
+    PageControl: TPageControl;
+    tsPosix: TTabSheet;
+    tsSamba: TTabSheet;
+    tsMAil: TTabSheet;
     Panel1: TPanel;
-    GroupBox3: TGroupBox;
-    Label5: TLabel;
-    Label6: TLabel;
+    gbDefaults: TGroupBox;
+    lblHomeDir: TLabel;
+    lblLoginShell: TLabel;
     edHomeDir: TEdit;
     edLoginShell: TEdit;
-    GroupBox4: TGroupBox;
-    Label8: TLabel;
-    Label9: TLabel;
-    Label10: TLabel;
-    Label11: TLabel;
+    gbSambaDefaults: TGroupBox;
+    lblScript: TLabel;
+    lblHomeShare: TLabel;
+    lblProfilePath: TLabel;
+    lblHomeDrive: TLabel;
     edScript: TEdit;
     edHomeShare: TEdit;
     edProfilePath: TEdit;
     cbHomeDrive: TComboBox;
-    GroupBox5: TGroupBox;
-    Label12: TLabel;
-    Label13: TLabel;
+    gbMailDefaults: TGroupBox;
+    lblMD: TLabel;
+    lblMA: TLabel;
     edMaildrop: TEdit;
     edMailAddress: TEdit;
     OkBtn: TButton;
     CancelBtn: TButton;
-    GroupBox6: TGroupBox;
-    Label7: TLabel;
+    gbServer: TGroupBox;
+    lblNetbios: TLabel;
     edNetbios: TEdit;
-    Label14: TLabel;
+    lblDomainName: TLabel;
     cbDomain: TComboBox;
     edDisplayName: TEdit;
     edUsername: TEdit;
-    Label16: TLabel;
-    Label17: TLabel;
+    lblUsername: TLabel;
+    lblDisplayname: TLabel;
     BtnWizard: TButton;
     cbxLMPasswords: TCheckBox;
-    TabSheet4: TTabSheet;
-    GroupBox1: TGroupBox;
-    Label1: TLabel;
-    Label2: TLabel;
+    tsID: TTabSheet;
+    gbUserLimits: TGroupBox;
+    lblFirstUId: TLabel;
+    lblLastUid: TLabel;
     edFirstUID: TEdit;
     edLastUID: TEdit;
-    GroupBox2: TGroupBox;
-    Label3: TLabel;
-    Label4: TLabel;
+    gbGroupLimits: TGroupBox;
+    lblFirstGid: TLabel;
+    lblLastGid: TLabel;
     edFirstGID: TEdit;
     edLastGID: TEdit;
-    GroupBox7: TGroupBox;
-    Label15: TLabel;
+    gbGroups: TGroupBox;
+    lblPosixGroup: TLabel;
     edGroup: TEdit;
     SetBtn: TButton;
     cbxExtendGroups: TCheckBox;
     cbExtendGroups: TComboBox;
-    IDGroup: TRadioGroup;
+    gbID: TRadioGroup;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure SetBtnClick(Sender: TObject);
-    procedure PageControl1Change(Sender: TObject);
+    procedure PageControlChange(Sender: TObject);
     procedure BtnWizardClick(Sender: TObject);
     procedure cbxExtendGroupsClick(Sender: TObject);
     procedure IDGroupClick(Sender: TObject);
@@ -115,9 +115,9 @@ begin
   with Connection.Account do
   begin
     try
-      IDGroup.ItemIndex    := ReadInteger(rPosixIDType, POSIX_ID_RANDOM)
+      gbID.ItemIndex       := ReadInteger(rPosixIDType, POSIX_ID_RANDOM)
     except end;
-    IDGroup.OnClick        := IDGroupClick;
+    gbID.OnClick           := IDGroupClick;
     edFirstUID.Text        := IntToStr(ReadInteger(rposixFirstUID, FIRST_UID));
     edLastUID.Text         := IntToStr(ReadInteger(rposixLastUID,  LAST_UID));
     edFirstGID.Text        := IntToStr(ReadInteger(rposixFirstGID, FIRST_GID));
@@ -151,7 +151,7 @@ procedure TPrefDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   if ModalResult = mrOK then
   with Connection.Account do begin
-    WriteInteger(rPosixIDType,        IDGroup.ItemIndex);
+    WriteInteger(rPosixIDType,        gbID.ItemIndex);
     WriteInteger(rposixFirstUID,      StrToInt(edFirstUID.Text));
     WriteInteger(rposixLastUID,       StrToInt(edLastUID.Text));
     WriteInteger(rposixFirstGID,      StrToInt(edFirstGID.Text));
@@ -179,7 +179,7 @@ procedure TPrefDlg.SetBtnClick(Sender: TObject);
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
-    ColumnNames := 'Name,Description';
+    ColumnNames := cName + ',' + cDescription;
     Populate(Connection, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;
@@ -192,7 +192,7 @@ begin
   end;
 end;
 
-procedure TPrefDlg.PageControl1Change(Sender: TObject);
+procedure TPrefDlg.PageControlChange(Sender: TObject);
 var
   i: Integer;
 begin
@@ -214,7 +214,7 @@ end;
 
 procedure TPrefDlg.BtnWizardClick(Sender: TObject);
 begin
-  PageControl1Change(nil); // Get domain list
+  PageControlChange(nil); // Get domain list
   TPrefWizDlg.Create(Self).ShowModal;
 end;
 
@@ -238,7 +238,7 @@ procedure TPrefDlg.IDGroupClick(Sender: TObject);
 var
   Msg: string;
 begin
-  Case IDGroup.ItemIndex of
+  Case gbId.ItemIndex of
     0: Msg := stNoPosixID;
     2: Msg := stSequentialID;
   else

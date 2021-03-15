@@ -24,7 +24,7 @@ object MainFrm: TMainFrm
     Left = 257
     Top = 34
     Width = 3
-    Height = 519
+    Height = 527
     Cursor = crHSplit
     Beveled = True
   end
@@ -70,7 +70,6 @@ object MainFrm: TMainFrm
     object PropertiesBtn: TToolButton
       Left = 96
       Top = 0
-      Hint = 'Edit properties'
       Action = ActProperties
     end
     object DeleteBtn: TToolButton
@@ -131,14 +130,13 @@ object MainFrm: TMainFrm
     object ExitBtn: TToolButton
       Left = 336
       Top = 0
-      Hint = 'Exit'
       Action = ActExit
       ImageIndex = 18
     end
   end
   object StatusBar: TStatusBar
     Left = 0
-    Top = 569
+    Top = 577
     Width = 863
     Height = 19
     Panels = <
@@ -164,7 +162,7 @@ object MainFrm: TMainFrm
     Left = 260
     Top = 34
     Width = 603
-    Height = 519
+    Height = 527
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 2
@@ -214,7 +212,7 @@ object MainFrm: TMainFrm
       Left = 0
       Top = 185
       Width = 603
-      Height = 334
+      Height = 342
       Align = alClient
       Columns = <>
       DragMode = dmAutomatic
@@ -234,7 +232,7 @@ object MainFrm: TMainFrm
     Left = 0
     Top = 34
     Width = 257
-    Height = 519
+    Height = 527
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 3
@@ -242,7 +240,7 @@ object MainFrm: TMainFrm
       Left = 0
       Top = 0
       Width = 257
-      Height = 480
+      Height = 488
       Align = alClient
       DragCursor = crDefault
       DragMode = dmAutomatic
@@ -263,7 +261,7 @@ object MainFrm: TMainFrm
     end
     object SearchPanel: TPanel
       Left = 0
-      Top = 480
+      Top = 488
       Width = 257
       Height = 39
       Align = alBottom
@@ -292,7 +290,7 @@ object MainFrm: TMainFrm
   end
   object TabSet1: TTabSet
     Left = 0
-    Top = 553
+    Top = 561
     Width = 863
     Height = 16
     Align = alBottom
@@ -2148,6 +2146,12 @@ object MainFrm: TMainFrm
     end
     object mbTools: TMenuItem
       Caption = '&Tools'
+      object mbLanguage: TMenuItem
+        Caption = '&Language'
+      end
+      object N16: TMenuItem
+        Caption = '-'
+      end
       object mbExport: TMenuItem
         Action = ActExport
       end
@@ -2277,6 +2281,7 @@ object MainFrm: TMainFrm
     object ActExit: TAction
       Category = 'Start'
       Caption = '&Exit'
+      Hint = 'Exit'
       OnExecute = ActExitExecute
     end
     object ActSchema: TAction
@@ -2355,6 +2360,7 @@ object MainFrm: TMainFrm
     object ActProperties: TAction
       Category = 'Edit'
       Caption = '&Properties...'
+      Hint = 'Edit properties'
       ImageIndex = 16
       OnExecute = ActPropertiesExecute
     end

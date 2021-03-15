@@ -26,7 +26,7 @@ interface
 {$DEFINE REGEXPR}
 
 uses ComCtrls, LdapClasses, Classes, Contnrs, Controls, StdCtrls, ExtCtrls, Xml, Windows,
-     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask, Script, Math
+     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask, Script, Math, XmlLoader
     {$IFDEF REGEXPR}
     { Note: If you want to compile templates with regex support you'll need }
     { Regexpr.pas unit from TRegeExpr library (http://www.regexpstudio.com) }
@@ -616,25 +616,19 @@ type
     property      Extensions[Index: string]: TTemplateList read GetTemplates; default;
   end;
 
-  TTemplateParser = class
+  TTemplateParser = class(TXmlLoader)
   private
-    fTemplateFiles: TStringList;
     fExtensionList: TExtensionList;
     fImageList:   TImageList;
     function      GetTemplate(Index: Integer): TTemplate;
-    function      GetCount: Integer;
-    procedure     SetCommaPaths(Value: string);
     procedure     SetImageList(AList: TImageList);
   public
-    constructor   Create; virtual;
+    constructor   Create; override;
     destructor    Destroy; override;
-    procedure     Clear;
-    procedure     AddTemplatePath(Path: string);
+    function      Parse(const FileName: string): TObject; override;
     function      IndexOf(const Name: string): Integer;
     property      Templates[Index: Integer]: TTemplate read GetTemplate;
-    property      Count: Integer read GetCount;
     property      Extensions: TExtensionList read fExtensionList;
-    property      Paths: string write SetCommaPaths;
     property      ImageList: TImageList read fImageList write SetImageList;
   end;
 
@@ -1754,8 +1748,6 @@ procedure TTemplateCtrlGrid.SetValue(AValue: TTemplateAttributeValue);
 var
   i, j: Integer;
 begin
-  {if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
-    Exit;}
   with (Control as TStringGrid) do
   begin
     i := RowCount;
@@ -3292,71 +3284,38 @@ end;
 constructor TTemplateParser.Create;
 begin
   inherited;
-  fTemplateFiles := TStringList.Create;
   fExtensionList := TExtensionList.Create;
 end;
 
 destructor TTemplateParser.Destroy;
 begin
   Clear;
-  fTemplateFiles.Free;
   fExtensionList.Free;
   inherited;
 end;
 
-procedure TTemplateParser.Clear;
+function TTemplateParser.Parse(const FileName: string): TObject;
 var
   i: Integer;
 begin
-  with fTemplateFiles do begin
-    for i := 0 to Count - 1 do
-      TTemplate(Objects[i]).Free;
-    Clear;
-  end;
-  fExtensionList.Clear;
-end;
-
-procedure TTemplateParser.AddTemplatePath(Path: string);
-var
-  sr: TSearchRec;
-  Dir: string;
-
-  procedure AddTemplate(name: string);
-  var
-    Template: TTemplate;
-    i: Integer;
-  begin
-    try
-      Template := TTemplate.Create(name);
-      if Assigned (FImageList) then with Template do
-        if Assigned(Icon) then
-          fImageIndex := FImageList.AddMasked(Icon, Icon.TransparentColor);
-    except
-      on E:EXmlException do
-      begin
-        ParseError(mtError, Application.MainForm, sr.Name, E.Message, E.Message2, E.XmlText, E.Tag, E.Line, E.Position);
-        Exit;
-      end;
-      on E:Exception do
-        raise Exception.Create(Name +': ' + #13#10 + E.Message);
-    end;
-    fTemplateFiles.AddObject(name, Template);
-    for i := 0 to Template.Extends.Count - 1 do
-      fExtensionList.Add(Template.Extends[i], Template);
-  end;
-
-begin
-  if FindFirst(Path, faArchive, sr) = 0 then
-  begin
-    Dir := ExtractFileDir(Path) + '\';
-    with fTemplateFiles do
+  Result := TTemplate.Create(FileName);
+  try
+    if Assigned (FImageList) then with TTemplate(Result) do
+      if Assigned(Icon) then
+        fImageIndex := FImageList.AddMasked(Icon, Icon.TransparentColor);
+  except
+    on E:EXmlException do
     begin
-      AddTemplate(Dir + sr.Name);
-      while FindNext(sr) = 0 do
-        AddTemplate(Dir + sr.Name);
-      FindClose(sr);
+      ParseError(mtError, Application.MainForm, ExtractFileName(FileName), E.Message, E.Message2, E.XmlText, E.Tag, E.Line, E.Position);
+      Exit;
     end;
+    on E:Exception do
+      raise Exception.Create(ExtractFileName(FileName) +': ' + #13#10 + E.Message);
   end;
+
+  for i := 0 to TTemplate(Result).Extends.Count - 1 do
+    fExtensionList.Add(TTemplate(Result).Extends[i], TTemplate(Result));
+
 end;
 
 function TTemplateParser.IndexOf(const Name: string): Integer;
@@ -3368,29 +3327,7 @@ end;
 
 function TTemplateParser.GetTemplate(Index: Integer): TTemplate;
 begin
-  Result := fTemplateFiles.Objects[Index] as TTemplate;
-end;
-
-function TTemplateParser.GetCount: Integer;
-begin
-  Result := fTemplateFiles.Count;
-end;
-
-procedure TTemplateParser.SetCommaPaths(Value: string);
-var
-  List: TStringList;
-  i: Integer;
-
-begin
-  List := TStringList.Create;
-  try
-    List.CommaText := Value;
-    TemplateParser.Clear;
-    for i := 0 to List.Count - 1 do
-      TemplateParser.AddTemplatePath(List[i] + '\*.' + TEMPLATE_EXT);
-  finally
-    List.Free;
-  end;
+  Result := fFiles.Objects[Index] as TTemplate;
 end;
 
 procedure TTemplateParser.SetImageList(AList: TImageList);
@@ -3698,9 +3635,11 @@ initialization
   Iso639LangName := GetIso639LangName;
 
   TemplateParser := TTemplateParser.Create;
+  with TemplateParser do
   try
-    TemplateParser.Paths := GlobalConfig.ReadString('TemplateDir');
-    TemplateParser.AddTemplatePath(ExtractFileDir(application.ExeName) + '\*.' + TEMPLATE_EXT);
+     FileExtension := TEMPLATE_EXT;
+    Paths := GlobalConfig.ReadString('TemplateDir');
+    AddPath(ExtractFileDir(application.ExeName) + '\*.' + TEMPLATE_EXT);
   except
     on E: Exception do
       MessageDlg(E.Message, mtError, [mbOK], 0);

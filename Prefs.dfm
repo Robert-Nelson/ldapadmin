@@ -12,97 +12,102 @@ object PrefDlg: TPrefDlg
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poDesktopCenter
+  Position = poMainFormCenter
   OnClose = FormClose
   PixelsPerInch = 96
   TextHeight = 13
-  object PageControl1: TPageControl
+  object PageControl: TPageControl
     Left = 0
     Top = 0
     Width = 554
     Height = 378
-    ActivePage = TabSheet1
+    ActivePage = tsPosix
     Align = alClient
     TabOrder = 0
-    OnChange = PageControl1Change
-    object TabSheet1: TTabSheet
+    OnChange = PageControlChange
+    object tsPosix: TTabSheet
       Caption = '&Posix'
-      object GroupBox3: TGroupBox
+      object gbDefaults: TGroupBox
         Left = 16
         Top = 16
         Width = 513
-        Height = 185
+        Height = 169
         Caption = 'Defaults:'
         TabOrder = 0
-        object Label5: TLabel
+        object lblHomeDir: TLabel
           Left = 38
-          Top = 100
+          Top = 92
           Width = 76
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Home Directory:'
         end
-        object Label6: TLabel
+        object lblLoginShell: TLabel
           Left = 62
-          Top = 132
+          Top = 124
           Width = 53
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Login shell:'
         end
-        object Label16: TLabel
+        object lblUsername: TLabel
           Left = 64
-          Top = 36
+          Top = 28
           Width = 51
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Username:'
         end
-        object Label17: TLabel
+        object lblDisplayname: TLabel
           Left = 48
-          Top = 68
+          Top = 60
           Width = 66
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Display name:'
         end
         object edHomeDir: TEdit
           Left = 120
-          Top = 96
+          Top = 88
           Width = 353
           Height = 21
           TabOrder = 2
         end
         object edLoginShell: TEdit
           Left = 120
-          Top = 128
+          Top = 120
           Width = 353
           Height = 21
           TabOrder = 3
         end
         object edDisplayName: TEdit
           Left = 120
-          Top = 64
+          Top = 56
           Width = 353
           Height = 21
           TabOrder = 1
         end
         object edUsername: TEdit
           Left = 120
-          Top = 32
+          Top = 24
           Width = 353
           Height = 21
           TabOrder = 0
         end
       end
-      object GroupBox7: TGroupBox
+      object gbGroups: TGroupBox
         Left = 16
-        Top = 216
+        Top = 200
         Width = 513
-        Height = 105
+        Height = 129
         Caption = 'Groups:'
         TabOrder = 1
-        object Label15: TLabel
+        object lblPosixGroup: TLabel
           Left = 52
           Top = 31
           Width = 60
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Posix Group:'
         end
         object edGroup: TEdit
@@ -124,16 +129,16 @@ object PrefDlg: TPrefDlg
         object cbxExtendGroups: TCheckBox
           Left = 120
           Top = 63
-          Width = 140
+          Width = 233
           Height = 17
           Caption = 'Extend Posix groups with:'
           TabOrder = 2
           OnClick = cbxExtendGroupsClick
         end
         object cbExtendGroups: TComboBox
-          Left = 264
-          Top = 60
-          Width = 161
+          Left = 120
+          Top = 84
+          Width = 233
           Height = 21
           Style = csDropDownList
           ItemHeight = 13
@@ -144,28 +149,30 @@ object PrefDlg: TPrefDlg
         end
       end
     end
-    object TabSheet4: TTabSheet
+    object tsID: TTabSheet
       Caption = '&ID Settings'
       ImageIndex = 3
-      object GroupBox1: TGroupBox
+      object gbUserLimits: TGroupBox
         Left = 16
         Top = 136
         Width = 249
         Height = 113
         Caption = 'User ID limitations:'
         TabOrder = 1
-        object Label1: TLabel
+        object lblFirstUId: TLabel
           Left = 40
           Top = 36
           Width = 44
           Height = 13
+          Alignment = taRightJustify
           Caption = 'First UID:'
         end
-        object Label2: TLabel
+        object lblLastUid: TLabel
           Left = 40
           Top = 68
           Width = 45
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Last UID:'
         end
         object edFirstUID: TEdit
@@ -183,25 +190,27 @@ object PrefDlg: TPrefDlg
           TabOrder = 1
         end
       end
-      object GroupBox2: TGroupBox
+      object gbGroupLimits: TGroupBox
         Left = 280
         Top = 136
         Width = 249
         Height = 113
         Caption = 'Group ID limitations:'
         TabOrder = 2
-        object Label3: TLabel
+        object lblFirstGid: TLabel
           Left = 37
           Top = 32
           Width = 44
           Height = 13
+          Alignment = taRightJustify
           Caption = 'First GID:'
         end
-        object Label4: TLabel
+        object lblLastGid: TLabel
           Left = 36
           Top = 64
           Width = 45
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Last GID:'
         end
         object edFirstGID: TEdit
@@ -219,7 +228,7 @@ object PrefDlg: TPrefDlg
           TabOrder = 1
         end
       end
-      object IDGroup: TRadioGroup
+      object gbID: TRadioGroup
         Left = 16
         Top = 16
         Width = 513
@@ -233,42 +242,46 @@ object PrefDlg: TPrefDlg
         TabOrder = 0
       end
     end
-    object TabSheet2: TTabSheet
+    object tsSamba: TTabSheet
       Caption = '&Samba'
       ImageIndex = 1
-      object GroupBox4: TGroupBox
+      object gbSambaDefaults: TGroupBox
         Left = 16
         Top = 138
         Width = 513
         Height = 196
         Caption = 'Default settings:'
         TabOrder = 1
-        object Label8: TLabel
+        object lblScript: TLabel
           Left = 72
           Top = 99
           Width = 30
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Script:'
         end
-        object Label9: TLabel
+        object lblHomeShare: TLabel
           Left = 48
           Top = 35
           Width = 60
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Home share:'
         end
-        object Label10: TLabel
+        object lblProfilePath: TLabel
           Left = 48
           Top = 131
           Width = 56
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Profile path:'
         end
-        object Label11: TLabel
+        object lblHomeDrive: TLabel
           Left = 48
           Top = 67
           Width = 57
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Home drive:'
         end
         object edScript: TEdit
@@ -329,20 +342,20 @@ object PrefDlg: TPrefDlg
         object cbxLMPasswords: TCheckBox
           Left = 112
           Top = 160
-          Width = 129
+          Width = 225
           Height = 17
           Caption = 'LANMAN Passwords'
           TabOrder = 4
         end
       end
-      object GroupBox6: TGroupBox
+      object gbServer: TGroupBox
         Left = 16
         Top = 16
         Width = 513
         Height = 105
         Caption = 'Server:'
         TabOrder = 0
-        object Label7: TLabel
+        object lblNetbios: TLabel
           Left = 24
           Top = 36
           Width = 81
@@ -350,7 +363,7 @@ object PrefDlg: TPrefDlg
           Alignment = taRightJustify
           Caption = 'NETBIOS Name:'
         end
-        object Label14: TLabel
+        object lblDomainName: TLabel
           Left = 35
           Top = 68
           Width = 70
@@ -376,28 +389,30 @@ object PrefDlg: TPrefDlg
         end
       end
     end
-    object TabSheet3: TTabSheet
+    object tsMAil: TTabSheet
       Caption = '&Mail'
       ImageIndex = 2
-      object GroupBox5: TGroupBox
+      object gbMailDefaults: TGroupBox
         Left = 16
         Top = 24
         Width = 513
         Height = 297
         Caption = 'Default settings:'
         TabOrder = 0
-        object Label12: TLabel
+        object lblMD: TLabel
           Left = 64
           Top = 84
           Width = 80
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Default Maildrop:'
         end
-        object Label13: TLabel
+        object lblMA: TLabel
           Left = 40
           Top = 44
           Width = 100
           Height = 13
+          Alignment = taRightJustify
           Caption = 'Default Mail Address:'
         end
         object edMaildrop: TEdit

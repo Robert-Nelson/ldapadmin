@@ -24,6 +24,10 @@
     @Version 2007/07/02  v1.2.1. Added callback write support, T.Karlovic
     @Version 2012/02/08  v1.2.2. Added EXmlException,
                                  Added script tag support, T.Karlovic
+    @Version 2012/02/08  v1.2.3. Added Utf8 read support, T.Karlovic
+                                 Added Markups property, T.Karlovic
+                                 Read performance improvement
+                                 TFileStream->TMemoryStream, T.Karlovic
   }
 
 unit Xml;
@@ -87,7 +91,8 @@ type
   TXmlTree=class
   private
     FRoot:      TXmlNode;
-    FUtf8:      Boolean; { Node: only does UTF8 write currently }
+    FUtf8:      Boolean;
+    FMarkups:   Boolean;
     function    GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
     procedure   ParseAttributes(S: string; Attributes: TStringList);
     function    ClearContent(S: string): string;
@@ -107,19 +112,17 @@ type
     function    Exist(const Path: string): boolean;
     property    CaseSensitive: boolean read GetCaseSens write SetCaseSens;
     property    Utf8: Boolean read fUtf8 write fUtf8;
+    property    Markups: Boolean read FMarkups write FMarkups;
   end;
 
 
 implementation
 
-uses Misc;
+uses Misc, Constant;
 
 const
-  BAD_XML_DOCUMENT         = 'Not well formed XML.';
-  XML_BAD_CLOSE_TAG        = 'The "%s" is expected, but the "%s" is received';
-  XML_UNEXPECTED_CLOSE_TAG = 'Unexpected closing tag "%s"';
-  TAB                      = '  ';//#9;
-  CRLF                     = #13#10;
+  TAB  = '  ';//#9;
+  CRLF = #13#10;
 
 { EXmlException }
 
@@ -269,12 +272,30 @@ end;
 
 function TXmlTree.GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
 type
-  TState=(tsContent, tsScriptContent, tsTag, tsScriptTag, tsAttrs, tsEnd, tsSkip, tsComment);
+  TState=(tsContent, tsScriptContent, tsTag, tsScriptTag, tsAttrs, tsEnd, tsSkip, tsComment, tsMarkup);
 var
   c: AnsiChar;
   State: TState;
   quota: boolean;
   CommentState: byte;
+  Markup: string;
+
+  function DecodeMarkup(const s: string): string;
+  begin
+    try
+      if (s <> '') and (s[1] = '#') then Result := Chr(StrToInt(Copy(S, 2, MaxInt))) else
+      if s = 'quot' then Result := '"'  else
+      if s = 'amp'  then Result := '&'  else
+      if s = 'apos' then Result := '''' else
+      if s = 'lt'   then Result := '<'  else
+      if s = 'gt'   then Result := '>'
+      else raise Exception.CreateFmt('Unknown reference: %s', [s]);
+    except
+       on E: Exception do
+        raise EXmlException.Create(Stream, TagName, E.Message);
+    end;
+  end;
+  
 begin
   result:=false;
   PrevContent:='';
@@ -294,25 +315,13 @@ begin
       //////////////////////////////////////////////////////////////////////////
       tsContent:  case c of
                     '<':  State:=tsTag;
+                    '&':  if FMarkups then begin
+                            State := tsMarkup;
+                            Markup := '';
+                          end
+                          else
+                            PrevContent:=PrevContent+c;
                     else  PrevContent:=PrevContent+c;
-                  end;
-      //////////////////////////////////////////////////////////////////////////
-      tsScriptContent:
-                  case c of
-                    '<':  State:=tsScriptTag;
-                    else  PrevContent:=PrevContent+c;
-                  end;
-      tsScriptTag:
-                  case c of
-                    '/': begin
-                           if TagName='' then TagType:=tt_Close
-                           else TagType:=tt_Single;
-                           State:=tsTag;
-                         end;
-                    else begin
-                      PrevContent:=PrevContent+'<'+c;
-                      State := tsScriptContent;
-                    end;
                   end;
       //////////////////////////////////////////////////////////////////////////
       tsTag:      case c of
@@ -345,6 +354,15 @@ begin
                     else  attrs:=attrs+c;
                   end;
      //////////////////////////////////////////////////////////////////////////
+     tsMarkup:    case c of
+                    ';':  begin
+                            PrevContent := PrevContent + DecodeMarkup(Markup);
+                            State := tsContent;
+                          end;
+                    '<':  raise EXmlException.Create(Stream, TagName, Format('Invalid (unclosed) reference: %s', [Markup]));                          
+                    else  Markup := Markup + c;
+                  end;
+    ////////////////////////////////////////////////////////////////////////////
      tsSkip:      case c of
                     '>':  State:=tsContent;
                   end;
@@ -355,6 +373,25 @@ begin
                     else  CommentState:=0;
                   end;
     ////////////////////////////////////////////////////////////////////////////
+      tsScriptContent:
+                  case c of
+                    '<':  State:=tsScriptTag;
+                    else  PrevContent:=PrevContent+c;
+                  end;
+    ////////////////////////////////////////////////////////////////////////////                  
+      tsScriptTag:
+                  case c of
+                    '/': begin
+                           if TagName='' then TagType:=tt_Close
+                           else TagType:=tt_Single;
+                           State:=tsTag;
+                         end;
+                    else begin
+                      PrevContent:=PrevContent+'<'+c;
+                      State := tsScriptContent;
+                    end;
+                  end;
+      //////////////////////////////////////////////////////////////////////////
     end;
   end;
 
@@ -371,12 +408,46 @@ var
   TagType: TTagType;
   Node:   TXmlNode;
   Attrs:  string;
+
+  procedure CheckEncoding;
+  var
+    s: TStringList;
+  begin
+    if not GetNextTag(Stream, PrevContent, TagName, Attrs, TagType) then
+     raise EXmlException.Create(Stream, TagName, '');
+
+    if TagName = '?xml' then
+    begin
+      s := TStringList.Create;
+      try
+        ParseAttributes(attrs, s);
+         if s.Values['encoding'] = 'utf-8' then
+           utf8 := true;
+      finally
+        s.Free;
+      end;
+      GetNextTag(Stream, PrevContent, TagName, Attrs, TagType);
+    end
+    else
+    if (Length(PrevContent) >= 3) and ((PInteger(@PrevContent[1])^ and $FFFFFF) = $BFBBEF) then // UTF8 BOF
+      utf8 := true;
+  end;
+
+  function EncodedString(const s: string): string;
+  begin
+    if utf8 then
+      Result := UTF8ToStringLen(PChar(s), Length(s))
+    else
+      Result := s;
+  end;
+
 begin
   if FRoot<>nil then FRoot.Free;
   FRoot:=nil;
   Node:=nil;
   try
-    while GetNextTag(Stream, PrevContent, TagName, Attrs, TagType) do begin
+    CheckEncoding;
+    repeat
       case TagType of
         //////////////////////////////////////////////////////////////////////////
         tt_Single,
@@ -384,10 +455,10 @@ begin
                     Node:=TXmlNode.Create(Node);
                     if FRoot=nil then FRoot:=Node;
 
-                    Node.FName:=TagName;
-                    ParseAttributes(attrs, Node.Attributes);
+                    Node.FName:=EncodedString(TagName);
+                    ParseAttributes(EncodedString(attrs), Node.Attributes);
 
-                    if Node.Parent<>nil then Node.Parent.Content:=ClearContent(Node.Parent.Content+PrevContent);
+                    if Node.Parent<>nil then Node.Parent.Content:=EncodedString(ClearContent(Node.Parent.Content+PrevContent));
                     if TagType=tt_Single then Node:=Node.Parent;
                   end;
         //////////////////////////////////////////////////////////////////////////
@@ -395,12 +466,12 @@ begin
                     if Node=nil then raise EXmlException.Create(Stream, TagName, format(XML_UNEXPECTED_CLOSE_TAG,[TagName]));
                     if Node.Name<>TagName then raise EXmlException.Create(Stream, TagName, format(XML_BAD_CLOSE_TAG, [Node.Name, TagName]));
 
-                    Node.Content:=ClearContent(Node.Content+PrevContent);
+                    Node.Content:=EncodedString(ClearContent(Node.Content+PrevContent));
                     Node:=Node.Parent;
                   end;
         //////////////////////////////////////////////////////////////////////////
-      end;
-    end;
+       end;
+    until not GetNextTag(Stream, PrevContent, TagName, Attrs, TagType);
   finally
     if FRoot=nil then FRoot:=TXmlNode.Create(nil);
   end;
@@ -463,10 +534,31 @@ begin
 end;
 
 procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil);
+
+  function EncodeMarkups(const s: string): string;
+  var
+    i: Integer;
+  begin
+    Result := '';
+    for i := 1 to Length(s) do
+      case s[i] of
+        '"':  Result := Result + '&quot;';
+        '&':  Result := Result + '&amp;';
+        '''': Result := Result + '&apos;';
+        '<':  Result := Result + '&lt;';
+        '>':  Result := Result + '&gt;';
+      else
+        Result := Result + s[i]
+      end;
+  end;
+
   procedure WriteString(Value: string);
   var
     s: string;
   begin
+    if fMarkups then
+      Value := EncodeMarkups(Value);
+
     if fUtf8 then
     begin
       s := StringToUTF8Len(PChar(Value), length(Value));
@@ -510,10 +602,11 @@ end;
 
 procedure TXmlTree.LoadFromFile(const FileName: string);
 var
-  FStream: TFileStream;
+  FStream: TMemoryStream;
 begin
-  FStream:=TFileStream.Create(FileName, fmOpenRead);
+  FStream:=TMemoryStream.Create;
   try
+    FStream.LoadFromFile(FileName);
     LoadFromStream(FStream);
   finally
     FStream.Free;
@@ -598,7 +691,5 @@ function TXmlTree.GetCaseSens: boolean;
 begin
   result:=Froot.CaseSensitive;
 end;
-
-
 
 end.

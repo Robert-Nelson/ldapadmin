@@ -1,3 +1,24 @@
+  {      LDAPAdmin - Constant.pas
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
+  *
+  *      Author: Tihomir Karlovic
+  *
+  *
+  * This file is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This file is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+  }
+
 unit Constant;
 
 interface
@@ -92,7 +113,7 @@ const
   COMBO_HISTORY        = 10;
 
   ScrollAccMargin  = 40;
-    
+
 type
   TEditMode            = (EM_ADD, EM_MODIFY);
 
@@ -101,56 +122,58 @@ const
 // Registry names
 
   rAccountFiles       = 'ConfigFiles';
+  rDirectoryType      = 'Connection\DirectoryType';
   rDontCheckProto     = 'DontCheckProto';
-  rMwShowValues       = 'MwShowValues';
-  rMwShowEntries      = 'MwShowEntries';
-  rMwViewSplit        = 'MwVSplit';
-  rMwTreeSplit        = 'MwHSplit';
-  rEvViewStyle        = 'EvViewStyle';
-  rMwLTWidth          = 'MwLTWidth';
-  rMwLTIdentObject    = 'MwLTIdObject';
-  rMwLTEnfContainer   = 'MwLTEnfContainer';
-  rTemplateDir        = 'TemplateDir';
-  rTemplateExtensions = 'TemplateExtensions';
-  rTemplateAutoload   = 'TemplateAutoload';
-  rTemplateProperties = 'TemplateProperites';
-  rStartupSession     = 'StartupSession';
-  rSearchFilter       = 'SearchFilter';
-  rQuickSearchFilter  = 'QuickSearchFilter';
-  rSmartDelete        = 'SmartDelete';
-  rUseTemplateImages  = 'UseTemplateImages';
   rEditorSchemaHelp   = 'General\EdSchemaHelp';
-  rLastMemberOf       = 'General\LastMemberOf';
-  rPosixIDType        = 'Posix\IdType';
-  rPosixFirstUID      = 'Posix\FirstUID';
-  rPosixLastUID       = 'Posix\LastUID';
-  rPosixFirstGID      = 'Posix\FirstGID';
-  rPosixLastGID       = 'Posix\LastGID';
-  rPosixUserName      = 'Posix\UserName';
+  rEvViewStyle        = 'EvViewStyle';
   rInetDisplayName    = 'Inet\DisplayName';
-  rPosixHomeDir       = 'Posix\HomeDir';
-  rPosixLoginShell    = 'Posix\LoginShell';
+  rLanguage           = 'Language';
+  rLanguageDir        = 'LanguageDir';
+  rLastMemberOf       = 'General\LastMemberOf';
+  rLocalTransTable    = 'TranscodeTable';
+  rMwLTEnfContainer   = 'MwLTEnfContainer';
+  rMwLTIdentObject    = 'MwLTIdObject';
+  rMwLTWidth          = 'MwLTWidth';
+  rMwShowEntries      = 'MwShowEntries';
+  rMwShowValues       = 'MwShowValues';
+  rMwTreeSplit        = 'MwHSplit';
+  rMwViewSplit        = 'MwVSplit';
+  rPosixFirstGID      = 'Posix\FirstGID';
+  rPosixFirstUID      = 'Posix\FirstUID';
   rPosixGroup         = 'Posix\Group';
   rPosixGroupOfUnames = 'Posix\PosixGroupOfUniqueNames';
+  rPosixHomeDir       = 'Posix\HomeDir';
+  rPosixIDType        = 'Posix\IdType';
+  rPosixLastGID       = 'Posix\LastGID';
+  rPosixLastUID       = 'Posix\LastUID';
+  rPosixLoginShell    = 'Posix\LoginShell';
   rPosixPwdHashType   = 'Posix\PwdHashType';
-  rSambaNetbiosName   = 'Samba\NetbiosName';
-  rSambaDomainName    = 'Samba\DomainName';
-  rSambaHomeShare     = 'Samba\HomeShare';
-  rSambaHomeDrive     = 'Samba\HomeDrive';
-  rSambaScript        = 'Samba\Script';
-  rSambaProfilePath   = 'Samba\ProfilePath';
-  rSambaLMPasswords   = 'Samba\LMPasswords';
+  rPosixUserName      = 'Posix\UserName';
   rPostfixMailAddress = 'Postfix\MailAddress';
   rPostfixMaildrop    = 'Postfix\Maildrop';
-  rSearchBase         = 'Search\Base';
+  rQuickSearchFilter  = 'QuickSearchFilter';
+  rSambaDomainName    = 'Samba\DomainName';
+  rSambaHomeDrive     = 'Samba\HomeDrive';
+  rSambaHomeShare     = 'Samba\HomeShare';
+  rSambaLMPasswords   = 'Samba\LMPasswords';
+  rSambaNetbiosName   = 'Samba\NetbiosName';
+  rSambaProfilePath   = 'Samba\ProfilePath';
+  rSambaScript        = 'Samba\Script';
   rSearchAttributes   = 'Search\Attributes';
-  rSearchScope        = 'Search\Scope';
+  rSearchBase         = 'Search\Base';
   rSearchCustFilters  = 'Search\Filters\';
   rSearchDerefAliases = 'Search\DereferenceAliases';
+  rSearchFilter       = 'SearchFilter';
+  rSearchScope        = 'Search\Scope';
+  rSmartDelete        = 'SmartDelete';
+  rStartupSession     = 'StartupSession';
+  rTemplateAutoload   = 'TemplateAutoload';
+  rTemplateDir        = 'TemplateDir';
+  rTemplateExtensions = 'TemplateExtensions';
   rTemplateFormHeight = 'TemplateForm\Height';
   rTemplateFormWidth  = 'TemplateForm\Width';
-  rLocalTransTable    = 'TranscodeTable';
-  rDirectoryType      = 'Connection\DirectoryType';
+  rTemplateProperties = 'TemplateProperites';
+  rUseTemplateImages  = 'UseTemplateImages';
 
 // Search filters
 
@@ -186,80 +209,113 @@ const
   sDEFQUICKSRCH     = '(|(cn=*%s*)(uid=*%s*)(displayName=*%s*))';
   sDEFSRCH          = '(|(uid=*%s*)(displayName=*%s*)(cn=*%s*)(sn=*%s*))';
 
+resourcestring
+
+  LAC_NOTLAC               = 'The file "%s" is not an Ldap Admin accounts file';
+  BAD_XML_DOCUMENT         = 'Not well formed XML.';
+  XML_BAD_CLOSE_TAG        = 'The "%s" is expected, but the "%s" is received';
+  XML_UNEXPECTED_CLOSE_TAG = 'Unexpected closing tag "%s"';
+
+
 // Captions
 
-  cAppName          = 'LDAP Admin';
-  cAnonymousConn    = 'Anonymous connection';
-  cSASLCurrUSer     = 'Use current user credentials';
-  cDescription      = 'Description';
-  cPickGroups       = 'Choose Groups';
-  cPickAccounts     = 'Choose Accounts';
-  cNewResource      = 'New Resource';
-  cEditResource     = 'Edit Resource';
-  cResource         = 'Resource:';
-  cPropertiesOf     = 'Properties of %s';
+  cAdd              = '&Add';
   cAddAddress       = 'Add Address';
-  cEditAddress      = 'Edit Address';
-  cSmtpAddress      = 'SMTP Address:';
-  cConfirm          = 'Confirmation';
-  cServer           = 'Server: %s';
-  cPath             = 'Path: %s';
-  cUser             = 'User: %s';
-  cEditEntry        = 'Edit entry';
-  cNewEntry         = 'New entry';
-  cSurname          = 'Second name';
-  cName             = 'Name';
-  cIpAddress        = 'IP Address';
-  cUsername         = 'Username';
-  cHomeDir          = 'Home Directory';
-  cMaildrop         = 'Maildrop';
+  cAddAttribute     = 'Add attribute...';
   cAddConn          = 'New connection';
-  cRename           = 'Rename';
-  cNewName          = 'New name:';
-  cDeleting         = 'Deleting:';
-  cPreparing        = 'Preparing...';
+  cAddHost          = 'Add Host';
+  cAddValue         = 'Add value';
+  cAnonymousConn    = 'Anonymous connection';
+  cAppName          = 'LDAP Admin';
+  cAttribute        = 'Attribute';
+  cAttributeName    = 'Attribute name:';
+  cBinary           = 'Binary';
+  cBrowse           = '&Browse...';
+  cCancel           = '&Cancel';
+  cCert             = 'Certificate';
+  cClose            = '&Close';
+  cColumnNames      = 'Name,DN';
+  cConfirm          = 'Confirmation';
+  cCopying          = 'Copying...';
   cCopyTo           = 'Copy %s to...';
+  cDecimal          = 'Decimal:';
+  cDelete           = '&Delete';
+  cDeleting         = 'Deleting:';
+  cDescription      = 'Description';
+  cDetails          = '&Details';
+  cEdit             = '&Edit';
+  cEditAddress      = 'Edit Address';
+  cEditEntry        = 'Edit entry';
+  cEditHost         = 'Edit Host';
+  cEditResource     = 'Edit Resource';
+  cEditValue        = 'Edit value';
+  cEnglish          = 'English';
+  cEnterNewValue    = 'Enter new value:';
+  cEnterPasswd      = 'Enter password';
+  cEnterRDN         = 'Enter rdn:';
+  cError            = 'Error';
+  cFinish           = '&Finish';
+  cHex              = 'Hex:';
+  cHomeDir          = 'Home Directory';
+  cHostName         = 'Host Name:';
+  cImage            = 'Image';
+  cInformation      = 'Information';
+  cIpAddress        = 'IP Address';
+  cMaildrop         = 'Maildrop';
+  cModifyOk         = 'Ok.';
+  cModifySkipped    = 'Skipped.';
+  cMore             = 'More...';
   cMoveTo           = 'Move %s to...';
   cMoving           = 'Moving...';
-  cCopying          = 'Copying...';
-  cAddHost          = 'Add Host';
-  cEditHost         = 'Edit Host';
-  cHostName         = 'Host Name:';
-  cSambaDomain      = 'Samba Domain';
-  cEnterPasswd      = 'Enter password';
-  cEnterNewValue    = 'Enter new value:';
-  cSearchResults    = 'Search results:';
-  cAttribute        = 'Attribute';
-  cValue            = 'Value';
-  cOldValue         = 'Old value';
-  cNewValue         = 'New value';
-  cObjectclass      = 'Objectclass';
+  cName             = 'Name';
   cNew              = '<<new>>';
+  cNewEntry         = 'New entry';
   cNewItem          = 'New item';
+  cNewName          = 'New name:';
+  cNewResource      = 'New Resource';
   cNewSubmenu       = 'New submenu';
-  cSetPassword      = 'Set password...';
-  cRegistryCfgName  = 'Private';
-  sConnectSuccess   = 'Connection is successful.';
-  cAddAttribute     = 'Add attribute...';
-  cAttributeName    = 'Attribute name:';
-  cProgress         = 'Progress:';
-  cAdd              = '&Add';
-  cBrowse           = '&Browse...';
-  cDelete           = '&Delete';
-  cEdit             = '&Edit';
-  cBinary           = 'Binary';
-  cImage            = 'Image';
-  cText             = 'Text';
-  cCert             = 'Certificate';
-  cUnknown          = 'Unknown';
-  cViewPic          = 'View picture: ';
-  cSaveToLdap       = 'Save to LDAP';
-  cAddValue         = 'Add value';
-  cEditValue        = 'Edit value';
-  cMore             = 'More...';
+  cNewValue         = 'New value';
+  cNext             = '&Next';
+  cObjectclass      = 'Objectclass';
   cOk               = '&OK';
-  cCancel           = '&Cancel';
-  cEnterRDN         = 'Enter rdn:';
+  cOldValue         = 'Old value';
+  cOperation        = 'Operation:';
+  cParentDir        = 'Parent directory:';
+  cPassword         = 'Password:';
+  cPath             = 'Path: %s';
+  cPickAccounts     = 'Choose Accounts';
+  cPickGroups       = 'Choose Groups';
+  cPickMembers      = 'Choose members';
+  cPreparing        = 'Preparing...';
+  cProgress         = 'Progress:';
+  cPropertiesOf     = 'Properties of %s';
+  cRegistryCfgName  = 'Private';
+  cRename           = 'Rename';
+  cResource         = 'Resource:';
+  cRetry            = '&Retry';
+  cSambaDomain      = 'Samba Domain';
+  cSASLCurrUSer     = 'Use current user credentials';
+  cSaveToLdap       = 'Save to LDAP';
+  cSearchBase       = 'Search base';
+  cSearchResults    = 'Search results:';
+  cSelectAliasDir   = 'Select alias directory';
+  cSelectEntry      = 'Select entry';
+  cServer           = 'Server: %s';
+  cSetPassword      = 'Set password...';
+  cSkip             = '&Skip';
+  cSkipAll          = 'Skip &all';
+  cSmartDelete      = '&Smart delete';
+  cSmtpAddress      = 'SMTP Address:';
+  cSurname          = 'Second name';
+  cText             = 'Text';
+  cUnknown          = 'Unknown';
+  cUser             = 'User: %s';
+  cUsername         = 'Username';
+  cUserPrompt       = 'User Prompt';
+  cValue            = 'Value';
+  cView             = '&View:';
+  cViewPic          = 'View picture: ';
+  cWarning          = 'Warning';
 
 // Menu captions
 
@@ -277,108 +333,122 @@ const
   mcAlias             = 'Alias...';
 
 // Messages
-  stUserBreak       = 'User break!';
-  stOverwrite       = 'Do you want to overwrite?';
-  stLdapError       = 'LDAP error: %s!';
-  stLdapErrorEx     = 'LDAP error! %s: %s.';
-  stReqAttr         = 'Attribute %s may not be empty!';
-  stReqNoEmpty      = '%s must have a value!';
-  stReqMail         = 'At least one E-Mail address must be defined!';
-  stPassDiff        = 'Passwords do not match!';
-  stPassFor         = 'Password for : %s';
+
+  stConnectSuccess  = 'Connection is successful.';
+  stAbortScript     = 'Do you want to abort the script?';
+  stAccntExist      = 'Account with this name already exists.' + #10#13 + 'Do you want to overwrite it?';
   stAccntNameReq    = 'You have to enter a name for this connection!';
-  stGroupNameReq    = 'You have to enter a name for this group!';
-  stGroupMailReq    = 'You have to enter at least one mail address for this group!';
-  stGidNotSamba     = 'Selected primary group is not a Samba group or it does not map to user domain. Do you still want to continue?';
+  stAskTreeCopy     = 'Copy %s to %s?';
+  stAskTreeMove     = 'Move %s to %s?';
+  stCantStorPass    = 'This storage does not allow to keep the password';
+  stCertConfirmConn = 'The server you are trying to connect to is using a certificate which could not be verified!'#10#13#10#13'%s'#10#13'Do you want to proceed?';
+  stCertInvalidName = 'The name of the security certificate is invalid or does not match the server name!';
+  stCertInvalidSig  = 'Signature check failed!';
+  stCertInvalidTime = 'The security certificate has expired or is not yet valid!';
+  stCertNotFound    = 'Issuer certificate not found';
+  stCertSelfSigned  = 'The certificate is self-signed root certificate';
+  stClassNotFound   = 'Class %s not found!';
+  stCntObjects      = '%d object(s) retrieved.';
+  stCntSubentries   = '%d subentries';
   stConfirmDel      = 'Delete entry "%s"?';
   stConfirmDelAccnt = 'Delete account "%s"?';
   stConfirmMultiDel = 'Delete %d entries?';
-  stRegAccntErr     = 'Could not read account data!';
-  stNoMoreNums      = 'Pool depleted! No more available free id''s for %s!';
-  stUnclosedStr     = 'Unclosed string!';
-  stObjnRetrvd      = 'Object not yet retrieved!';
-  stSmbDomainReq    = 'You have to select samba domain to which this group should be mapped!';
+  stDateFormat      = 'date format';
   stDeleteAll       = '"%s"'#10#13'This directory entry is not empty (it contains further leaves). Delete all recursively?';
-  //stDelNamingAttr   = 'You cannot delete the naming value of this entry!';
+  stDeleteMenuItem  = 'Delete this menu item?';
+  stDeleteSubmenu   = 'Delete this submenu?';
   stDelNamingAttr   = 'Attribute %s is the naming value of this entry! Do you want to delete it?';
-  stMoveOverlap     = 'Cannot move: Source and destination paths overlap!';
-  stAskTreeCopy     = 'Copy %s to %s?';
-  stAskTreeMove     = 'Move %s to %s?';
-  stNumObjects      = '%d objects';
+  stDisplaying      = 'Displaying first %d results.';
+  stDoNotCheckAgain = 'Do not perform this check in the future.';
+  stDoNotShowAgain  = 'Do not show this message in the future.';
+  stDuplicateEntry  = 'EntryList does not allow duplicates';
+  stDuplicateSC     = 'Shortcut ''%s'' is already assigned to ''%s'' menu item!';
+  stEmptyArg        = 'Empty argument!';
+  stErrExtMethName  = 'Error extracting method name!';
+  stEvTypeEvTypeErr = 'Error setting %s event: %s event type is not supported!';
+  stExtConfirmAssoc = 'LDAPAdmin is currently not your default LDAP browser.'+#10+'Would you like to make it your default LDAP browser?';
+  stFileOverwrite   = 'File ''%s'' exists, overwrite?';
   stFileReadOnly    = 'File opened in read only mode!';
-  stLdifEVer        = 'Invalid version value: %s!';
+  stGetProcAddrErr  = 'Cannot GetProcAddress of %s.';
+  stGidNotSamba     = 'Selected primary group is not a Samba group or it does not map to user domain. Do you still want to continue?';
+  stGroupMailReq    = 'You have to enter at least one mail address for this group!';
+  stGroupNameReq    = 'You have to enter a name for this group!';
+  stIdentIsnotValid = '"%s" is not a valid %s!';
+  stInserting       = 'Inserting, %d of %d. Press ESC to abort...';
+  stInteger         = 'integer number';
+  stInvalidArgIndex = 'Invalid Argument Index: %d';
+  stInvalidCmdVer   = 'Invalid LDAP version in command line: %s';
+  stInvalidFilter   = 'Invalid or unsupported filter type!';
+  stInvalidLdapOp   = 'Invalid Ldap operation!';
+  stInvalidTagValue = 'Invalid value %s for <%s>!';
+  stInvalidTimeFmt  = 'Invalid time format!';
+  stInvalidURL      = 'Invalid URL format!';
+  stLdapError       = 'LDAP error: %s!';
+  stLdapErrorEx     = 'LDAP error! %s: %s.';
   stLdifEFold       = 'Line %d: Empty line may not be folded!';
+  stLdifEInvMode    = 'Internal error: Invalid LDIF mode!';
   stLdifENoCol      = 'Line %d: Missing ":".';
   stLdifENoDn       = 'Line %d: dn expected but %s found!';
+  stLdifEof         = 'End of file reached!';
+  stLdifEVer        = 'Invalid version value: %s!';
+  stLdifFailure     = '%d Object(s) could not be imported!';
+  stLdifInvalidUrl  = 'Invalid URL!';
+  stLdifInvAttrName = 'Line %d: Invalid attribute name, expected "%s" but found "%s"!';
   stLdifInvChType   = 'Line %d: Invalid changetype "%s"!';
   stLdifInvOp       = 'Line %d: Invalid operation "%s"!';
   stLdifNotExpected = 'Line %d: Expected "%s" but found "%s"!';
-  stLdifInvAttrName = 'Line %d: Invalid attribute name, expected "%s" but found "%s"!';
   stLdifSuccess     = '%d Object(s) succesfully imported!';
-  stLdifFailure     = '%d Object(s) could not be imported!';
-  stLdifEof         = 'End of file reached!';
-  stLdifInvalidUrl  = 'Invalid URL!';
   stLdifUrlNotSupp  = 'URL method not supported!';
-  stInvalidLdapOp   = 'Invalid Ldap operation!';
-  stSkipRecord      = '%s'#10#13'Skip this record?';
-  stFileOverwrite   = 'File ''%s'' exists, overwrite?';
-  stCertNotFound    = 'Issuer certificate not found';
-  stCertSelfSigned  = 'The certificate is self-signed root certificate';
-  stCertInvalidSig  = 'Signature check failed!';
-  stCertInvalidTime = 'The security certificate has expired or is not yet valid!';
-  stCertInvalidName = 'The name of the security certificate is invalid or does not match the server name!';
-  stCertConfirmConn = 'The server you are trying to connect to is using a certificate which could not be verified!'#10#13#10#13'%s'#10#13'Do you want to proceed?';
-  stExtConfirmAssoc = 'LDAPAdmin is currently not your default LDAP browser.'+#10+'Would you like to make it your default LDAP browser?';
-  stResetAutolock   = 'This account has been locked down by SAMBA server! Do you want to reset the autolock flag and enable it now?';
-  stDoNotCheckAgain = 'Do not perform this check in the future.';
-  stDoNotShowAgain  = 'Do not show this message in the future.';
-  stNoRdn           = 'You have to enter the unique name (rdn) for this entry!';
-  stRetrieving      = 'Reading: %d objects retrieved. Press ESC to abort...';
-  stInserting       = 'Inserting, %d of %d. Press ESC to abort...';
-  stDisplaying      = 'Displaying first %d results.';
-  stSorting         = 'Sorting...';
-  stCntObjects      = '%d object(s) retrieved.';
-  stCntSubentries   = '%d subentries';
-  stUnclosedParam   = 'Invalid (Unclosed) parameter!';
-  stIdentIsnotValid = '"%s" is not a valid %s!';
-  stInvalidTagValue = 'Invalid value %s for <%s>!';
-  stNumber          = 'number';
-  stInteger         = 'integer number';
-  stDateFormat      = 'date format';
-  stTimeFormat      = 'time format';
-  stDuplicateEntry  = 'EntryList does not allow duplicates';
-  stCantStorPass    = 'This storage does not allow to keep the password';
-  stAccntExist      = 'Account with this name already exists.' + #10#13 + stOverwrite;
-  stInvalidFilter   = 'Invalid or unsupported filter type!';
-  stRegexFailed     = 'Regexp validation failed!';
-  stInvalidTimeFmt  = 'Invalid time format!';
-  stUnsupportedAuth = 'Unsupported authentication method: %s!';
-  stInvalidURL      = 'Invalid URL format!';
+  stMenuAssignTempl = 'A template name must not be empty!';
+  stMenuLocateTempl = 'The template "%s" which is assigned to this action could not be located!';
+  stMoveOverlap     = 'Cannot move: Source and destination paths overlap!';
   stNeedElevated    = 'On Vista or higher, LDAPAdmin must be executed with elevated privileges for this operation to succesfully complete!';
-  stSaslSSL         = 'SASL encryption can not be used over an SSL connection!';
+  stNoActiveConn    = 'Connection error: could not locate active connection!';
+  stNoMoreChecks    = 'Do not perform this check in the future.';
+  stNoMoreNums      = 'Pool depleted! No more available free id''s for %s!';
   stNoPosixID       = 'You should disable id creation only if you use a server side id assignment! Otherwise, you will not be able to create any users or groups.';
-  stSequentialID    = 'Activating this option could cause a significant network traffic with large user databases. Unless you REALLY need sequential id''s, leave the default option (random) on!';
-  stStopTLSError    = 'Stop TLS Failed! The connection will be closed due to unrecoverable error.';
-  stScriptNotSupp   = '''%s'' does not support ''%s'' event !';
-  stScriptNotEvent  = 'Property ''%s'' is not an event!';
-  stEvTypeEvTypeErr = 'Error setting %s event: %s event type is not supported!';
+  stNoRdn           = 'You have to enter the unique name (rdn) for this entry!';
+  stNoSchema        = 'Can''t load LDAP schema';
+  stNotEnoughArgs   = 'Not enough arguments!';
+  stNumber          = 'number';
+  stNumObjects      = '%d objects';
+  stObjnRetrvd      = 'Object not yet retrieved!';
+  stOverwrite       = 'Do you want to overwrite?';
+  stPassDiff        = 'Passwords do not match!';
+  stPassFor         = 'Password for : %s';
+  stPropReadOnly    = 'Property is read only!';
+  stRegAccntErr     = 'Could not read account data!';
+  stRegexFailed     = 'Regexp validation failed!';
+  stReqAttr         = 'Attribute %s may not be empty!';
+  stReqMail         = 'At least one E-Mail address must be defined!';
+  stReqNoEmpty      = '%s must have a value!';
+  stRequired        = '%s is required!';
+  stResetAutolock   = 'This account has been locked down by SAMBA server! Do you want to reset the autolock flag and enable it now?';
+  stRetrieving      = 'Reading: %d objects retrieved. Press ESC to abort...';
+  stSaslSSL         = 'SASL encryption can not be used over an SSL connection!';
+  stSchemaNoSubentry= 'Can''t find SubschemaSubentry';
   stScriptNoProc    = 'Procedure "%s" could not be located.';
+  stScriptNotEvent  = 'Property ''%s'' is not an event!';
+  stScriptNotSupp   = '''%s'' does not support ''%s'' event !';
   stScriptParamType = 'Unsupported parameter type!';
   stScriptSetErr    = 'Could not convert set to integer!';
-  stUnsuppScript    = 'Unsupported script type: ';
-  stWritePropRO     = 'Can not write to read only property!';
-  stNotEnoughArgs   = 'Not enough arguments!';
+  stSequentialID    = 'Activating this option could cause a significant network traffic with large user databases. Unless you REALLY need sequential id''s, leave the default option (random) on!';
+  stSkipRecord      = '%s'#10#13'Skip this record?';
+  stSmbDomainReq    = 'You have to select samba domain to which this group should be mapped!';
+  stSorting         = 'Sorting...';
+  stStopTLSError    = 'Stop TLS Failed! The connection will be closed due to unrecoverable error.';
+  stTimeFormat      = 'time format';
   stTooManyArgs     = 'Too many arguments!';
-  stEmptyArg        = 'Empty argument!';
-  stRequired        = '%s is required!';
-  stInvalidCmdVer   = 'Invalid LDAP version in command line: %s';
-  stDeleteMenuItem  = 'Delete this menu item?';
-  stDeleteSubmenu   = 'Delete this submenu?';
-  stMenuLocateTempl = 'The template "%s" which is assigned to this action could not be located!';
-  stMenuAssignTempl = 'A template name must not be empty!';
-  stDuplicateSC     = 'Shortcut ''%s'' is already assigned to ''%s'' menu item!';
-  stErrExtMethName  = 'Error extracting method name!';
-  stPropReadOnly    = 'Property is read only!';
+  stUnclosedParam   = 'Invalid (Unclosed) parameter!';
+  stUnclosedStr     = 'Unclosed string!';
+  stUnknownValueType= 'Unknown value type.'#10'key:%s'#10'value:%s"';
+  stUnsupportedAuth = 'Unsupported authentication method: %s!';
+  stUnsuppScript    = 'Unsupported script type: ';
+  stUserBreak       = 'User break!';
+  stWritePropRO     = 'Can not write to read only property!';
+
+  SAVE_SEARCH_FILTER  = 'Ldif file, Windows format (CR/LF) (*.ldif)|*.ldif|Ldif file, Unix format (LF only) (*.ldif)|*.ldif|CSV (Comma-separated) (*.csv)|*.csv|XML (*.xml)|*.xml';
+  SAVE_MODIFY_FILTER  = 'Text file (*.txt)|*.txt';
 
 implementation
 

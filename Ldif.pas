@@ -461,7 +461,7 @@ begin
                   F.Seek(0, soFromEnd);
                 end;
     else
-      raise Exception.Create('Internal error: Invalid LDIF mode!');
+      raise Exception.Create(stLdifEInvMode);
     end;
   except
     RaiseLastWin32Error;

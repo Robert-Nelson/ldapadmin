@@ -25,7 +25,6 @@ unit Script;
 interface
 
 uses
-  {$IFDEF VARIANTS} variants, {$ENDIF}
   Windows, Messages, ActiveX, SysUtils, Classes, ComObj, TypInfo,
   ScriptIntf, Contnrs, Controls;
 
@@ -797,7 +796,7 @@ end;
 function ArgParam(const Args: TArgList; Index: Integer): OleVariant;
 begin
   if Index < 0 then
-    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, Format('Ivalid Argument Index: %d', [Index]));
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, Format(stInvalidArgIndex, [Index]));
   if Index >= Args.Count then
     raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
   Result := OleVariant(Args.Arguments[Args.Count - Index - 1]);
@@ -1266,7 +1265,7 @@ function THostScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): Ol
 begin
   VarClear(Result);
   case MethodIndex of
-    0: Result := InputBox('User Prompt',Arg(0),Arg(1));
+    0: Result := InputBox(cUserPrompt,Arg(0),Arg(1));
     1: Alert(Arg(0));
     2: Result := CreateObject(Arg(0));
     3: Echo(Arg(0));

@@ -93,7 +93,7 @@ begin
     edAliasDN.Text := dn;
     edAliasDir.Text := DecodeDNString(GetDirFromDN(dn));
     Caption := Format(cPropertiesOf, [edAliasNameValue.Text]);
-    Label1.Caption := 'Parent directory:';
+    Label1.Caption := cParentDir;
   end
   else
   if ObjectPath then
@@ -106,7 +106,7 @@ procedure TAliasDlg.btnObjDNClick(Sender: TObject);
 var
   s: string;
 begin
-  s := MainFrm.PickEntry('Select entry');
+  s := MainFrm.PickEntry(cSelectEntry);
   if s <> '' then
     edObjectDN.Text := s;
 end;
@@ -115,7 +115,7 @@ procedure TAliasDlg.btnAliasDirClick(Sender: TObject);
 var
   s: string;
 begin
-  s := MainFrm.PickEntry('Select alias directory');
+  s := MainFrm.PickEntry(cSelectAliasDir);
   if s <> '' then
    edAliasDir.Text := s;
 end;

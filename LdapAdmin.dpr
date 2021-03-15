@@ -75,7 +75,9 @@ uses
   SizeGrip in 'SizeGrip.pas',
   CustomMenus in 'CustomMenus.pas',
   CustMenuDlg in 'CustMenuDlg.pas' {CustomMenuDlg},
-  ObjectInfo in 'ObjectInfo.pas';
+  ObjectInfo in 'ObjectInfo.pas',
+  XmlLoader in 'XmlLoader.pas',
+  Lang in 'Lang.pas';
 
 {$R *.RES}
 

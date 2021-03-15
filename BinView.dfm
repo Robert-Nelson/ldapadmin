@@ -76,6 +76,7 @@ object HexView: THexView
       Top = 16
       Width = 32
       Height = 13
+      Alignment = taRightJustify
       Caption = 'Binary:'
     end
     object BinaryLabel: TLabel
@@ -99,14 +100,15 @@ object HexView: THexView
       Height = 13
     end
     object Label4: TLabel
-      Left = 16
+      Left = 26
       Top = 16
       Width = 23
       Height = 13
+      Alignment = taRightJustify
       Caption = 'Size:'
     end
     object SizeLabel: TLabel
-      Left = 44
+      Left = 53
       Top = 16
       Width = 3
       Height = 13

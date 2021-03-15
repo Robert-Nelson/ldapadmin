@@ -221,7 +221,7 @@ end;
 procedure TExportDlg.OKBtnClick(Sender: TObject);
 begin
   //ExportingLabel.Caption := dn;
-  Notebook.ActivePage := 'Progress';
+  Notebook.ActivePage := cProgress;
   Application.ProcessMessages;
   try
     case SaveDialog.FilterIndex of

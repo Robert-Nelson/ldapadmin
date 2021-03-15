@@ -46,13 +46,13 @@ type
     ToolBar2: TToolBar;
     ToolButton1: TToolButton;
     ToolButton2: TToolButton;
-    ToolButton3: TToolButton;
+    ViewBtn: TToolButton;
     ViewStyleMenu: TPopupMenu;
-    Icons1: TMenuItem;
-    List1: TMenuItem;
-    able1: TMenuItem;
+    vmSmall: TMenuItem;
+    vmList: TMenuItem;
+    vmTable: TMenuItem;
     LargeImgs: TImageList;
-    Largeicons1: TMenuItem;
+    vmLarge: TMenuItem;
     ToolButton4: TToolButton;
     Panel2: TPanel;
     StoragesImgs: TImageList;
@@ -76,7 +76,7 @@ type
     procedure ListViewEditing(Sender: TObject; Item: TListItem;
       var AllowEdit: Boolean);
     procedure ViewStyleChange(Sender: TObject);
-    procedure ToolButton3Click(Sender: TObject);
+    procedure ViewBtnClick(Sender: TObject);
     procedure StoragesListDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
     procedure Splitter1Moved(Sender: TObject);
@@ -463,11 +463,11 @@ begin
   SetViewStyle(TMenuItem(Sender).Tag);
 end;
 
-procedure TConnListFrm.ToolButton3Click(Sender: TObject);
+procedure TConnListFrm.ViewBtnClick(Sender: TObject);
 var
   p: TPoint;
 begin
-  p:=ToolButton3.ClientToScreen(point(0,ToolButton3.Height));
+  p:=ViewBtn.ClientToScreen(point(0,ViewBtn.Height));
   ViewStyleMenu.Popup(p.X, p.Y);
 end;
 

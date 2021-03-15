@@ -65,11 +65,12 @@ object PrefWizDlg: TPrefWizDlg
         object Label2: TLabel
           Left = 16
           Top = 24
-          Width = 359
+          Width = 433
           Height = 13
           Caption = 
             'This wizard helps you to create default preference profile for t' +
             'his connection.'
+          WordWrap = True
         end
         object Bevel4: TBevel
           Left = 0

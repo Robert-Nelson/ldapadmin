@@ -177,6 +177,8 @@ type
     Createalias1: TMenuItem;
     ActCustomizeMenu: TAction;
     Customizemenu1: TMenuItem;
+    mbLanguage: TMenuItem;
+    N16: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LDAPTreeExpanding(Sender: TObject; Node: TTreeNode;
@@ -272,6 +274,7 @@ type
     procedure EntrySortProc(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer);
     procedure SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
     procedure InitTemplateMenu;
+    procedure InitLanguageMenu;
     procedure InitStatusBar;
     procedure RefreshStatusBar;
     procedure ClassifyEntry(ObjectInfo: TObjectInfo; CNode: TTreeNode);
@@ -287,6 +290,7 @@ type
     function IsContainer(ANode: TTreeNode): Boolean;
     procedure NewTemplateClick(Sender: TObject);
     procedure NewClick(Sender: TObject);
+    procedure LanguageExecute(Sender: TObject);
   public
     function  ShowSchema: TSchemaDlg;
     function  PickEntry(const ACaption: string): string;
@@ -305,7 +309,7 @@ implementation
 
 uses EditEntry, ConnList, Search, LdapOp, Constant, Export, Import, Prefs, Misc,
      LdapCopy, BinView, Input, ConfigDlg, Templates, TemplateCtrl, Shellapi,
-     Cert, PicView, Base64, About, Alias, SizeGrip, CustMenuDlg;
+     Cert, PicView, Base64, About, Alias, SizeGrip, CustMenuDlg, Lang;
 
 {$R *.DFM}
 {$I LdapAdmin.inc}
@@ -415,6 +419,53 @@ begin
     ActionMenu.AssignItems(mbNew);
     ActionMenu.AssignItems(pbNew);
   end;
+end;
+
+procedure TMainFrm.InitLanguageMenu;
+var
+  i: Integer;
+  CurrentLanguage: string;
+
+  procedure AddMenuItem(const ACaption: string; ATag: Integer; AChecked: Boolean = false);
+  var
+    MenuItem: TMenuItem;
+  begin
+    MenuItem := TMenuItem.Create(Self);
+    with MenuItem do begin
+      Caption := ACaption;
+      Tag := ATag;
+      GroupIndex := 1;
+      RadioItem := true;
+      OnClick := LanguageExecute;
+      mbLanguage.Add(MenuItem);
+      if CurrentLanguage = ACaption then
+      begin
+        Checked := true;
+        LanguageLoader.CurrentLanguage := ATag;
+        LanguageLoader.Translator.TranslateForm(Self);
+      end
+      else
+        Checked := AChecked;
+    end;
+  end;
+
+begin
+  if LanguageLoader.Count = 0 then
+  begin
+    mbLanguage.Visible := false;
+    exit;
+  end;
+
+  CurrentLanguage := GlobalConfig.ReadString(rLanguage);
+
+  mbLanguage.Clear;
+  mbLanguage.Visible := true;
+
+  AddMenuItem(cEnglish, -1, true);
+
+  with LanguageLoader do
+    for i := 0 to Count - 1 do
+      AddMenuItem(Languages[i], i);
 end;
 
 function TMainFrm.PickEntry(const ACaption: string): string;
@@ -669,6 +720,7 @@ begin
   if Visible then
   begin
     InitTemplateMenu;
+    InitLanguageMenu;
     if Assigned(Connection) and ((a <> fIdObject) or (b <> fEnforceContainer) or (c <> UseTemplateImages)) then
       RefreshTree;
   end;
@@ -1625,6 +1677,7 @@ var
   AStorage: TConfigStorage;
 begin
   InitTemplateMenu;
+  InitLanguageMenu;
   GlobalConfig.CheckProtocol;
   // ComandLine params /////////////////////////////////////////////////////////
   if ParamCount <> 0 then
@@ -2025,6 +2078,24 @@ begin
     LocateEntry(Selected, true);
   finally
     LockControl(LdapTree, false);
+  end;
+end;
+
+procedure TMainFrm.LanguageExecute(Sender: TObject);
+begin
+  with (Sender as TMenuItem) do begin
+    if Tag = LanguageLoader.CurrentLanguage then exit;
+    if Tag = -1 then
+      LanguageLoader.Translator.RestoreForm(Self);
+    LanguageLoader.CurrentLanguage := Tag;
+    if Tag <> -1 then
+    begin
+      LanguageLoader.Translator.TranslateForm(Self);
+      GlobalConfig.WriteString(rLanguage, LanguageLoader.Languages[LanguageLoader.CurrentLanguage]);
+    end
+    else
+      GlobalConfig.WriteString(rLanguage, '');
+    Checked := true;
   end;
 end;
 

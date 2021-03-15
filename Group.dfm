@@ -11,7 +11,7 @@ object GroupDlg: TGroupDlg
   Font.Height = -11
   Font.Name = 'MS Sans Serif'
   Font.Style = []
-  OldCreateOrder = False
+  OldCreateOrder = True
   Position = poMainFormCenter
   OnClose = FormClose
   OnDestroy = FormDestroy
@@ -176,9 +176,9 @@ object GroupDlg: TGroupDlg
         OnClick = RadioGroup1Click
       end
       object cbBuiltin: TComboBox
-        Left = 128
-        Top = 232
-        Width = 209
+        Left = 160
+        Top = 240
+        Width = 185
         Height = 21
         Style = csDropDownList
         Color = clBtnFace

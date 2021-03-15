@@ -257,7 +257,7 @@ begin
     SourceSession.Search(sANYCLASS, dn, LDAP_SCOPE_ONELEVEL, ['objectclass'], false, EntryList);
     if not fDeleteAll and (EntryList.Count > 0) then
     begin
-      if CheckedMessageDlg(PChar(Format(stDeleteAll, [dn])), mtWarning, [mbYes, mbNo], '&Smart delete', fSmartDelete) <> mrYes then
+      if CheckedMessageDlg(PChar(Format(stDeleteAll, [dn])), mtWarning, [mbYes, mbNo], cSmartDelete, fSmartDelete) <> mrYes then
       begin
         ModalResult := mrCancel;
         Exit;

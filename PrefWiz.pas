@@ -79,6 +79,8 @@ var
 
 implementation
 
+uses Constant;
+
 {$R *.DFM}
 
 procedure TPrefWizDlg.btnBackClick(Sender: TObject);
@@ -86,7 +88,7 @@ begin
   if Notebook.PageIndex > 0 then
   begin
     Notebook.PageIndex := Notebook.PageIndex - 1;
-    btnNext.Caption := '&Next >';
+    btnNext.Caption := cNext + ' >';
     btnNext.Enabled := true;
     if Notebook.PageIndex = 0 then
       btnBack.Enabled := false;
@@ -100,7 +102,7 @@ begin
     Notebook.PageIndex := Notebook.PageIndex + 1;
     btnBack.Enabled := true;
     if Notebook.PageIndex = Notebook.Pages.Count - 1 then
-      btnNext.Caption := '&Finish';
+      btnNext.Caption := cFinish;
   end
   else begin
     Finish;

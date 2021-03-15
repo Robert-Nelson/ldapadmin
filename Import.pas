@@ -188,7 +188,7 @@ end;
 procedure TImportDlg.OKBtnClick(Sender: TObject);
 begin
   OKBtn.Enabled := false;
-  Notebook.ActivePage := 'Progress';
+  Notebook.ActivePage := cProgress;
   Application.ProcessMessages;
   try
     ImportFile(edFileName.Text);
@@ -200,12 +200,12 @@ begin
       DetailBtn.Visible := true;
     end;
   except
-    OKBtn.Caption := '&Retry';
+    OKBtn.Caption := cRetry;
     OKBtn.Enabled := true;
     raise;
   end;
   OKBtn.Visible := false;
-  CancelBtn.Caption := '&Close';
+  CancelBtn.Caption := cClose;
   CancelBtn.Left := (Width - CancelBtn.Width) div 2;
   CancelBtn.ModalResult := mrOk;
   CancelBtn.Default := true;
@@ -217,12 +217,12 @@ begin
   begin
     mbErrors.Visible := false;
     Height := 266;
-    DetailBtn.Caption := '&Details >>';
+    DetailBtn.Caption := cDetails + ' >>';
   end
   else begin
     mbErrors.Visible := true;
     Height := 477;
-    DetailBtn.Caption := '&Details <<';
+    DetailBtn.Caption := cDetails + ' <<';
   end;
 end;
 

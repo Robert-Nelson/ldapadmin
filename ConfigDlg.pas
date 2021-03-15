@@ -52,24 +52,32 @@ type
     cbTemplateExtensions: TCheckBox;
     cbTemplateAutoload: TCheckBox;
     cbTemplateProperties: TCheckBox;
-    Button1: TButton;
+    SetDefBtn: TButton;
     CheckAssocCbk: TCheckBox;
     cbSmartDelete: TCheckBox;
     TabSheet3: TTabSheet;
-    TranscodingTable: TStringGrid;
-    Label3: TLabel;
     edSearch: TEdit;
     Label4: TLabel;
     cbTemplateIcons: TCheckBox;
+    GroupBox6: TGroupBox;
+    Label5: TLabel;
+    LanguageList: TListBox;
+    btnAddLang: TButton;
+    btnDelLang: TButton;
+    GroupBox7: TGroupBox;
+    TranscodingTable: TStringGrid;
+    Label3: TLabel;
     procedure btnAddClick(Sender: TObject);
     procedure btnDelClick(Sender: TObject);
     procedure cbConnectClick(Sender: TObject);
     procedure cbIdObjectClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
+    procedure SetDefBtnClick(Sender: TObject);
     procedure TranscodingTableSetEditText(Sender: TObject; ACol,
       ARow: Integer; const Value: String);
+    procedure btnAddLangClick(Sender: TObject);
+    procedure btnDelLangClick(Sender: TObject);
   private
     cbStartupConnection: TLAComboBox;
     procedure cbStartupConnectionDrawItem(Control: TWinControl;
@@ -95,9 +103,9 @@ begin
   cbStartupConnection := TLAComboBox.Create(Self);
   with cbStartupConnection do begin
     Parent := GroupBox3;
-    Left := 136;
+    Left := cbConnect.Left +  25 + Canvas.TextWidth(cbConnect.Caption);
     Top := cbConnect.Top - 2;
-    Width := 265;
+    Width := SetDefBtn.Left + SetDefBtn.Width - Left;
     Height := 21;
     ItemHeight := 16;
     Style := csOwnerDrawFixed;
@@ -113,6 +121,7 @@ begin
       cbStartupConnection.Items.AddObject(Accounts[j].Name, Accounts[j]);
   end;
   with GlobalConfig do begin
+    LanguageList.Items.CommaText := ReadString(rLanguageDir);
     TemplateList.Items.CommaText := ReadString(rTemplateDir);
     cbTemplateExtensions.Checked := ReadBool(rTemplateExtensions, true);
     cbTemplateAutoload.Checked := ReadBool(rTemplateAutoload, true);
@@ -132,11 +141,12 @@ begin
       end;
     cbIdObject.Checked := ReadBool(rMwLTIdentObject, true);
     cbEnforceContainer.Checked := ReadBool(rMwLTEnfContainer, true);
-    edSearch.Text := ReadString('SearchFilter', sDEFSRCH);
-    edQSearch.Text := ReadString('QuickSearchFilter', sDEFQUICKSRCH);
+    edSearch.Text := ReadString(rSearchFilter, sDEFSRCH);
+    edQSearch.Text := ReadString(rQuickSearchFilter, sDEFQUICKSRCH);
     names := TStringList.Create;
     with TranscodingTable do
     try
+      ColWidths[1] := Width - ColWidths[0] - 6;
       Split(ReadString(rLocalTransTable), names, #$1E);
       for i := 0 to names.Count - 1 do
       begin
@@ -204,13 +214,14 @@ begin
   if ModalResult = mrOk then with GlobalConfig do
   begin
     TemplateParser.Paths := TemplateList.Items.CommaText;
-    TemplateParser.AddTemplatePath(ExtractFileDir(application.ExeName) + '\*.' + TEMPLATE_EXT);
+    TemplateParser.AddPath(ExtractFileDir(application.ExeName) + '\*.' + TEMPLATE_EXT);
     WriteBool(rTemplateExtensions, cbTemplateExtensions.Checked);
     WriteBool(rTemplateAutoload, cbTemplateAutoload.Checked);
     WriteBool(rTemplateProperties, cbTemplateProperties.Checked);
     WriteBool(rSmartDelete, cbSmartDelete.Checked);
     WriteBool(rUseTemplateImages, cbTemplateIcons.Checked);
     WriteString(rTemplateDir, TemplateList.Items.CommaText);
+    WriteString(rLanguageDir, LanguageList.Items.CommaText);
     WriteBool(rDontCheckProto, not CheckAssocCbk.Checked);
     with cbStartupConnection do
     begin
@@ -281,7 +292,7 @@ begin
   end;
 end;
 
-procedure TConfigDlg.Button1Click(Sender: TObject);
+procedure TConfigDlg.SetDefBtnClick(Sender: TObject);
 begin
   RegProtocol('LDAP');
   RegProtocol('LDAPS');
@@ -291,7 +302,25 @@ procedure TConfigDlg.TranscodingTableSetEditText(Sender: TObject; ACol, ARow: In
 begin
   with TranscodingTable do
   if (ARow = RowCount - 1) and (Cells[ACol, ARow] <> '') then
+  begin
     RowCount := RowCount + 1;
+    ColWidths[1] := ClientWidth - ColWidths[0] - 1;
+  end;
+end;
+
+procedure TConfigDlg.btnAddLangClick(Sender: TObject);
+var
+  Dir: string;
+begin
+  if SelectDirectory('','',Dir) then
+    LanguageList.Items.Add(Dir);
+end;
+
+procedure TConfigDlg.btnDelLangClick(Sender: TObject);
+begin
+  with LanguageList do
+  if ItemIndex <> -1 then
+    Items.Delete(ItemIndex);
 end;
 
 end.

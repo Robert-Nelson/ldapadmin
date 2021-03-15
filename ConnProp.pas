@@ -490,7 +490,7 @@ begin
 
     Screen.Cursor:=crHourGlass;
     Asession.Connect;
-    Application.MessageBox(sConnectSuccess, pchar(Application.Title), MB_ICONINFORMATION+ MB_OK);
+    Application.MessageBox(PChar(stConnectSuccess), pchar(Application.Title), MB_ICONINFORMATION+ MB_OK);
   finally
     Screen.Cursor:=crDefault;
     Asession.Free;
@@ -502,7 +502,7 @@ procedure TConnPropDlg.SetPassEnable(const Value: boolean);
 begin
   FPassEnable := Value;
   PasswordEd.Visible:=Value;
-  if Value then Label5.Caption:= 'Password:'
+  if Value then Label5.Caption:= cPassword
   else Label5.Caption:=stCantStorPass;
 end;
 

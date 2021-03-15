@@ -952,7 +952,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
-    ColumnNames := 'Name,Description';
+    ColumnNames := cName + ',' + cDescription;
     Populate(Connection, GetGroupQuery(true), ['cn', 'description']);
 
     if ShowModal=MrOK then begin
@@ -1065,7 +1065,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
-    ColumnNames := 'Name,Description';
+    ColumnNames := cName + ',' + cDescription;
     Populate(Connection, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;

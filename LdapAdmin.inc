@@ -5,6 +5,7 @@
        // Delphi 6 *************************************
        {$IF CompilerVersion >= 14}
             {$DEFINE VARIANTS}
+            {$DEFINE D6UP}
        {$IFEND}
 
        // Delphi 7 *************************************

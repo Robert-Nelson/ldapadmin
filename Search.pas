@@ -39,9 +39,7 @@ const
   MODPANEL_CTRL_SPACING   =  8;
   MODPANEL_OP_COMBO_WIDTH = 97;
 
-  SAVE_SEARCH_FILTER  = 'Ldif file, Windows format (CR/LF) (*.ldif)|*.ldif|Ldif file, Unix format (LF only) (*.ldif)|*.ldif|CSV (Comma-separated) (*.csv)|*.csv|XML (*.xml)|*.xml';
   SAVE_SEARCH_EXT     = '*.ldif';
-  SAVE_MODIFY_FILTER  = 'Text file (*.txt)|*.txt';
   SAVE_MODIFY_EXT     = '*.txt';
 
 type
@@ -394,7 +392,7 @@ begin
   end;
   with TLabel.Create(Self) do
   begin
-    Caption := 'Operation:';
+    Caption := cOperation;
     Top := MODPANEL_LABEL_TOP;
     Left := MODPANEL_LEFT_IND;
     Parent := Panel;
@@ -489,10 +487,10 @@ var
     if esModified in Entry.State then
     begin
       Entry.Write;
-      fMemo.Lines.Add(Entry.dn + ': Ok.');
+      fMemo.Lines.Add(Entry.dn + ': ' + cModifyOk);
     end
     else
-      fMemo.Lines.Add(Entry.dn + ': Skipped.');
+      fMemo.Lines.Add(Entry.dn + ': ' + cModifySkipped);
   end;
 
 begin
@@ -532,7 +530,7 @@ begin
         fMemo.SelAttributes.Color := clRed;
         fMemo.Lines.Add(fSearchList.Entries[i].dn + ': ' + E.Message);
         if StopOnError then
-          case MessageDlgEx(Format(stSkipRecord, [E.Message]), mtError, [mbYes, mbNo, mbCancel], ['Skip', 'Skip all', 'Cancel'],[]) of
+          case MessageDlgEx(Format(stSkipRecord, [E.Message]), mtError, [mbYes, mbNo, mbCancel], [cSkip, cSkipAll, cCancel],[]) of
             mrCancel: break;
             mrNo: StopOnError := false;
           end;
@@ -543,7 +541,7 @@ begin
   end;
   fTimer.Enabled := false;
   fState := mbxdone;
-  fCloseButton.Caption := '&Ok';
+  fCloseButton.Caption := cOk;
 end;
 
 procedure TModifyBox.SaveResults(const Filename: string);
@@ -575,7 +573,7 @@ begin
     Width := 65;
     Top := MODPANEL_LABEL_TOP - 4;
     Left := fSBPanel.Width - Width - MODPANEL_LEFT_IND;
-    Caption := 'Cancel';
+    Caption := cCancel;
     Anchors := [akTop, akRight];
     OnClick := ButtonClick;
   end;
@@ -615,7 +613,7 @@ begin
   fMemo.Clear;
   fSbPanel.Parent := nil;
   fProgressBar.Position := 0;
-  fCloseButton.Caption := 'Can&cel';
+  fCloseButton.Caption := cCancel;
   fOpList.Clear;
   FreeAndNil(fSearchList);
   while ControlCount > 0 do Controls[0].Free;
@@ -832,6 +830,10 @@ begin
   begin
     TabSheet2Resize(nil);
     TabSheet3Resize(nil);
+    cbBasePath.Width := PageControl.Left + PageControl.Width - cbBasePath.Left;
+    PathBtn.Left := Panel3.Left + StartBtn.Left;
+    PathBtn.Height := 25;
+    PathBtn.Top := PathBtn.Top - 1;
   end;
   {$ENDIF}
 
@@ -892,7 +894,7 @@ procedure TSearchFrm.PathBtnClick(Sender: TObject);
 var
   s: string;
 begin
-  s := MainFrm.PickEntry('Search base');
+  s := MainFrm.PickEntry(cSearchBase);
   if s <> '' then
     cbBasePath.Text := s;
 end;

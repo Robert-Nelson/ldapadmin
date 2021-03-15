@@ -270,7 +270,7 @@ end;
 
 procedure TTemplatePanel.ScriptQueryContinue(Sender: TObject; var Allow: Boolean);
 begin
-  if (GetAsyncKeyState(VK_CANCEL) <> 0) and (MessageBox(Handle, 'Do you want to abort the script?', 'Confirm', MB_ICONQUESTION + MB_YESNO) = mrYes) then
+  if (GetAsyncKeyState(VK_CANCEL) <> 0) and (MessageBox(Handle, PChar(stAbortScript), PChar(cConfirm), MB_ICONQUESTION + MB_YESNO) = mrYes) then
   begin
     fBreakRequested := true;
     Allow := false;

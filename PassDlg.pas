@@ -1,5 +1,5 @@
   {      LDAPAdmin - Passdlg.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -64,6 +64,8 @@ uses Config, Constant, Connection;
 constructor TPasswordDlg.Create(AOwner: TComponent; Entry: TLdapEntry; const AttributeName: string = sUserPassword);
 begin
   inherited Create(AOwner);
+  if Entry.Attributes.Count <= 1 then
+    Entry.Read;
   fPasswordAttribute := AttributeName;
   fDefaultHashType := (Entry.Session as TConnection).Account.ReadInteger(rPosixPwdHashType, Integer(chSha1));
   if (fDefaultHashType < 0) or (fDefaultHashType >= cbMethod.Items.Count) then
