@@ -528,7 +528,7 @@ end;
 
 procedure TTemplatePanel.AdjustControlSizes;
 begin
-  if fTemplate.AutoSizeControls then
+  if Assigned(fTemplate) and fTemplate.AutoSizeControls then
   begin
     fPanel.Control.Width := ClientWidth;
     fPanel.AdjustSizes;
