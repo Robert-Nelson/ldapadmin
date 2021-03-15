@@ -1,5 +1,5 @@
   {      LDAPAdmin - User.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -28,8 +28,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Posix, Samba,
-  RegAccnt, Constant;
+  StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Posix, Shadow,
+  InetOrg, Postfix, Samba, PropertyObject, RegAccnt, Constant, ExtDlgs;
 
 const
 
@@ -64,10 +64,10 @@ type
     Label7: TLabel;
     Label8: TLabel;
     Label13: TLabel;
-    scriptPath: TEdit;
-    homeDrive: TComboBox;
-    profilePath: TEdit;
-    smbHome: TEdit;
+    sambaLogonScript: TEdit;
+    sambaHomeDrive: TComboBox;
+    sambaProfilePath: TEdit;
+    sambaHomePath: TEdit;
     Label21: TLabel;
     description: TMemo;
     cbSamba: TCheckBox;
@@ -81,8 +81,6 @@ type
     AddMailBtn: TButton;
     EditMailBtn: TButton;
     DelMailBtn: TButton;
-    UpBtn: TButton;
-    DownBtn: TButton;
     OfficeSheet: TTabSheet;
     Label15: TLabel;
     Label16: TLabel;
@@ -132,16 +130,32 @@ type
     cbPwdMustChange: TCheckBox;
     cbPwdCantChange: TCheckBox;
     BtnAdvanced: TButton;
+    cbAccntDisabled: TCheckBox;
+    ShadowSheet: TTabSheet;
     RadioGroup1: TRadioGroup;
     DateTimePicker: TDateTimePicker;
-    cbAccntDisabled: TCheckBox;
+    cbShadow: TCheckBox;
+    ShadowPropertiesGroup: TGroupBox;
+    ShadowMin: TEdit;
+    ShadowWarning: TEdit;
+    ShadowInactive: TEdit;
+    ShadowLastChange: TEdit;
+    ShadowMax: TEdit;
+    Label35: TLabel;
+    Label37: TLabel;
+    Label38: TLabel;
+    Label39: TLabel;
+    Label40: TLabel;
+    Panel2: TPanel;
+    OpenPictureBtn: TButton;
+    Label41: TLabel;
+    Image1: TImage;
+    OpenPictureDialog: TOpenPictureDialog;
+    DeleteJpegBtn: TButton;
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
-    procedure ComboChange(Sender: TObject);
     procedure AddMailBtnClick(Sender: TObject);
     procedure EditMailBtnClick(Sender: TObject);
     procedure DelMailBtnClick(Sender: TObject);
-    procedure UpBtnClick(Sender: TObject);
-    procedure DownBtnClick(Sender: TObject);
     procedure PageControlChange(Sender: TObject);
     procedure AddGroupBtnClick(Sender: TObject);
     procedure RemoveGroupBtnClick(Sender: TObject);
@@ -160,33 +174,40 @@ type
     procedure cbPwdMustChangeClick(Sender: TObject);
     procedure cbPwdCantChangeClick(Sender: TObject);
     procedure RadioGroup1Click(Sender: TObject);
+    procedure EditChange(Sender: TObject);
+    procedure cbShadowClick(Sender: TObject);
+    procedure cbDomainChange(Sender: TObject);
+    procedure sambaHomeDriveChange(Sender: TObject);
+    procedure cbAccntDisabledClick(Sender: TObject);
+    procedure DateTimePickerChange(Sender: TObject);
+    procedure OpenPictureBtnClick(Sender: TObject);
+    procedure DeleteJpegBtnClick(Sender: TObject);
+    procedure BtnAdvancedClick(Sender: TObject);
   private
-    Account: TPosixAccount;
-    EditMode: TEditMode;
-    dn: string;
-    gid: Integer;
-    ldapSession: TLDAPSession;
+    ParentDn: string;
+    Entry: TLdapEntry;
+    PosixAccount: TPosixAccount;
+    ShadowAccount: TShadowAccount;
+    SambaAccount: TSamba3Account;
+    MailAccount: TMailUser;
+    InetOrgPerson: TInetOrgPerson;
+    Session: TLDAPSession;
     RegAccount: TAccountEntry;
     origGroups: TStringList;
     ColumnToSort: Integer;
     Descending: Boolean;
-    IsMailObject: Boolean;
-    SambaVersion: Integer;
+    PageSetup: Boolean;
     DomList: TDomainList;
-    function IsSambaObject: Boolean;
     function FormatString(const Src : string) : string;
-    procedure GetInput(Page: TWinControl; EMode: TEditMode);
+    procedure LoadControls(Parent: TWinControl);
     procedure PosixPreset;
+    procedure ShadowPreset;
     procedure SambaPreset;
     procedure MailPreset;
-    procedure AddMailAccount;
-    procedure RemoveMailAccount;
+    procedure SetSambaTime;    
     procedure SetShadowTime;
     procedure GetShadowTime;
-    procedure NewAccount;
-    procedure ModifyAccount;
     procedure CheckSchema;
-    function PrimaryGroupSid: string;
     procedure PopulateGroupList;
     procedure MailButtons(Enable: Boolean);
     procedure CopyGroups;
@@ -195,7 +216,7 @@ type
     procedure SaveGroups;
     procedure SetText(Edit: TCustomEdit; Value: string);
   public
-    constructor Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode); reintroduce; overload;
+    constructor Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
 
 var
@@ -203,16 +224,11 @@ var
 
 implementation
 
-uses Pickup, Input, Misc;
+uses AdvSamba, Pickup, Input, Misc, Jpeg;
 
 {$R *.DFM}
 
 { TUsrDlg }
-
-function TUserDlg.IsSambaObject: Boolean;
-begin
-  Result := SambaVersion <> 0;
-end;
 
 function TUserDlg.FormatString(const Src : string) : string;
 var
@@ -242,59 +258,29 @@ begin
   end;
 end;
 
-// Read attribute values from tab page
-procedure TUserDlg.GetInput(Page: TWinControl; EMode: TEditMode);
+procedure TUserDlg.LoadControls(Parent: TWinControl);
 var
-  Component: TComponent;
-  i, m: Integer;
+  Control: TControl;
+  i: Integer;
   s: string;
-  Mode: ULONG;
-
 begin
-  with Page do
+  PageSetup := true;
+  for i := 0 to Parent.ControlCount - 1 do
   begin
-      for I := 0 to Page.ControlCount - 1 do
-      begin
-        Component := Page.Controls[i];
-        if ((Component is TCustomEdit) and (TCustomEdit(Component).Modified)) or
-           ((Component is TComboBox) and (Component.Tag = 1)) then
-        begin
-          if Component is TMemo then
-            s := FormatMemoOutput(TCustomEdit(Component).Text)
-          else
-          if Component.Name = 'gidNumber' then // special case
-            s := IntToStr(gid)
-          else
-            s := TCustomEdit(Component).Text;
-          s := Trim(s);
-          if EMode = EM_ADD then
-          begin
-            if s <> '' then
-              Account.AddAttr(Component.Name, s, LDAP_MOD_ADD);
-          end
-          else begin
-            if s = '' then
-              Mode := LDAP_MOD_DELETE
-            else
-              Mode := LDAP_MOD_REPLACE;
-            Account.AddAttr(Component.Name, s, Mode);
-          end;
-        end
-        else
-        if (Component.Tag = 1) then // handle special cases
-        begin
-          if Component.Name = 'mail' then
-          begin
-            // If modifying then delete all attributes/value pairs first
-            if EMode = EM_MODIFY then
-              Account.AddAttr('mail', '', LDAP_MOD_DELETE);
-            // Handle mail list
-            for m := 0 to mail.Items.Count - 1 do
-              Account.AddAttr('mail', mail.Items[m], LDAP_MOD_ADD);
-          end;
-        end;
-      end;
+    Control := Parent.Controls[i];
+    s := Entry.AttributesByName[Control.Name].AsString;
+    if Control is TCustomEdit then
+    begin
+      if Control is TMemo then
+        s := FormatMemoInput(s);
+      TCustomEdit(Control).Text := s;
+    end
+    else
+    if Control is TComboBox then
+      with TComboBox(Control) do
+        ItemIndex :=  Items.IndexOf(s);
   end;
+  PageSetup := false;
 end;
 
 procedure TUserDlg.PosixPreset;
@@ -320,6 +306,11 @@ var
   end;
 
 begin
+
+  LoadControls(AccountSheet);
+  LoadControls(OfficeSheet);
+  LoadControls(PrivateSheet);
+
   if sn.Modified then
   begin
     if givenName.Text <> '' then
@@ -340,62 +331,144 @@ begin
   end;
 end;
 
-procedure TUserDlg.SambaPreset;
+procedure TUserDlg.ShadowPreset;
 begin
-  if cbSamba.Checked and (uid.Text <> '') then
+  if not ShadowAccount.Activated then
+    ShadowAccount.New;
+  LoadControls(ShadowPropertiesGroup);
+  GetShadowTime;
+end;
+
+procedure TUserDlg.SambaPreset;
+var
+  i: Integer;
+  Active: Boolean;
+begin
+  if not cbSamba.Checked then
+    Exit;
+
+  if not Assigned(DomList) then // first time, initialize domain list
   begin
-    if RegAccount.sambaNetbiosName <> '' then
-    begin
-      SetText(smbHome, FormatString(RegAccount.sambaHomeShare));
-      SetText(profilePath, FormatString(RegAccount.sambaProfilePath));
-    end;
-    SetText(scriptPath, FormatString(RegAccount.sambaScript));
-    if homeDrive.ItemIndex = -1 then
-      homeDrive.ItemIndex := homeDrive.Items.IndexOf(RegAccount.sambaHomeDrive);
+    cbDomain.Items.Clear;
+    DomList := TDomainList.Create(Session);
+    for i := 0 to DomList.Count - 1 do
+      cbDomain.Items.Add(DomList.Items[i].DomainName);
   end;
+
+  Active := SambaAccount.Activated;
+  if not Active then
+  begin
+    LoadControls(SambaSheet);
+    SetSambaTime;
+    cbDomain.ItemIndex := cbDomain.Items.IndexOf(RegAccount.SambaDomainName);
+    cbDomain.Enabled := true;
+    if (uid.Text <> '') then
+    begin
+      if RegAccount.sambaNetbiosName <> '' then
+      begin
+        SetText(sambaHomePath, FormatString(RegAccount.sambaHomeShare));
+        SetText(sambaProfilePath, FormatString(RegAccount.sambaProfilePath));
+      end;
+      SetText(sambaLogonScript, FormatString(RegAccount.sambaScript));
+      if sambaHomeDrive.ItemIndex = -1 then
+      begin
+        sambaHomeDrive.ItemIndex := sambaHomeDrive.Items.IndexOf(RegAccount.sambaHomeDrive);
+        SambaAccount.HomeDrive := RegAccount.sambaHomeDrive;
+      end;
+    end;
+   end
+   else begin
+     LoadControls(SambaSheet);
+     cbDomain.ItemIndex := cbDomain.Items.IndexOf(SambaAccount.DomainName);
+     cbDomain.Enabled := false;
+   end;
+
+   with SambaAccount do
+   begin
+     i := cbDomain.ItemIndex;
+     if i = -1 then
+       DomainData := nil
+     else
+       DomainData := DomList.Items[i];
+     try
+       cbPwdCantChange.Checked := PwdCanChange = 2147483647;
+     except end; // not critical
+     try
+       cbPwdMustChange.Checked := PwdMustChange = 0;
+     except end; // not critical
+     cbAccntDisabled.Checked := Disabled;
+     if not Active then
+     begin
+       New;
+       UserAccount := true;
+     end;
+   end;
 end;
 
 procedure TUserDlg.MailPreset;
 var
   s: string;
 begin
-  if cbMail.Checked and (uid.Text <> '') then
+  if not cbMail.Checked then
+    Exit;
+
+  if not MailAccount.Activated then
   begin
-    if (maildrop.Text = '') and (RegAccount.postfixMaildrop <> '') then
-      SetText(maildrop, FormatString(RegAccount.postfixMaildrop));
-    if RegAccount.postfixMailAddress <> '' then
+    MailAccount.New;
+    if uid.Text <> '' then
     begin
-      s := FormatString(RegAccount.postfixMailAddress);
-      if mail.Items.IndexOf(s) = -1 then
+      if (maildrop.Text = '') and (RegAccount.postfixMaildrop <> '') then
+        SetText(maildrop, FormatString(RegAccount.postfixMaildrop));
+      if RegAccount.postfixMailAddress <> '' then
       begin
-        mail.Items.Add(s);
-        mail.Tag := 1; // modified
+        s := FormatString(RegAccount.postfixMailAddress);
+        if mail.Items.IndexOf(s) = -1 then
+        begin
+          mail.Items.Add(s);
+          MailAccount.AddAddress(s);
+        end;
       end;
     end;
+  end
+  else
+  begin
+    LoadControls(MailSheet);
+    mail.Items.CommaText := MailAccount.AsCommaText;
+  end;
+end;
+
+procedure TUserDlg.SetSambaTime;
+begin
+  with SambaAccount do
+  begin
+    if RadioGroup1.ItemIndex = 0 then
+      KickoffTime := SAMBA_MAX_KICKOFF_TIME
+    else
+      KickoffTime := DateTimePicker.DateTime;
   end;
 end;
 
 procedure TUserDlg.SetShadowTime;
 begin
-  with Account do
+  with ShadowAccount do
   begin
     if RadioGroup1.ItemIndex = 0 then
-      ShadowExpire := SHADOW_MAX_DATE
+      ShadowExpire := SHADOW_MAX
     else
       ShadowExpire := trunc(DateTimePicker.Date) - 25569;
   end;
+  if SambaAccount.Activated then
+    SetSambaTime;
 end;
 
 procedure TUserDlg.GetShadowTime;
 begin
-  if Account.Shadow then
-  try
-  with Account do
-    if ShadowExpire = SHADOW_MAX_DATE then
+  try with ShadowAccount do
+    if ShadowExpire = SHADOW_EXPIRE then
       DateTimePicker.DateTime := Date
     else begin
+      DateTimePicker.DateTime := 25569 + ShadowExpire;
       RadioGroup1.ItemIndex := 1;
-      DateTimePicker.DateTime := 25569.0 + Account.ShadowExpire;
     end;
   except
     on E: Exception do
@@ -404,286 +477,73 @@ begin
   end;
 end;
 
-procedure TUserDlg.NewAccount;
-var
-  pDom: PDomainRec;
-  NewDN: string;
-begin
-
-  NewDN := 'uid=' + uid.Text + ',' + dn;
-  if cbSamba.Checked then
-  begin
-    if cbDomain.ItemIndex = 0 then
-      Account := TSambaAccount.Create(ldapSession, NewDN)
-    else
-      Account := TSamba3Account.Create(ldapSession, NewDN)
-  end
-  else
-    Account := TPosixAccount.Create(ldapSession, NewDN);
-
-  with Account do
-  begin
-    Shadow := true;
-    InetOrg := true;
-    Uid := Self.Uid.Text;
-    UidNumber := ldapSession.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
-    GidNumber := gid;
-    Cn := Uid;                        // set cn to be equal to uid
-    Sn := Self.Sn.Text;
-    GivenName := Self.GivenName.Text;
-    Initials := Self.Initials.Text;
-    DisplayName := Self.DisplayName.Text;
-    LoginShell := Self.LoginShell.Text;
-    HomeDirectory := Self.HomeDirectory.Text;
-    Gecos := Self.Gecos.Text;
-    SetShadowTime;
-    UserPassword := '';
-
-    if Account is TSambaAccount then with TSambaAccount(Account) do
-    begin
-      Rid := 1000 + 2 * uidNumber;
-      PrimaryGroupID := 2 * gid + 1001;
-      HomeDrive := Self.homeDrive.Text;
-      SmbHome:= Self.smbHome.Text;
-      LoginShell:= Self.loginShell.Text;
-      ScriptPath:= Self.scriptPath.Text;
-      ProfilePath:= Self.profilePath.Text;
-      NoPasswordExpiration := true;
-      UserAccount := true;
-      Disabled := cbAccntDisabled.Checked;
-    end
-    else
-    if Account is TSamba3Account then with TSamba3Account(Account) do
-    begin
-      pDom := DomList.Items[cbDomain.ItemIndex - 1];
-      DomainName := pDom.DomainName;
-      SID := Format('%s-%d', [pDom.SID, pDom.AlgorithmicRIDBase + 2 * UidNumber]);
-      GroupSID := PrimaryGroupSID;
-      HomeDrive := Self.homeDrive.Text;
-      HomePath:= Self.smbHome.Text;
-      loginShell:= Self.loginShell.Text;
-      LogonScript:= Self.scriptPath.Text;
-      ProfilePath:= Self.profilePath.Text;
-      if cbPwdMustChange.Checked then
-        PwdMustChange := 0
-      else
-        PwdMustChange := 2147483647;
-      if cbPwdCantChange.Checked then
-        PwdCanChange := 2147483647
-      else
-        PwdCanChange := 0;
-      UserAccount := true;
-      Disabled := cbAccntDisabled.Checked;
-    end;
-
-    GetInput(OfficeSheet, EM_ADD);
-    GetInput(PrivateSheet, EM_ADD);
-
-    if cbMail.Checked then
-    begin
-      AddMailAccount;
-      GetInput(MailSheet, EM_ADD);
-    end;
-
-    try
-      New;
-      if GroupList.Tag = 1 then
-        SaveGroups;
-    finally
-      Free;
-      Account := nil;
-    end;
-
-  end;
-
-end;
-
-procedure TUserDlg.ModifyAccount;
-var
-  Temp: TPosixAccount;
-  pDom: PDomainRec;
-begin
-
-  try
-    with Account do
-    begin
-      GidNumber := gid;
-      Cn := Uid;                        // set cn to be equal to uid
-      Sn := Self.Sn.Text;
-      GivenName := Self.GivenName.Text;
-      Initials := Self.Initials.Text;
-      DisplayName := Self.DisplayName.TExt;
-      LoginShell := Self.LoginShell.Text;
-      HomeDirectory := Self.HomeDirectory.Text;
-      Gecos := Self.Gecos.Text;
-    end;
-
-    GetInput(OfficeSheet, EM_MODIFY);
-    GetInput(PrivateSheet, EM_MODIFY);
-
-    if (IsSambaObject or cbSamba.Checked) then
-    begin
-      // TODO -> Mutate
-      if SambaVersion = 0 then
-      begin
-        Temp := Account;
-        if cbDomain.ItemIndex = 0 then
-          Account := TSambaAccount.Copy(Temp)
-        else
-          Account := TSamba3Account.Copy(Temp);
-        Temp.Free;
-      end;
-
-
-      if Account is TSambaAccount then
-        with Account as TSambaAccount do
-        begin
-          if cbSamba.Checked then
-          begin
-            if not IsSambaObject then
-            begin
-              Add;
-              rid := 1000 + 2 * uidNumber;
-              primaryGroupID := 2 * gid + 1001;
-              NoPasswordExpiration := true;
-              UserAccount := true;
-            end;
-            HomeDrive := Self.homeDrive.Text;
-            SmbHome:= Self.smbHome.Text;
-            ScriptPath:= Self.scriptPath.Text;
-            ProfilePath:= Self.profilePath.Text;
-            GidNumber := gid;
-            Disabled := cbAccntDisabled.Checked;
-          end
-          else
-            Remove;
-        end
-      else
-        with Account as TSamba3Account do
-        begin
-          if cbSamba.Checked then
-          begin
-            if not IsSambaObject then
-            begin
-              Add;
-              pDom := DomList.Items[cbDomain.ItemIndex - 1];
-              DomainName := pDom.DomainName;
-              SID := Format('%s-%d', [pDom.SID, pDom.AlgorithmicRIDBase + 2 * UidNumber]);
-              if not edGidNumber.Modified then // avoid calling PrimaryGroupSid twice
-                GroupSID := PrimaryGroupSID;
-              UserAccount := true;
-            end;
-            HomeDrive := Self.homeDrive.Text;
-            HomePath:= Self.smbHome.Text;
-            LoginShell:= Self.loginShell.Text;
-            LogonScript:= Self.scriptPath.Text;
-            ProfilePath:= Self.profilePath.Text;
-            if cbPwdMustChange.Checked then
-              PwdMustChange := 0
-            else
-              PwdMustChange := 2147483647;
-            if cbPwdCantChange.Checked then
-              PwdCanChange := 2147483647
-            else
-              PwdCanChange := 0;
-            if edGidNumber.Modified then
-            begin
-              GidNumber := gid;
-              GroupSID := PrimaryGroupSID;
-            end;
-            Disabled := cbAccntDisabled.Checked;
-          end
-          else
-            Remove;
-        end;
-
-    end;
-
-    SetShadowTime;
-
-    if cbMail.Checked then
-    begin
-      if not isMailObject then
-      begin
-        AddMailAccount;
-        GetInput(MailSheet, EM_ADD);
-      end
-      else
-        GetInput(MailSheet, EM_MODIFY);
-    end
-    else
-    if isMailObject then
-      RemoveMailAccount;
-
-    Account.Modify;
-  except
-    Account.ClearAttrs;
-    raise;
-  end;
-
-  if GroupList.Tag = 1 then
-    SaveGroups;
-
-end;
-
-procedure TUserDlg.AddMailAccount;
-begin
-  Account.AddAttr('objectclass', 'mailUser', LDAP_MOD_ADD);
-end;
-
-procedure TUserDlg.RemoveMailAccount;
-begin
-  with Account do
-  begin
-    AddAttr('objectclass', 'mailUser', LDAP_MOD_DELETE);
-    if Items.IndexOf('mail') <> -1 then
-      AddAttr('mail', '', LDAP_MOD_DELETE);
-    if Items.IndexOf('maildrop') <> -1 then
-      AddAttr('maildrop', '', LDAP_MOD_DELETE);
-  end;
-end;
-
 procedure TUserDlg.CheckSchema;
 begin
-  if (sn.text) = '' then
-    raise Exception.Create(Format(stReqNoEmpty, [cSurname]));
-  if cbSamba.Checked and (homeDirectory.text = '') then
-    raise Exception.Create(Format(stReqNoEmpty, [cHomeDir]));
+  try
+    if (uid.Text) = '' then
+      raise Exception.Create(Format(stReqNoEmpty, [cUsername]));
+    if (sn.text) = '' then
+      raise Exception.Create(Format(stReqNoEmpty, [cSurname]));
+    if (homeDirectory.text) = '' then
+      raise Exception.Create(Format(stReqNoEmpty, [cHomeDir]));
+  except
+    PageControl.ActivePage := AccountSheet;
+    raise;
+  end;
+  if cbSamba.Checked then
+  try
+    if homeDirectory.text = '' then
+      raise Exception.Create(Format(stReqNoEmpty, [cHomeDir]));
+    if cbDomain.ItemIndex = -1 then
+      raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
+  except
+    PageControl.ActivePage := SambaSheet;
+    raise;
+  end;
   if cbMail.Checked then
-  begin
+  try
     if (mail.Items.Count = 0) then
       raise Exception.Create(stReqMail);
     if (maildrop.text = '') then
        raise Exception.Create(Format(stReqNoEmpty, [cMaildrop]));
+  except
+    PageControl.ActivePage := MailSheet;
+    raise;
   end;
 end;
-
-function TUserDlg.PrimaryGroupSid: string;
-var
-  gdn: string;
-begin
-  with Account as TSamba3Account do
-  begin
-    if edGidNumber.Text = '' then
-      gdn := ldapSession.GetDN(Format(sGROUPBYGID, [gid]))
-    else
-      gdn := edGidNumber.Text;
-    Result := ldapSession.Lookup(gdn, sANYCLASS, 'sambasid', LDAP_SCOPE_BASE);
-    if (System.Copy(Result, 1, LastDelimiter('-', Result) - 1) <> DomainSID) and
-      (MessageDlg('Selected primary group is not a Samba group or it does not map to user domain. Do you still want to continue?', mtWarning, [mbYes, mbNo], 0) = mrNo) then Abort;
-  end;
-end;
-
 
 procedure TUserDlg.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+var
+  uidnr: Integer;
+  newdn: string;
 begin
   if ModalResult = mrOk then
   begin
     CheckSchema;
-    if EditMode = EM_ADD then
-      NewAccount
+    if esNew in Entry.State then
+    begin
+      Entry.Dn := 'uid=' + uid.Text + ',' + ParentDn;
+      PosixAccount.Cn := PosixAccount.Uid;
+      uidnr := Session.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
+      if cbSamba.Checked then
+        SambaAccount.UidNumber := uidnr
+      else
+        PosixAccount.UidNumber := uidnr;
+    end
     else
-      ModifyAccount;
+    if uid.Modified then
+    begin
+      { Handle username change }
+      newdn := 'uid=' + uid.Text + ',' + GetDirFromDn(ParentDn);
+      if newdn <> Entry.Dn then
+      begin
+        Entry.Delete;
+        Entry.Dn := newdn;
+      end;
+    end;
+    Entry.Write;
+    if GroupList.Tag = 1 then
+      SaveGroups;
   end;
 end;
 
@@ -692,130 +552,47 @@ begin
   Enable := Enable and (mail.ItemIndex > -1);
   DelMailBtn.Enabled := Enable;
   EditMailBtn.Enabled := Enable;
-  UpBtn.Enabled := Enable;
-  DownBtn.Enabled := Enable;
 end;
 
-constructor TUserDlg.Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode);
-const
-  TheMap: array [0..3,0..1] of string = (
-  ('homedrive','sambahomedrive'),
-  ('smbhome','sambahomepath'),
-  ('scriptpath','sambalogonscript'),
-  ('profilepath','sambaprofilepath'));
-var
-  attrName, attrValue: string;
-  I, C: Integer;
-  Temp: TPosixAccount;
-
-  function Map(const s: string): string;
-  var
-    i: Integer;
-  begin
-    Result := s;
-    for i := 0 to 3 do
-      if TheMap[i,1] = s then
-      begin
-        Result := TheMap[i,0];
-        break;
-      end;
-  end;
-
+constructor TUserDlg.Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; Mode: TEditMode);
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  ldapSession := Session;
-  Self.RegAccount := RegAccount;
-  EditMode := Mode;
+  Session := ASession;
+  RegAccount := ARegAccount;
+  ParentDn := adn;
+
+  Entry := TLdapEntry.Create(ASession, adn);
+
+  PosixAccount := TPosixAccount.Create(Entry);
+  InetOrgPerson := TInetOrgPerson.Create(Entry);
+  ShadowAccount := TShadowAccount.Create(Entry);
+  SambaAccount := TSamba3Account.Create(Entry);
+  MailAccount := TMailUser.Create(Entry);
+
+  ShadowSheet.TabVisible := false;
   SambaSheet.TabVisible := false;
   MailSheet.TabVisible := false;
-  if EditMode = EM_ADD then
+
+  if Mode = EM_ADD then
   begin
-    gid := RegAccount.posixGroup;
+    PosixAccount.New;
+    InetOrgPerson.New;
+    PosixAccount.GidNumber := RegAccount.posixGroup;
     SetText(loginShell, RegAccount.posixLoginShell);
     DateTimePicker.Date := Date;
   end
-  else
-  begin
+  else begin
     //Fill out the form
-    Account := TPosixAccount.Create(ldapSession, dn);
-    Account.Read;
-    gid := Account.GidNumber;
-    GetShadowTime;
-
-    for I := 0 to Account.Items.Count - 1 do
-    begin
-      attrName := Map(lowercase(Account.Items[i]));
-      attrValue := PChar(Account.Items.Objects[i]);
-      if attrName = 'objectclass' then
-      begin
-        if (SambaVersion < SAMBA_VERSION2) and (AnsiStrIComp(PChar(attrValue), 'sambaaccount') = 0) then
-          SambaVersion := SAMBA_VERSION2
-        else
-        if AnsiStrIComp(PChar(attrValue), 'sambasamaccount') = 0 then
-          SambaVersion := SAMBA_VERSION3
-        else
-        if AnsiStrIComp(PChar(attrValue), 'mailuser') = 0 then
-        begin
-          IsMailObject := true;        
-          cbMail.Checked := true;
-        end;
-      end
-      else
-        if attrName = 'homedrive' then
-          homeDrive.ItemIndex := homeDrive.Items.IndexOf(attrValue)
-        else
-        if attrName = 'mail' then
-          mail.Items.Add(attrValue)
-        else
-          for C := 0 to ComponentCount - 1 do
-          begin
-            if AnsiStrIComp(PChar(Components[C].Name), PChar(attrName)) = 0 then
-            begin
-              if Components[C] is TMemo then
-                TMemo(Components[C]).Text := FormatMemoInput(attrValue)
-              else
-                TEdit(Components[C]).Text := attrValue;
-            end;
-          end;
-    end;
-
-    // TODO -> Mutate
-    if SambaVersion > 0 then
-    begin
-      Temp := Account;
-      if (SambaVersion = SAMBA_VERSION2) then
-      begin
-        Account := TSambaAccount.Copy(Temp);
-        cbAccntDisabled.Checked := TSambaAccount(Account).Disabled;
-      end
-      else begin
-        Account := TSamba3Account.Copy(Temp);
-        with TSamba3Account(Account) do begin
-          try
-            cbPwdCantChange.Checked := PwdCanChange = 2147483647;
-          except end; // not critical
-          try
-            cbPwdMustChange.Checked := PwdMustChange = 0;
-          except end; // not critical
-          cbAccntDisabled.Checked := Disabled;
-        end;
-      end;
+    Entry.Read;
+    PosixPreset;
+    if ShadowAccount.Activated then
+      cbShadow.Checked := true;
+    if SambaAccount.Activated then
       cbSamba.Checked := true;
-      Temp.Free;
-    end;
-
-    if IsSambaObject then
-      cbDomain.Enabled := false;
-
-    if mail.Items.Count > 0 then
-      MailButtons(true);
+    if MailAccount.Activated then
+      cbMail.Checked := true;
+    Caption := Format(cPropertiesOf, [uid.Text]);
   end;
-end;
-
-procedure TUserDlg.ComboChange(Sender: TObject);
-begin
-  (Sender as TComponent).Tag := 1;
 end;
 
 procedure TUserDlg.AddMailBtnClick(Sender: TObject);
@@ -826,7 +603,7 @@ begin
   if InputDlg(cAddAddress, cSmtpAddress, s) then
   begin
     mail.Items.Add(s);
-    mail.tag := 1;
+    MailAccount.AddAddress(s);
     MailButtons(true);
   end;
 end;
@@ -838,8 +615,9 @@ begin
   s := mail.Items[mail.ItemIndex];
   if InputDlg(cEditAddress, cSmtpAddress, s) then
   begin
+    MailAccount.RemoveAddress(mail.Items[mail.ItemIndex]);
+    MailAccount.AddAddress(s);
     mail.Items[mail.ItemIndex] := s;
-    mail.tag := 1;
   end;
 end;
 
@@ -849,44 +627,14 @@ var
 begin
   with mail do begin
     idx := ItemIndex;
+    MailAccount.RemoveAddress(Items[ItemIndex]);
     Items.Delete(idx);
     if idx < Items.Count then
       ItemIndex := idx
     else
       ItemIndex := Items.Count - 1;
-    Tag := 1;
     if Items.Count = 0 then
       MailButtons(false);
-  end;
-end;
-
-procedure TUserDlg.UpBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with mail do begin
-    idx := ItemIndex;
-    if idx > 0 then
-    begin
-      Items.Move(idx, idx - 1);
-      ItemIndex := idx - 1;
-    end;
-    Tag := 1;
-  end;
-end;
-
-procedure TUserDlg.DownBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with mail do begin
-    idx := ItemIndex;
-    if idx < Items.Count - 1 then
-    begin
-      Items.Move(idx, idx + 1);
-      ItemIndex := idx + 1;
-    end;
-    Tag := 1;
   end;
 end;
 
@@ -894,72 +642,48 @@ end;
 
 procedure TUserDlg.PopulateGroupList;
 var
-  plmSearch, plmEntry: PLDAPMessage;
-  ppcVals: PPChar;
-  pld: PLDAP;
-  attrs: PCharArray;
-  ListItem: TListItem;
   i: Integer;
-
+  EntryList: TLdapEntryList;
+  ListItem: TListItem;
 begin
 
-  pld := ldapSession.pld;
-  // set result to cn and description only
-  SetLength(attrs, 3);
-  attrs[0] := 'cn';
-  attrs[1] := 'description';
-  attrs[2] := nil;
-
-  LdapCheck(ldap_search_s(pld, PChar(ldapSession.Base), LDAP_SCOPE_SUBTREE,
-                               PChar(Format(sMY_GROUP,[uid.Text])), PChar(attrs), 0, plmSearch));
-
+  EntryList := TLdapEntryList.Create;
   try
-      //GroupList.Items.BeginUpdate;
-      // loop thru entries
-      plmEntry := ldap_first_entry(pld, plmSearch);
-      while Assigned(plmEntry) do
-      begin
-        ListItem := GroupList.Items.Add;
-        for i := 0 to 1 do
-        begin
-          ppcVals := ldap_get_values(pld, plmEntry, attrs[i]);
-          if Assigned(ppcVals) then
-          try
-            if i = 0 then
-            begin
-              ListItem.Caption := PCharArray(ppcVals)[0];
-              ListItem.Data := StrNew(ldap_get_dn(pld, plmEntry));
-            end
-            else
-              ListItem.SubItems.Add(PCharArray(ppcVals)[0]);
-              //ListItem.SubItems.Add(CanonicalName(ldap_get_dn(pld, plmEntry)));
-          finally
-            LDAPCheck(ldap_value_free(ppcVals));
-          end;
-        end;
-        plmEntry := ldap_next_entry(pld, plmEntry);
-      end;
-    finally
-      //GroupList.Items.EndUpdate;
-      // free search results
-      LDAPCheck(ldap_msgfree(plmSearch));
+    Session.Search(Format(sMY_GROUP,[uid.Text]), Session.Base, LDAP_SCOPE_SUBTREE,
+                   ['cn', 'description'], false, EntryList);
+    for i := 0 to EntryList.Count - 1 do with EntryList[i] do
+    begin
+      ListItem := GroupList.Items.Add;
+      ListItem.Caption := Attributes[0].AsString;
+      ListItem.Data := StrNew(PChar(Dn));
+      if Attributes.Count > 1 then
+        ListItem.SubItems.Add(Attributes[1].AsString);
     end;
+  finally
+    EntryList.Free;
+  end;
 
-    if GroupList.Items.Count > 0 then
-      RemoveGroupBtn.Enabled := true;
+  if GroupList.Items.Count > 0 then
+    RemoveGroupBtn.Enabled := true;
 end;
 
 procedure TUserDlg.PageControlChange(Sender: TObject);
 begin
   if (PageControl.ActivePage = GroupSheet) and (GroupSheet.Tag = 0) then  // Tag = 0: list not yet populated
   begin
-    edGidNumber.Text := ldapSession.GetDN(Format(sGROUPBYGID, [gid]));
+    edGidNumber.Text := Session.GetDN(Format(sGROUPBYGID, [PosixAccount.GidNumber]));
     if uid.Text <> '' then
     begin
       PopulateGroupList;
       GroupList.AlphaSort;
       GroupSheet.Tag := 1;
     end;
+  end
+  else
+  if (PageControl.ActivePage = PrivateSheet) and not Assigned(Image1.Picture.Graphic) then
+  begin
+    Image1.Picture.Graphic := InetOrgPerson.JPegPhoto;
+    DeleteJpegBtn.Enabled := true;
   end;
 end;
 
@@ -1020,7 +744,7 @@ begin
   with TPickupDlg.Create(Self), ListView do
   try
     MultiSelect := true;
-    PopulateGroups(ldapSession);
+    PopulateGroups(Session);
     if ShowModal = mrOk then
     begin
       CopyGroups;
@@ -1073,7 +797,7 @@ end;
 procedure TUserDlg.SaveGroups;
 var
   i, modop: Integer;
-  Entry: TLDAPEntry;
+  Entry: TLdapEntry;
 begin
   if Assigned(origGroups) then with origGroups do
   begin
@@ -1082,16 +806,17 @@ begin
       modop := Integer(Objects[i]);
       if modop <> 0 then
       begin
-        Entry := TLDAPEntry.Create(ldapSession, origGroups[i]);
+        Entry := TLdapEntry.Create(Session, origGroups[i]);
+        Entry.Read;
         try
           // modify user attributes always must happend before savegroups so we don't get inconsistent here
           if modop > 0 then
-            Entry.AddAttr('memberUid', uid.Text, LDAP_MOD_ADD)
+            Entry.AttributesByName['memberUid'].AddValue(uid.Text)
           else
-            Entry.AddAttr('memberUid', uid.Text, LDAP_MOD_DELETE);
-          Entry.Modify;
+            Entry.AttributesByName['memberUid'].DeleteValue(uid.Text);
+          Entry.Write;
         finally
-          Entry.Destroy;
+          Entry.Free;
         end;
       end;
     end;
@@ -1111,15 +836,27 @@ begin
 end;
 
 procedure TUserDlg.PrimaryGroupBtnClick(Sender: TObject);
+var
+  gidnr: Integer;
+  gsid: string;
 begin
   with TPickupDlg.Create(Self), ListView do
   try
-    PopulateGroups(ldapSession);
+    PopulateGroups(Session);
     if ShowModal = mrOk then
     begin
       if Assigned(Selected) and (AnsiStrComp(PChar(edGidNumber.Text), PChar(Selected.Data)) <> 0) then
       begin
-        gid := StrToInt(ldapSession.Lookup(PChar(Selected.Data), sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE));
+        gidnr := StrToInt(Session.Lookup(PChar(Selected.Data), sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE));
+        if SambaAccount.Activated then
+        begin
+          gsid := Session.Lookup(PChar(Selected.Data), sANYCLASS, 'sambasid', LDAP_SCOPE_BASE);
+          if (Copy(gsid, 1, LastDelimiter('-', gsid) - 1) <> SambaAccount.DomainSID) and
+             (MessageDlg('Selected primary group is not a Samba group or it does not map to user domain. Do you still want to continue?', mtWarning, [mbYes, mbNo], 0) = mrNo) then Abort;
+          SambaAccount.GidNumber := gidnr;
+        end
+        else
+          PosixAccount.GidNumber := gidnr;
         edGidNumber.Text := PChar(Selected.Data);
         edGidNumber.Modified := true;
       end;
@@ -1188,61 +925,57 @@ begin
 end;
 
 procedure TUserDlg.cbSambaClick(Sender: TObject);
-var
-  i: Integer;
 begin
   if cbSamba.Checked then
   begin
-    if not Assigned(DomList) then // first time in
-    begin
-      cbDomain.Items.Clear;
-      cbDomain.Items.Add(cSamba2Accnt);
-      
-      if SambaVersion = SAMBA_VERSION2 then
-        cbDomain.ItemIndex := 0
-      else
-      begin
-        DomList := TDomainList.Create(ldapSession);
-        for i := 0 to DomList.Count - 1 do
-          cbDomain.Items.Add(DomList.Items[i].DomainName);
-        if SambaVersion = SAMBA_VERSION3 then
-          i := cbDomain.Items.IndexOf(TSamba3Account(Account).DomainName)
-        else
-        begin
-          i := cbDomain.Items.IndexOf(RegAccount.SambaDomainName);
-          if i = -1 then i := 0;
-        end;
-        cbDomain.ItemIndex := i;
-      end;
-    end;
-    if not ((Account is TSambaAccount) or (Account is TSamba3Account)) then
-      SambaPreset;
+    SambaPreset;
+    SambaSheet.TabVisible := true;
+  end
+  else begin
+    SambaAccount.Remove;
+    SambaSheet.TabVisible := false;
   end;
-  SambaSheet.TabVisible := cbSamba.Checked;
+
 end;
 
 procedure TUserDlg.cbMailClick(Sender: TObject);
 begin
-  MailSheet.TabVisible := cbMail.Checked;
-  if not isMailObject then
+  if cbMail.Checked then
+  begin
+    MailSheet.TabVisible := true;
     MailPreset;
+  end
+  else begin
+    MailSheet.TabVisible := false;
+    MailAccount.Remove;
+  end;
 end;
 
 procedure TUserDlg.FormDestroy(Sender: TObject);
 begin
-  Account.Free;
+  Entry.Free;
 end;
 
 procedure TUserDlg.cbPwdMustChangeClick(Sender: TObject);
 begin
   if cbPwdMustChange.Checked then
+  begin
+    SambaAccount.PwdMustChange := 0;
     cbPwdCantChange.Checked := false;
+  end
+  else
+    SambaAccount.PwdMustChange := 2147483647;
 end;
 
 procedure TUserDlg.cbPwdCantChangeClick(Sender: TObject);
 begin
   if cbPwdCantChange.Checked then
+  begin
     cbPwdMustChange.Checked := false;
+    SambaAccount.PwdCanChange := 2147483647;
+  end
+  else
+    SambaAccount.PwdCanChange := 0;
 end;
 
 procedure TUserDlg.RadioGroup1Click(Sender: TObject);
@@ -1256,7 +989,76 @@ begin
     DateTimePicker.Enabled := true;
     DateTimePicker.Color := clWindow;
   end;
+  SetShadowTime;
+end;
 
+procedure TUserDlg.EditChange(Sender: TObject);
+var
+  s: string;
+begin
+  if not PageSetup then with Sender as TCustomEdit do
+  begin
+    s := Trim(Text);
+    if Sender is TMemo then
+      s := FormatMemoInput(s);
+    Entry.AttributesByName[TControl(Sender).Name].AsString := s;
+  end;
+end;
+
+procedure TUserDlg.cbShadowClick(Sender: TObject);
+begin
+  if cbShadow.Checked then
+  begin
+    ShadowPreset;
+    ShadowSheet.TabVisible := true;
+  end
+  else begin
+    ShadowAccount.Remove;
+    ShadowSheet.TabVisible := false;
+  end;
+end;
+
+procedure TUserDlg.cbDomainChange(Sender: TObject);
+begin
+  SambaAccount.DomainData := DomList.Items[cbDomain.ItemIndex];
+end;
+
+procedure TUserDlg.sambaHomeDriveChange(Sender: TObject);
+begin
+  //TODO -> combo change?//
+  SambaAccount.HomeDrive := sambaHomeDrive.Text;
+end;
+
+procedure TUserDlg.cbAccntDisabledClick(Sender: TObject);
+begin
+  SambaAccount.Disabled := cbAccntDisabled.Checked;
+end;
+
+procedure TUserDlg.DateTimePickerChange(Sender: TObject);
+begin
+  SetShadowTime;
+end;
+
+procedure TUserDlg.OpenPictureBtnClick(Sender: TObject);
+begin
+  if OpenPictureDialog.Execute then
+  begin
+    Image1.Picture.LoadFromFile(OpenPictureDialog.fileName);
+    InetOrgPerson.JPegPhoto := Image1.Picture.Graphic as TJpegImage;
+    DeleteJpegBtn.Enabled := true;
+  end;
+end;
+
+procedure TUserDlg.DeleteJpegBtnClick(Sender: TObject);
+begin
+  Image1.Picture.Bitmap.FreeImage;
+  InetOrgPerson.JPegPhoto := nil;
+  DeleteJpegBtn.Enabled := false;
+end;
+
+procedure TUserDlg.BtnAdvancedClick(Sender: TObject);
+begin
+  TSambaAdvancedDlg.Create(Self, Session, SambaAccount).ShowModal;
 end;
 
 end.

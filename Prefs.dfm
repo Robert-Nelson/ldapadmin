@@ -317,7 +317,7 @@ object PrefDlg: TPrefDlg
           Width = 353
           Height = 21
           Style = csDropDownList
-          ItemHeight = 13
+          ItemHeight = 0
           TabOrder = 1
         end
       end

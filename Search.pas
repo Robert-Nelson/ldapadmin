@@ -77,21 +77,22 @@ uses Winldap, Constant, Main;
 
 procedure TSearchFrm.Search(const Filter: string);
 var
-  RList: TStringList;
+  RList: TLdapEntryList;
   ListItem: TListItem;
   i: Integer;
 begin
 
-  RList := Session.Search(Filter, SBCombo.Text{dn}, LDAP_SCOPE_SUBTREE);
+  RList := TLdapEntryList.Create;
 
-  if Assigned(RList) then
-  begin
+  try
+    Session.Search(Filter, SBCombo.Text{dn}, LDAP_SCOPE_SUBTREE, nil, true, RList);
     for i := 0 to RList.Count - 1 do
     begin
       ListItem := ListView.Items.Add;
-      ListItem.Caption := RList[i];
+      ListItem.Caption := RList[i].dn;
     end;
     StatusBar.SimpleText := Format(stCntObjects, [RList.Count]);
+  finally
     RList.Free;
   end;
 end;

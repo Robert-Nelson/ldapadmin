@@ -14,6 +14,7 @@ object HostDlg: THostDlg
   OldCreateOrder = False
   Position = poScreenCenter
   OnClose = FormClose
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object NameLabel: TLabel
@@ -37,7 +38,7 @@ object HostDlg: THostDlg
     Height = 13
     Caption = '&Description:'
   end
-  object _cn: TEdit
+  object cn: TEdit
     Left = 16
     Top = 32
     Width = 369
@@ -51,14 +52,14 @@ object HostDlg: THostDlg
     Height = 201
     Caption = ' Additional host &names: '
     TabOrder = 3
-    object cn: TListBox
+    object cnList: TListBox
       Left = 8
       Top = 16
       Width = 353
       Height = 145
       ItemHeight = 13
       TabOrder = 0
-      OnClick = cnClick
+      OnClick = cnListClick
     end
     object AddHostBtn: TButton
       Left = 8
@@ -89,26 +90,6 @@ object HostDlg: THostDlg
       TabOrder = 3
       OnClick = DelHostBtnClick
     end
-    object UpBtn: TButton
-      Left = 224
-      Top = 168
-      Width = 65
-      Height = 25
-      Caption = '&Up'
-      Enabled = False
-      TabOrder = 4
-      OnClick = UpBtnClick
-    end
-    object DownBtn: TButton
-      Left = 296
-      Top = 168
-      Width = 65
-      Height = 25
-      Caption = '&Down'
-      Enabled = False
-      TabOrder = 5
-      OnClick = DownBtnClick
-    end
   end
   object OKBtn: TButton
     Left = 136
@@ -135,6 +116,7 @@ object HostDlg: THostDlg
     Width = 369
     Height = 21
     TabOrder = 1
+    OnChange = EditChange
   end
   object description: TEdit
     Left = 16
@@ -142,5 +124,6 @@ object HostDlg: THostDlg
     Width = 369
     Height = 21
     TabOrder = 2
+    OnChange = EditChange
   end
 end

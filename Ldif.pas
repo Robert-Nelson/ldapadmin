@@ -1,5 +1,5 @@
   {      LDAPAdmin - Ldif.pas
-  *      Copyright (C) 2004 Tihomir Karlovic
+  *      Copyright (C) 2004-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,7 +23,7 @@ unit Ldif;
 
 interface
 
-uses Windows, Classes, SysUtils;
+uses LdapClasses, Windows, Classes, SysUtils;
 
 const
   SIZE_CRLF = 2;
@@ -31,19 +31,12 @@ const
   SafeInitChar: set of Char = [#$01..#09, #$0B..#$0C, #$0E..#$1F, #$21..#$39, #$3B, #$3D..#$7F];
 
 type
-  TAttrRec = record
-    Name: string;
-    Value: string;
-  end;
-
   TLdifMode = (fmRead, fmWrite, fmAppend);
 
 { TLDIF
-  Uses ReadRecord to fetch and parse one record and returns the result in Dn and
-  Attributes properties. Property RecordLines contains original Ldif lines
-  of fetched record (without comments).
-  Uses WriteRecord to dump one record to file opened for writing (Dn property
-  must be correctly set prior to calling the procedure WriteRecord).
+  Uses ReadRecord to fetch and parse one record. Property RecordLines contains
+  original Ldif lines of fetched record (without comments).
+  Uses WriteRecord to dump one record to file opened for writing.
   Descendant classes are responsible for reading and writing of the data by
   overwriting abstract ReadLine and WriteLine procedures. }
 
@@ -51,35 +44,25 @@ type
   TLDIF = class
   private
     fRecord: TStringList;
-    fAttributes: TList;
-    fdn: string;
     fVersion: Integer;
     fMode: TLdifMode;
     fWrap: Integer;
     fLinesRead: Integer;
     fEof: Boolean;
-    function  GetAttribute(Index: Integer): TAttrRec;
-    function  GetCount: Integer;
-    procedure SetDn(Value: string);
   protected
-    procedure ClearResult;
-    function  IsSafe(const s: string): Boolean;
-    function  StringToUTF8(const src: string): string;
-    function  UTF8ToString(const src: string): string;
+    function  IsSafe(const Buffer: PBytes; DataSize: Cardinal): Boolean;
     function  ReadLine: string; virtual; abstract;
     procedure WriteLine(const Line: string); virtual; abstract;
-    procedure PutLine(const attrib, value: string);
+    procedure PutLine(const attrib: string; const Buffer: PBytes; const DataSize: Cardinal);
     procedure FetchRecord; virtual;
-    procedure ParseRecord; virtual;
+    procedure ParseRecord(Entry: TLdapEntry); virtual;
+    procedure ReadFromURL(url: string; Value: TLdapAttributeData);
   public
-    procedure ReadRecord; virtual;
-    procedure WriteRecord(Items: TStringList); virtual;
+    procedure ReadRecord(Entry: TLdapEntry = nil); virtual;
+    procedure WriteRecord(Entry: TLdapEntry); virtual;
     constructor Create; virtual;
     destructor Destroy; override;
     property Version: Integer read fVersion;
-    property dn: string read fdn write SetDn;
-    property Attributes[Index: Integer]: TAttrRec read GetAttribute;
-    property Count: Integer read GetCount;
     property Wrap: Integer read fWrap write fWrap;
     property RecordLines: TStringList read fRecord;
     property EOF: Boolean read fEof;
@@ -116,44 +99,15 @@ uses Constant, Base64;
 
 { TLDIF }
 
-function TLDIF.GetCount: Integer;
-begin
-  Result := fAttributes.Count;
-end;
-
-function TLDIF.GetAttribute(Index: Integer): TAttrRec;
-begin
-  Result := TAttrRec(fAttributes[Index]^);
-end;
-
-procedure TLDIF.SetDn(Value: string);
-begin
-  if fMode = fmRead then
-    raise Exception.Create(stFileReadOnly);
-  fdn := Value;
-end;
-
-procedure TLDIF.ClearResult;
-var
-  i: Integer;
-begin
-  for i := 0 to fAttributes.Count - 1 do
-    Dispose(fAttributes[i]);
-  fAttributes.Clear;
-end;
-
 constructor TLDIF.Create;
 begin
   fRecord := TStringList.Create;
-  fAttributes := TList.Create;
   fWrap := 80;
 end;
 
 destructor TLDIF.Destroy;
 begin
   fRecord.Free;
-  ClearResult;
-  fAttributes.Free;
   inherited Destroy;
 end;
 
@@ -161,6 +115,8 @@ procedure TLDIF.FetchRecord;
 var
   Line: string;
 begin
+  if fEof then
+    raise Exception.Create(stLdifEof);
   fRecord.Clear;
   while not fEof do
   begin
@@ -180,16 +136,13 @@ begin
   end;
 end;
 
-procedure TLDIF.ParseRecord;
+procedure TLDIF.ParseRecord(Entry: TLdapEntry);
 var
   i, po, vLen: Integer;
   Line, s: string;
-  Attr: ^TAttrRec;
   Name, Value: string;
-
+  Attr: TLdapAttribute;
 begin
-  fdn := '';
-  ClearResult;
   i := 0;
   while i < fRecord.Count do
   begin
@@ -211,6 +164,7 @@ begin
       raise Exception.Create(Format(stLdifENoCol, [Integer(fRecord.Objects[i])]));
 
     Name := lowercase(TrimRight(Copy(Line, 1, po - 1)));
+    Attr := Entry.AttributesByName[name];
     if po = Length(Line) - 1 then
       Value := ''
     else
@@ -221,20 +175,18 @@ begin
       SetLength(Value, Base64decSize(vLen));
       vLen := Base64Decode(s[1], vLen, Value[1]);
       SetLength(Value, vLen);
-      Value := Utf8ToString(Value);
     end
     else
     if Line[po + 1] = '<' then
-      //Value := GetUrl(PChar(Line[po + 2]))
-      raise Exception.Create('"<" not (yet) supported!')
+      ReadFromUrl(TrimLeft(Copy(Line, po + 2, MaxInt)), Attr.AddValue)
     else
       Value := TrimLeft(Copy(Line, po + 1, MaxInt));
 
-    if fdn = '' then
+    if Entry.dn = '' then
     begin
       // it has to be dn or version atribute
       if Name = 'dn' then
-        fdn := Value
+        Entry.dn := Value
       else
       if Name = 'version' then
       try
@@ -246,100 +198,76 @@ begin
       else
         raise Exception.Create(Format(stLdifENoDn, [Integer(fRecord.Objects[i]), Name]));
     end
-    else begin
-      New(Attr);
-      Attr^.Name := name;
-      Attr^.Value := value;
-      fAttributes.Add(Attr);
-    end;
+    else
+      Attr.AddValue(Pointer(@Value[1]), Length(Value));
   end;
 end;
 
-{ Tests whether string contains only safe chars }
-function TLDIF.IsSafe(const s: string): Boolean;
+procedure TLDIF.ReadFromURL(url: string; Value: TLdapAttributeData);
+var
+  i: Integer;
+  fs: TFileStream;
+begin
+  i := Pos('://', url);
+  if i = 0 then
+    raise Exception.Create(stLdifInvalidUrl);
+  if AnsiStrLIComp(PChar(url), 'file', i - 1) <> 0 then
+    raise Exception.Create(stLdifUrlNotSupp);
+  fs := TFileStream.Create(Copy(url, i + 3, MaxInt), fmOpenRead);
+  try
+    Value.LoadFromStream(fs);
+  finally
+    fs.Free;
+  end;
+end;
+
+{ Tests whether data contains only safe chars }
+function TLDIF.IsSafe(const Buffer: PBytes; DataSize: Cardinal): Boolean;
 var
   p: PChar;
+  EndBuf: PChar;
 begin
   Result := true;
-  p := PChar(s);
+  p := PChar(Buffer);
   if not (p^ in SafeInitChar) then
   begin
     Result := false;
     exit;
   end;
-  while (p^ <> #0) do
+  EndBuf := PChar(Cardinal(Buffer) + DataSize);
+  while (p <> EndBuf) do
   begin
     if not (p^ in SafeChar) then
     begin
       Result := false;
       break;
     end;
-    p := CharNext(p);
-  end;
-end;
-
-function TLDIF.StringToUTF8(const src: string): string;
-var
-  Dest, UTF8: array [0..1] of WideChar;
-  p: PChar;
-  c: string;
-begin
-  Result := '';
-  p := PChar(src);
-  while (p^ <> #0) do
-  begin
-    if p^ < #128 then
-      Result := Result + p^
-    else
-    begin
-      c := p^;
-      StringToWideChar(c, @Dest, SizeOf(Dest));
-      WideCharToMultiByte(CP_UTF8, 0, @Dest, 1, LPSTR(@Utf8), SizeOf(UTF8), nil, nil);
-      Result := Result + Char(Lo(Integer(UTF8))) + Char(Hi(Integer(UTF8)));
-    end;
-    p := CharNext(p);
-  end;
-end;
-
-function TLDIF.UTF8ToString(const src: string): string;
-var
-  l: Integer;
-  dst: string;
-  p: PWord;
-begin
-  Result := '';
-  l := Length(src);
-  SetLength(Dst, l * SizeOf(WideChar));
-  l := MultiByteToWideChar( CP_UTF8, 0, PChar(src), l+1, PWChar(Dst), l*SizeOf(WideChar));
-  if l = 0 then
-    RaiseLastWin32Error;
-  p := PWord(Dst);
-  while p^ <> 0 do begin
-    Result := Result + Char(p^);
     Inc(p);
   end;
 end;
 
-{ If neccessary converts value to base64 coding and dumps the string to file
+{ If neccessary encodes data to base64 coding and dumps the string to file
   wrapping the line so that max length doesn't exceed Wrap count of chars }
-procedure TLDIF.PutLine(const attrib, value: string);
+procedure TLDIF.PutLine(const attrib: string; const Buffer: PBytes; const DataSize: Cardinal);
 var
   p1, len: Integer;
-  line, utfstr, s: string;
+  line, s: string;
 begin
 
   line := attrib + ':';
 
-  if value <> '' then
+  if DataSize > 0 then
   begin
     // Check if we need to encode to base64
-    if IsSafe(value) then
-      line := line + ' ' + value
+    if IsSafe(Buffer, DataSize) then
+    begin
+      SetString(s, PChar(Buffer), DataSize);
+      line := line + ' ' + s
+    end
     else
     begin
-      utfstr := StringToUTF8(value);
-      SetLength(s, Base64encSize(Length(utfstr)*SizeOf(Char)));
-      Base64Encode(utfstr[1], Length(utfstr)*SizeOf(Char), s[1]);
+      SetLength(s, Base64encSize(DataSize));
+      Base64Encode(Pointer(Buffer)^, DataSize, s[1]);
       line := line + ': ' + s;
     end;
   end;
@@ -360,21 +288,25 @@ begin
   end;
 end;
 
-procedure TLDIF.ReadRecord;
+procedure TLDIF.ReadRecord(Entry: TLdapEntry = nil);
 begin
-  if fEof then
-    raise Exception.Create(stLdifEof);
   FetchRecord;
-  ParseRecord;
+  if Assigned(Entry) then
+  begin
+    Entry.dn := '';
+    Entry.Attributes.Clear;
+    ParseRecord(Entry);
+  end;
 end;
 
-procedure TLDIF.WriteRecord(Items: TStringList);
+procedure TLDIF.WriteRecord(Entry: TLdapEntry);
 var
-  i: Integer;
+  i, j: Integer;
 begin
-  PutLine('dn', fdn);
-  for i := 0 to Items.Count - 1 do
-    PutLine(Items[i], PChar(Items.Objects[i]));
+  PutLine('dn', @Entry.dn[1], Length(Entry.dn));
+  for i := 0 to Entry.Attributes.Count - 1 do with Entry.Attributes[i] do
+    for j := 0 to ValueCount - 1 do with Values[j] do
+      PutLine(Name, Data, DataSize);
   WriteLine('');
 end;
 

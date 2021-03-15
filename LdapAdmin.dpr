@@ -35,7 +35,15 @@ uses
   MailGroup in 'MailGroup.pas' {MailGroupDlg},
   Host in 'Host.pas' {HostDlg},
   Locality in 'Locality.pas' {LocalityDlg},
-  LdapCopy in 'LdapCopy.pas' {CopyDlg};
+  LdapCopy in 'LdapCopy.pas' {CopyDlg},
+  InetOrg in 'InetOrg.pas',
+  PropertyObject in 'PropertyObject.pas',
+  Shadow in 'Shadow.pas',
+  Password in 'password.pas',
+  uSchemaDlg in 'uSchemaDlg.pas' {SchemaDlg},
+  Schema in 'Schema.pas',
+  BinView in 'BinView.pas' {HexView},
+  AdvSamba in 'AdvSamba.pas' {SambaAdvancedDlg};
 
 {$R *.RES}
 

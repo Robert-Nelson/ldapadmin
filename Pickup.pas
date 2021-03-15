@@ -66,6 +66,7 @@ type
     procedure PopulateGroups(Session: TLDAPSession);
     procedure PopulateMailGroups(Session: TLDAPSession);
     procedure PopulateAccounts(Session: TLDAPSession);
+    procedure PopulateComputers(Session: TLDAPSession);
     procedure PopulateMailAccounts(Session: TLDAPSession);
 
     procedure FillFullList;
@@ -87,11 +88,6 @@ var
 begin
   n1 := Item1.ImageIndex;
   n2 := Item2.ImageIndex;
-  {if ((n1 = bmOu) and (n2 <> bmOu)) then
-    Result := -1
-  else
-  if ((n2 = bmOu) and (n1 <> bmOu))then
-    Result := 1}
   if n1 > n2 then
     Result := 1
   else
@@ -229,11 +225,37 @@ begin
   Caption := cPickAccounts;
   Populate(Session, sPOSIXACCNT, attrs, bmUser);
   for i := 0 to ListView.Items.Count - 1 do
-    with ListView.Items[i] do Subitems.Add(Session.CanonicalName(Session.GetDirFromDN(PChar(Data))));
+    with ListView.Items[i] do Subitems.Add(CanonicalName(GetDirFromDn(PChar(Data))));
 
   FillFullList;
 end;
 
+procedure TPickupDlg.PopulateComputers(Session: TLDAPSession);
+var
+  attrs: PCharArray;
+  i: Integer;
+  s: string;
+begin
+  SetLength(attrs, 2);
+  attrs[0] := 'uid';
+  attrs[1] := nil;
+  Caption := cPickAccounts;
+  Populate(Session, sPOSIXACCNT, attrs, bmComputer);
+  with ListView do
+  begin
+    i := Items.Count - 1;
+    while i >= 0 do
+    begin
+      s := Items[i].Caption;
+      if s[Length(s)] <> '$' then
+        Items.Delete(i);
+      dec(i);
+    end;
+    for i := 0 to Items.Count - 1 do
+      with Items[i] do Subitems.Add(CanonicalName(GetDirFromDn(PChar(Data))));
+  end;
+  FillFullList;
+end;
 
 procedure TPickupDlg.PopulateMailAccounts(Session: TLDAPSession);
 var
@@ -247,7 +269,7 @@ begin
   Caption := cPickAccounts;
   Populate(Session, sMAILACCNT, attrs, bmUser);
   for i := 0 to ListView.Items.Count - 1 do
-    with ListView.Items[i] do Subitems.Add(Session.CanonicalName(Session.GetDirFromDN(PChar(Data))));
+    with ListView.Items[i] do Subitems.Add(CanonicalName(GetDirFromDn(PChar(Data))));
 
   FillFullList;
 end;

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Computer.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -24,7 +24,8 @@ unit Computer;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, LDAPClasses, Samba, Posix, RegAccnt, Constant;
+  Buttons, ExtCtrls, LDAPClasses, Samba, Posix, RegAccnt, PropertyObject,
+  Constant;
 
 type
   TComputerDlg = class(TForm)
@@ -39,15 +40,14 @@ type
     Label3: TLabel;
     procedure edComputernameChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormDestroy(Sender: TObject);
   private
-    dn: string;
-    ldSession: TLDAPSession;
     RegAccount: TAccountEntry;
     DomList: TDomainList;
-    EditMode: TEditMode;
-    Account: TPosixAccount;
+    Entry: TLdapEntry;
+    Account: TSamba3Computer;
   public
-    constructor Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; AMode: TEditMode); reintroduce;
   end;
 
 var
@@ -59,39 +59,33 @@ uses WinLDAP;
 
 {$R *.DFM}
 
-constructor TComputerDlg.Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode);
+constructor TComputerDlg.Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; AMode: TEditMode);
 var
   i: Integer;
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  ldSession := Session;
-  Self.RegAccount := RegAccount;
-  EditMode := Mode;
-
-  if EditMode = EM_MODIFY then
+  RegAccount := ARegAccount;
+  Entry := TLdapEntry.Create(ASession, adn);
+  if AMode = EM_MODIFY then
   begin
-    edComputername.Enabled := False;
-    edComputername.Text := ldSession.GetNameFromDN(dn);
-    Caption := Format(cPropertiesOf, [edComputername.Text]);
-    Account := TSamba3Account.Create(ldSession, dn);
-    with TSamba3Account(Account) do
+    Entry.Read;
+    Account := TSamba3Computer.Create(Entry);
+    with Account do
     begin
-      Account.Read;
       if DomainName <> '' then
-        cbDomain.Items.Add(DomainName)
-      else
-        cbDomain.Items.Add(cSamba2Accnt);
+        cbDomain.Items.Add(DomainName);
       cbDomain.ItemIndex := 0;
       cbDomain.Enabled := false;
       edDescription.text := Description;
     end;
+    edComputername.Enabled := False;
+    edComputername.Text := GetNameFromDN(adn);
+    Caption := Format(cPropertiesOf, [edComputername.Text]);
   end
   else begin
-    DomList := TDomainList.Create(ldSession);
+    DomList := TDomainList.Create(ASession);
     with cbDomain do
     begin
-      Items.Add(cSamba2Accnt);
       for i := 0 to DomList.Count - 1 do
         Items.Add(DomList.Items[i].DomainName);
       ItemIndex := Items.IndexOf(RegAccount.SambaDomainName);
@@ -103,75 +97,39 @@ end;
 
 procedure TComputerDlg.edComputernameChange(Sender: TObject);
 begin
-  OKBtn.Enabled := edComputername.Text <> '';
+  OKBtn.Enabled := (edComputername.Text <> '') and (cbDomain.ItemIndex <> -1);
 end;
 
 procedure TComputerDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 var
-  uidnr, gidnr: Integer;
-  nbName: string;
-  pDom: PDomainRec;
+  uidnr: Integer;
 begin
   if ModalResult = mrOk then
   begin
-    if EditMode = EM_ADD then
+    if esNew in Entry.State then
     begin
-
-      // Aquire next available uidNumber and calculate related SAMBA attributes
-      uidnr := ldSession.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
-      gidnr := COMPUTER_GROUP;
-
-      nbName := uppercase(edComputername.Text) + '$';
-
-      if cbDomain.ItemIndex = 0 then
-        Account := TSambaAccount.Create(ldSession, 'uid=' + nbName + ',' + dn)
-      else
-        Account := TSamba3Account.Create(ldSession, 'uid=' + nbName + ',' + dn);
-
+      // Acquire next available uidNumber
+      uidnr := Entry.Session.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
+      Account := TSamba3Computer.Create(Entry);
       with Account do
-      try
-        UidNumber := uidnr;
-        GidNumber := gidnr;
-        Cn := nbName;                        // set cn to be equal to uid
-        Uid := nbName;
-        LoginShell := '/bin/false';
-        HomeDirectory := '/dev/null';
-
-        if Account is TSambaAccount then with TSambaAccount(Account) do
-        begin
-          rid := 2 * uidnr + 1000;
-          PrimaryGroupID := 2 * gidnr + 1001;
-          //acctFlags := '[W          ]';
-          ComputerAccount := true;
-          Description := Self.edDescription.Text;
-        end
-        else with TSamba3Account(Account) do
-        begin
-          pDom := DomList.Items[cbDomain.ItemIndex - 1];
-          DomainName := pDom.DomainName;
-          SID := Format('%s-%d', [pDom.SID, pDom.AlgorithmicRIDBase + 2 * UidNumber]);
-          GroupSID := Format('%s-%d', [pDom.SID, 2 * gidnr + 1001]);
-          //acctFlags := '[W          ]';
-          ComputerAccount := true;
-          Description := Self.edDescription.Text;
-        end;
+      begin
         New;
-      finally
-        Free;
-      end;
-    end
-    else // Modify
-    if edDescription.Modified then
-    begin
-      with Account do
-      try
-        Description := Self.edDescription.Text;
-        Modify;
-      finally
-        Free;
+        ComputerName := edComputername.Text;
+        DomainData := DomList.Items[cbDomain.ItemIndex];
+        UidNumber := uidnr;
+        GidNumber := COMPUTER_GROUP;
+        Entry.dn := 'uid=' + ComputerName + ',' + Entry.dn;
       end;
     end;
+    if edDescription.Modified then
+      Account.Description := Self.edDescription.Text;
+    Entry.Write;
   end;
+end;
+
+procedure TComputerDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
 end;
 
 end.

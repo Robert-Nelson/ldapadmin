@@ -1,5 +1,5 @@
   {      LDAPAdmin - Import.pas
-  *      Copyright (C) 2004 Tihomir Karlovic
+  *      Copyright (C) 2004-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -117,10 +117,13 @@ begin
   StopOnError := cbStopOnError.Checked;
 
   try
+    Entry := nil;
+    ldFile := nil;
+    
+    System.Assign(F, FileName);
+    FileMode := 0;
+    Reset(F,1);
     try
-      System.Assign(F, FileName);
-      FileMode := 0;
-      Reset(F,1);
       ProgressBar.Max := FileSize(F);
     finally
       CloseFile(F);
@@ -133,25 +136,21 @@ begin
       ProgressBar.Position := 0;
       while not (eof or Stop) do
       try
-        ReadRecord;
-        Entry.ClearAttrs;
-        for i := 0 to Count - 1 do
-          Entry.AddAttr(Attributes[i].Name, Attributes[i].Value, LDAP_MOD_ADD);
-        Entry.dn := PChar(dn);
-        ImportingLabel.Caption := dn;
+        ReadRecord(Entry);
+        ImportingLabel.Caption := Entry.dn;
         ProgressBar.Position := NumRead;
-        Entry.New;
+        Entry.Write;
         inc(ObjCount);
         Application.ProcessMessages;
       except
         on E: Exception do
         begin
           Inc(ErrCount);
-          mbErrors.Lines.Add(dn);
+          mbErrors.Lines.Add(Entry.dn);
           mbErrors.Lines.Add('  ' + E.Message);
           if RejectList then
           try
-            WriteLn(R, dn);
+            WriteLn(R, Entry.dn);
             for i := 0 to RecordLines.Count - 1 do
               WriteLn(R, RecordLines[i]);
             WriteLn(R);
@@ -170,7 +169,8 @@ begin
       end;
     end;
   finally
-    if RejectList then try
+    if RejectList then
+    try
       CloseFile(R);
     except end;
     FreeAndNil(Entry);
@@ -205,6 +205,7 @@ begin
   OKBtn.Visible := false;
   CancelBtn.Caption := '&Close';
   CancelBtn.Left := (Width - CancelBtn.Width) div 2;
+  CancelBtn.ModalResult := mrOk;
   CancelBtn.Default := true;
 end;
 

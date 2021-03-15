@@ -1,5 +1,5 @@
   {      LDAPAdmin - LdapOp.pas
-  *      Copyright (C) 2004 Tihomir Karlovic
+  *      Copyright (C) 2004-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -37,7 +37,7 @@ type
     fDstSession: TLDAPSession;
     Running: Boolean;
     function GetDstSession: TLDAPSession;
-    procedure DeleteLeaf(const dn: PChar; const pld: PLDAP; const plmEntry: PLDAPMessage);
+    procedure DeleteLeaf(const Entry: TLdapEntry);
     procedure DeleteChildren(const dn: string; Children: Boolean);
     procedure Copy(const dn, pdn, rdn: string; Move: Boolean);
   public
@@ -68,183 +68,141 @@ end;
 
 { This procedure copies entire subtree to a different location (dn). If Move is
   set to true then the source entries are deleted, effectivly moving the tree }
-
 procedure TLdapOpDlg.Copy(const dn, pdn, rdn: string; Move: Boolean);
 var
+  EntryList: TLdapEntryList;
   srcEntry, dstEntry: TLDAPEntry;
   srdn: string;
-  plmSearch, plmEntry: PLDAPMessage;
-  pld: PLDAP;
-  attrs: PCharArray;
-  pszdn: PChar;
-  i: Integer;
+  i, j: Integer;
+  Attr: TLdapAttribute;
 begin
-  // Search for subentries
-  SetLength(attrs, 2);
-  attrs[0] := 'objectclass';
-  attrs[1] := nil;
-  pld := SourceSession.pld;
-  LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_ONELEVEL, PChar(sANYCLASS), PChar(attrs), 0, plmSearch));
 
-  if not Visible and (ldap_count_entries(pld, plmSearch) > 0) then
-    Show;
-
+  //Copy base entry
+  if rdn = '' then
+    srdn := GetRdnFromDn(dn)
+  else
+    srdn := rdn;
+  srcEntry := TLDAPEntry.Create(SourceSession, dn);
+  if SourceSession <> DestSession then
+    dstEntry := TLDAPEntry.Create(DestSession, dn)
+  else
+    dstEntry := srcEntry;
+  with srcEntry do
   try
-    //Copy entry
-    if rdn = '' then
-      srdn := SourceSession.GetRDN(dn)
-    else
-      srdn := rdn;
-    srcEntry := TLDAPEntry.Create(SourceSession, dn);
+    Read;
     if SourceSession <> DestSession then
-      dstEntry := TLDAPEntry.Create(DestSession, dn)
-    else
-      dstEntry := srcEntry;
-    with srcEntry do
-    try
-      Read;
-      dstEntry.dn := PChar(srdn + ',' + pdn);
-      for i := 0 to Items.Count - 1 do
-        dstEntry.AddAttr(Items[i],PChar(Items.Objects[i]), LDAP_MOD_ADD);
-      dstEntry.New;
-    finally
-      if dstEntry <> srcEntry then
-        dstEntry.Free;
-      Free;
-    end;
-
-    if Move then
-        begin
-          if SourceSession = DestSession then
-            // Adjust mailgroup references to new dn
-            SourceSession.ModifySet(PChar(Format(sMY_MAILGROUP,[dn])), SourceSession.Base, LDAP_SCOPE_SUBTREE,
-                                    'member', dn, PChar(srdn + ',' + pdn), LDAP_MOD_REPLACE)
-          else
-            // Remove mailgroup references
-            SourceSession.ModifySet(PChar(Format(sMY_MAILGROUP,[dn])),
-                                     SourceSession.Base, LDAP_SCOPE_SUBTREE, 'member', dn, '', LDAP_MOD_DELETE);
-    end;
-
-    plmEntry := ldap_first_entry(pld, plmSearch);
-    while Assigned(plmEntry) do
     begin
-      pszdn := ldap_get_dn(pld, plmEntry);
-      if Assigned(pszdn) then
-      try
-        if not Running then
-          Abort;
-        Exporting.Caption := pszdn;
-        Application.ProcessMessages;
-        if ModalResult <> mrNone then
-        begin
-          Running := false;
-          Abort;
-        end;
-        Copy(pszdn, srdn +',' + pdn, '', Move);
-        if Move then
-          LdapCheck(ldap_delete_s(pld, pszdn));
-      finally
-        ldap_memfree(pszdn);
+      for i := 0 to srcEntry.Attributes.Count - 1 do with srcEntry.Attributes[i] do
+      begin
+        Attr := dstEntry.Attributes.Add(Name);
+        for j := 0 to ValueCount - 1 do with Values[j] do
+          Attr.AddValue(Data, DataSize);
       end;
-      plmEntry := ldap_next_entry(pld, plmEntry);
+    end;
+    dstEntry.dn := srdn + ',' + pdn;
+    dstEntry.Write;
+  finally
+    if dstEntry <> srcEntry then
+      dstEntry.Free;
+    Free;
+  end;
+
+  if Move then
+  begin
+    if SourceSession = DestSession then
+      // Adjust mailgroup references to new dn
+      SourceSession.ModifySet(Format(sMY_MAILGROUP,[dn]), SourceSession.Base, LDAP_SCOPE_SUBTREE,
+                              'member', dn, PChar(srdn + ',' + pdn), LDAP_MOD_REPLACE)
+    else
+      // Remove mailgroup references
+      SourceSession.ModifySet(Format(sMY_MAILGROUP,[dn]),
+                              SourceSession.Base, LDAP_SCOPE_SUBTREE, 'member', dn, '', LDAP_MOD_DELETE);
+    end;
+
+  // Copy subentries
+  EntryList := TLdapEntryList.Create;
+  try
+    SourceSession.Search(sANYCLASS, dn, LDAP_SCOPE_ONELEVEL, nil, false, EntryList);
+
+    if not Visible and  (EntryList.Count > 0) then
+      Show;
+
+    for i := 0 to EntryList.Count - 1 do with EntryList[i] do
+    begin
+      if not Running then
+        Abort;
+      Exporting.Caption := dn;
+      Application.ProcessMessages;
+      if ModalResult <> mrNone then
+      begin
+        Running := false;
+        Abort;
+      end;
+      Copy(dn, srdn +',' + pdn, '', Move);
+      if Move then
+        Delete;
     end;
   finally
-    LDAPCheck(ldap_msgfree(plmSearch));
+    EntryList.Free;
   end;
 end;
 
-{ Deletes one leaf. If the leaf is simple entry it just deletes it, otherwise
-  object instance is created and its Delete method is called. In this way it is
-  assured that deleting of special objects, such as Posix or Samba users is
-  handeled properly (i.e memberUid is removed from groups before deleting) }
-
-procedure TLdapOpDlg.DeleteLeaf(const dn: PChar; const pld: PLDAP; const plmEntry: PLDAPMessage);
+{ Deletes one leaf. If the leaf is simple entry it just deletes it, if the leaf
+  represents posixAccount it removes memberUid from groups before deleting) }
+procedure TLdapOpDlg.DeleteLeaf(const Entry: TLdapEntry);
 var
-  ppcVals: PPChar;
-  I: Cardinal;
-  s: string;
-  Entry: TLDAPEntry;
+  i: Cardinal;
+  s, uid: string;
 begin
-  Entry := nil;
-  ppcVals := ldap_get_values(pld, plmEntry, 'objectclass');
-  if Assigned(ppcVals) then
-  try
-    I := 0;
-    while Assigned(PCharArray(ppcVals)[I]) do
+  Entry.Delete;
+  with Entry.AttributesByName['objectclass'] do
+  for i := 0 to ValueCount - 1 do
+  begin
+    s := lowercase(Values[i].AsString);
+    if s = 'posixaccount' then with SourceSession do
     begin
-      s := lowercase(PCharArray(ppcVals)[I]);
-      if (s = 'posixaccount') or (s = 'sambaaccount') or (s = 'sambasamaccount') then
-      begin
-        Entry := TPosixAccount.Create(SourceSession, dn);
-        break;
-      end;
-      Inc(I);
+      // Remove any references to uid from groups before deleting user itself;
+      //TODO: Entry := TPosixAccount.Create(SourceSession, dn);
+      uid := GetNameFromDN(Entry.dn);
+      ModifySet(Format(sMY_GROUP,[uid]), Base, LDAP_SCOPE_SUBTREE,
+                'memberUid', uid, '', LDAP_MOD_DELETE);
+      break;
     end;
-  finally
-    LDAPCheck(ldap_value_free(ppcVals));
   end;
-
-  if Assigned(Entry) then
-  try
-    Entry.Delete
-  finally
-    Entry.Free;
-  end
-  else
-    LdapCheck(ldap_delete_s(pld, dn));
 end;
 
 { This procedure checks for leaf's children and deletes them recursively if
   boolean Children is set to true. Otherwise, user is prompted to delete }
-
 procedure TLdapOpDlg.DeleteChildren(const dn: string; Children: Boolean);
 var
-  plmSearch, plmEntry: PLDAPMessage;
-  pld: PLDAP;
-  attrs: PCharArray;
-  pszdn: PChar;
+  EntryList: TLdapEntryList;
+  i: Integer;
 begin
-
-  // set result to objectclass only
-  SetLength(attrs, 2);
-  attrs[0] := 'objectclass';
-  attrs[1] := nil;
-  pld := SourceSession.pld;
-  LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_ONELEVEL, PChar(sANYCLASS), PChar(attrs), 0, plmSearch));
-
-  if not Children and (ldap_count_entries(pld, plmSearch) > 0) then
-  begin
-    if MessageBox(Handle, PChar(stDeleteAll), PChar(cConfirm), MB_YESNO + MB_ICONQUESTION) <> IDYES then
-      Abort;
-    Show;
-  end;
-
+  EntryList := TLdapEntryList.Create;
   try
-    plmEntry := ldap_first_entry(pld, plmSearch);
-    while Assigned(plmEntry) do
+    SourceSession.Search(sANYCLASS, dn, LDAP_SCOPE_ONELEVEL, ['objectclass'], false, EntryList);
+    if not Children and (EntryList.Count > 0) then
     begin
-      pszdn := ldap_get_dn(pld, plmEntry);
-      if Assigned(pszdn) then
-      try
-        DeleteChildren(pszdn, true);
-        if not Running then
-          Abort;
-        Exporting.Caption := pszdn;
-        Application.ProcessMessages;
-        if ModalResult <> mrNone then
-        begin
-          Running := false;
-          Abort;
-        end;
-        DeleteLeaf(pszdn, pld, plmEntry);
-      finally
-        ldap_memfree(pszdn);
+      if MessageBox(Handle, PChar(stDeleteAll), PChar(cConfirm), MB_YESNO + MB_ICONQUESTION) <> IDYES then
+        Abort;
+      Show;
+    end;
+    for i := 0 to EntryList.Count - 1 do with EntryList[i] do
+    begin
+      DeleteChildren(dn, true);
+      if not Running then
+        Abort;
+      Exporting.Caption := dn;
+      Application.ProcessMessages;
+      if ModalResult <> mrNone then
+      begin
+        Running := false;
+        Abort;
       end;
-
-      plmEntry := ldap_next_entry(pld, plmEntry);
+      Delete;
     end;
   finally
-    LDAPCheck(ldap_msgfree(plmSearch));
+    EntryList.Free;
   end;
 end;
 
@@ -257,7 +215,6 @@ end;
 procedure TLdapOpDlg.CopyTree(const dn, pdn, rdn: string);
 begin
   Message.Caption := cCopying;
-  //Show;
   Running := true;
   Copy(dn, pdn, rdn, false);
 end;
@@ -267,28 +224,28 @@ begin
   if System.Copy(pdn, Pos(dn, pdn), Length(pdn)) = dn then
     raise Exception.Create(stMoveOverlap);
   Message.Caption := cMoving;
-  //Show;
   Running := true;
   Copy(dn, pdn, rdn, true);
   if Running then // if not interrupted by user
-    LdapCheck(ldap_delete_s(SourceSession.pld, PChar(dn)));
+    SourceSession.DeleteEntry(dn);
 end;
 
 procedure TLdapOpDlg.DeleteTree(const adn: string);
 var
-  attrs: PCharArray;
-  plmEntry: PLDAPMessage;
+  Entry: TLdapEntry;
 begin
   Message.Caption := cDeleting;
   Running := true;
   DeleteChildren(adn, false);
   if Running then
   begin
-    SetLength(attrs, 2);
-    attrs[0] := 'objectclass';
-    attrs[1] := nil;
-    LdapCheck(ldap_search_s(SourceSession.pld, PChar(adn), LDAP_SCOPE_BASE, PChar(sANYCLASS), PChar(attrs), 0, plmEntry));
-    DeleteLeaf(PChar(adn), SourceSession.pld, plmEntry);
+    Entry := TLdapEntry.Create(SourceSession, adn);
+    try
+      Entry.Read;
+      DeleteLeaf(Entry);
+    finally
+      Entry.Free;
+    end;
   end;
 end;
 

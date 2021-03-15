@@ -173,7 +173,6 @@ begin
     DomList := TDomainList.Create(Session);
     with cbDomain do
     begin
-      Items.Add(cSamba2Accnt);
       for i := 0 to DomList.Count - 1 do
         Items.Add(DomList.Items[i].DomainName);
       ItemIndex := Items.IndexOf(Account.SambaDomainName);

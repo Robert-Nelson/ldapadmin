@@ -197,9 +197,9 @@ object AboutDlg: TAboutDlg
     object Label5: TLabel
       Left = 72
       Top = 24
-      Width = 30
+      Width = 37
       Height = 13
-      Caption = '0.9.7'
+      Caption = '0.9.84'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
@@ -240,7 +240,7 @@ object AboutDlg: TAboutDlg
       Top = 112
       Width = 144
       Height = 13
-      Caption = '(c) 2003-2004 Tihomir Karlovic'
+      Caption = '(c) 2003-2005 Tihomir Karlovic'
     end
   end
   object BtnClose: TButton

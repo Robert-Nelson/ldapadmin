@@ -30,31 +30,26 @@ uses
 type
   THostDlg = class(TForm)
     NameLabel: TLabel;
-    _cn: TEdit;
+    cn: TEdit;
     GroupBox1: TGroupBox;
     OKBtn: TButton;
     CancelBtn: TButton;
     ipHostNumber: TEdit;
     IPLabel: TLabel;
-    cn: TListBox;
+    cnList: TListBox;
     AddHostBtn: TButton;
     EditHostBtn: TButton;
     DelHostBtn: TButton;
-    UpBtn: TButton;
-    DownBtn: TButton;
     description: TEdit;
     Label2: TLabel;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure AddHostBtnClick(Sender: TObject);
     procedure EditHostBtnClick(Sender: TObject);
     procedure DelHostBtnClick(Sender: TObject);
-    procedure UpBtnClick(Sender: TObject);
-    procedure DownBtnClick(Sender: TObject);
-    procedure cnClick(Sender: TObject);
+    procedure cnListClick(Sender: TObject);
+    procedure EditChange(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
-    dn: string;
-    Session: TLDAPSession;
-    EditMode: TEditMode;
     Entry: TLDAPEntry;
     procedure Save;
   public
@@ -73,104 +68,51 @@ uses WinLDAP, Input;
 {$R *.DFM}
 
 procedure THostDlg.Save;
-var
-  C, Mode: Integer;
-
-  procedure AddModEntry(Entry: TLDAPEntry; Name, Value: String; Modified: boolean = true);
-  begin
-    if EditMode = EM_ADD then
-    begin
-      if Value <> '' then
-        Entry.AddAttr(Name, Value, LDAP_MOD_ADD);
-    end
-    else
-      if Modified then
-      begin
-        if Value = '' then
-          Mode := LDAP_MOD_DELETE
-        else
-          Mode := LDAP_MOD_REPLACE;
-
-        Entry.AddAttr(Name, Value, Mode)
-       end;
-  end;
-
 begin
-  if _cn.Text = '' then
-    raise Exception.Create(Format(stReqNoEmpty, [NameLabel.Caption]));
+  if cn.Text = '' then
+    raise Exception.Create(Format(stReqNoEmpty, [cName]));
   if ipHostNumber.Text = '' then
-    raise Exception.Create(Format(stReqNoEmpty, [IPLabel.Caption]));
-
-  try
-    if EditMode = EM_ADD then
-    begin
-      Entry := TLDAPEntry.Create(Session, 'cn=' + _cn.Text + ',' + dn);
-      Entry.AddAttr('objectclass', 'top', LDAP_MOD_ADD);
-      Entry.AddAttr('objectclass', 'device', LDAP_MOD_ADD);
-      Entry.AddAttr('objectclass', 'ipHost', LDAP_MOD_ADD);
-//      Entry.AddAttr('cn', _cn.Text, LDAP_MOD_ADD);
-    end;
-
-    AddModEntry(Entry, 'ipHostNumber', ipHostNumber.Text, ipHostNumber.Modified);
-    AddModEntry(Entry, 'description', description.Text, description.Modified);
-
-    if cn.Tag = 1 then
-    begin
-      AddModEntry(Entry, 'cn', _cn.Text);
-
-      for C := 0 to cn.Items.Count - 1 do
-        if cn.Items[C] <> '' then
-          AddModEntry(Entry, 'cn', cn.Items[C]);
-    end;
-
-    if EditMode = EM_ADD then
-      Entry.New
-    else
-      Entry.Modify;
-  except
-    raise;
+    raise Exception.Create(Format(stReqNoEmpty, [cIpAddress]));
+  if esNew in Entry.State then
+  begin
+    Entry.dn := 'cn=' + cn.Text + ',' + Entry.dn;
+    Entry.AttributesByName['cn'].AddValue(cn.Text);
   end;
+  Entry.Write;
 end;
 
 
 constructor THostDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
 var
-  I, C: Integer;
-  attrName, attrValue: string;
+  i: Integer;
+  attrValue: string;
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  Self.Session := Session;
-  EditMode := Mode;
-  if EditMode = EM_MODIFY then
+  Entry := TLDAPEntry.Create(Session, dn);
+  if Mode = EM_MODIFY then
   begin
-    _cn.Enabled := False;
-    _cn.text := Session.GetNameFromDN(dn);
-    Caption := Format(cPropertiesOf, [_cn.Text]);
-    Entry := TLDAPEntry.Create(Session, dn);
     Entry.Read;
-
-    for I := 0 to Entry.Items.Count - 1 do
+    cn.Enabled := False;
+    cn.Text := GetNameFromDn(dn);
+    Caption := Format(cPropertiesOf, [cn.Text]);
+    ipHostNumber.Text := Entry.AttributesByName['iphostnumber'].AsString;
+    description.Text := Entry.AttributesByName['description'].AsString;
+    with Entry.AttributesByName['cn'] do
+    for i := 0 to ValueCount - 1 do
     begin
-      attrName := lowercase(Entry.Items[i]);
-      attrValue := PChar(Entry.Items.Objects[i]);
-      for C := 0 to ComponentCount - 1 do
-      begin
-        if AnsiStrIComp(PChar(Components[C].Name), PChar(attrName)) = 0 then
-        begin
-          if Components[C] is TListBox then
-          begin
-            if attrValue <> _cn.Text then
-              TListBox(Components[C]).Items.Add(attrValue);
-          end
-          else
-            TEdit(Components[C]).Text := attrValue;
-        end;
-      end;
+      attrValue := Values[i].AsString;
+      if CompareText(attrValue, cn.Text) <> 0 then
+        cnList.Items.Add(attrValue);
     end;
   end
-  else
-    cn.Tag := 1;
+  else begin
+    with Entry.Attributes.Add('objectclass') do
+    begin
+      AddValue('top');
+      AddValue('device');
+      AddValue('ipHost');
+    end;
+  end;
 end;
 
 procedure THostDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -182,11 +124,9 @@ end;
 
 procedure THostDlg.HostButtons(Enable: Boolean);
 begin
-  Enable := Enable and (cn.ItemIndex > -1);
+  Enable := Enable and (cnList.ItemIndex > -1);
   DelHostBtn.Enabled := Enable;
   EditHostBtn.Enabled := Enable;
-  UpBtn.Enabled := Enable;
-  DownBtn.Enabled := Enable;
 end;
 
 procedure THostDlg.AddHostBtnClick(Sender: TObject);
@@ -196,8 +136,8 @@ begin
   s := '';
   if InputDlg(cAddHost, cHostName, s) and (s <> '') then
   begin
-    cn.Items.Add(s);
-    cn.tag := 1;
+    Entry.AttributesByName['cn'].AddValue(s);
+    cnList.Items.Add(s);
     HostButtons(true);
   end;
 end;
@@ -206,11 +146,12 @@ procedure THostDlg.EditHostBtnClick(Sender: TObject);
 var
   s: string;
 begin
-  s := cn.Items[cn.ItemIndex];
+  s := cnList.Items[cnList.ItemIndex];
   if InputDlg(cEditHost, cHostName, s) then
   begin
-    cn.Items[cn.ItemIndex] := s;
-    cn.tag := 1;
+    with Entry.AttributesByName['cn'] do
+      Values[IndexOf(cnList.Items[cnList.ItemIndex])].AsString := s;
+    cnList.Items[cnList.ItemIndex] := s;
   end;
 end;
 
@@ -218,8 +159,9 @@ procedure THostDlg.DelHostBtnClick(Sender: TObject);
 var
   idx: Integer;
 begin
-  with cn do begin
+  with cnList do begin
     idx := ItemIndex;
+    Entry.AttributesByName['cn'].DeleteValue(Items[idx]);
     Items.Delete(idx);
     if idx < Items.Count then
       ItemIndex := idx
@@ -231,39 +173,20 @@ begin
   end;
 end;
 
-procedure THostDlg.UpBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with cn do begin
-    idx := ItemIndex;
-    if idx > 0 then
-    begin
-      Items.Move(idx, idx - 1);
-      ItemIndex := idx - 1;
-    end;
-    Tag := 1;
-  end;
-end;
-
-procedure THostDlg.DownBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with cn do begin
-    idx := ItemIndex;
-    if idx < Items.Count - 1 then
-    begin
-      Items.Move(idx, idx + 1);
-      ItemIndex := idx + 1;
-    end;
-    Tag := 1;
-  end;
-end;
-
-procedure THostDlg.cnClick(Sender: TObject);
+procedure THostDlg.cnListClick(Sender: TObject);
 begin
   HostButtons(true);
+end;
+
+procedure THostDlg.EditChange(Sender: TObject);
+begin
+  with Sender as TEdit do
+    Entry.AttributesByName[Name].AsString := Text;
+end;
+
+procedure THostDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
 end;
 
 end.

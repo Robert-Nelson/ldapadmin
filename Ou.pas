@@ -45,11 +45,10 @@ type
     OKBtn: TButton;
     CancelBtn: TButton;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormDestroy(Sender: TObject);
   private
-    dn: string;
-    Session: TLDAPSession;
-    EditMode: TEditMode;
     Entry: TLDAPEntry;
+    ParentDn: string;
     procedure Save;
   public
     constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
@@ -66,94 +65,61 @@ uses WinLDAP, Misc;
 
 procedure TOuDlg.Save;
 var
-  C, Mode: Integer;
+  C: Integer;
   Component: TComponent;
   s: string;
 begin
-
   if ou.Text = '' then
-    raise Exception.Create(Format(stReqNoEmpty, [NameLabel.Caption]));
+    raise Exception.Create(Format(stReqNoEmpty, [cName]));
 
-  try
-    if EditMode = EM_ADD then
+  if esNew in Entry.State then
+  begin
+    Entry.dn := 'ou=' + ou.Text + ',' + ParentDn;
+    with Entry.AttributesByName['objectclass'] do
     begin
-      Entry := TLDAPEntry.Create(Session, 'ou=' + ou.Text + ',' + dn);
-      Entry.AddAttr('objectclass', 'top', LDAP_MOD_ADD);
-      Entry.AddAttr('objectclass', 'organizationalUnit', LDAP_MOD_ADD);
-      Entry.AddAttr('ou', ou.Text, LDAP_MOD_ADD);
+      AddValue('top');
+      AddValue('organizationalUnit');
     end;
-
-    for C := 0 to GroupBox1.ControlCount - 1 do
-    begin
-      Component := GroupBox1.Controls[c];
-      if (Component is TCustomEdit) and (TCustomEdit(Component).Modified) then
-      begin
-        if Component is TMemo then
-          s := FormatMemoOutput(TMemo(Component).Text)
-        else
-          s := TEdit(Component).Text;
-        if EditMode = EM_ADD then
-        begin
-          if s <> '' then
-            Entry.AddAttr(Component.Name, s, LDAP_MOD_ADD);
-        end
-        else begin
-          if s = '' then
-            Mode := LDAP_MOD_DELETE
-          else
-            Mode := LDAP_MOD_REPLACE;
-          Entry.AddAttr(Component.Name, s, Mode)
-        end;
-      end;
-    end;
-
-    if EditMode = EM_ADD then
-      Entry.New
-    else
-      Entry.Modify;
-  except
-    {Entry.ClearAttrs;}
-    raise;
+    Entry.AttributesByName['ou'].AddValue(ou.Text);
   end;
 
+  for C := 0 to GroupBox1.ControlCount - 1 do
+  begin
+    Component := GroupBox1.Controls[c];
+    if (Component is TCustomEdit) and (TCustomEdit(Component).Modified) then
+    begin
+      if Component is TMemo then
+        s := FormatMemoOutput(TMemo(Component).Text)
+      else
+        s := TEdit(Component).Text;
+      Entry.AttributesByName[Component.Name].AsString := s;
+    end;
+  end;
+
+  Entry.Write;
 end;
 
 
 constructor TOuDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
 var
-  I, C: Integer;
-  attrName, attrValue: string;
+  C: Integer;
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  Self.Session := Session;
-  EditMode := Mode;
-  if EditMode = EM_MODIFY then
+  ParentDn := dn;
+  Entry := TLDAPEntry.Create(Session, dn);
+  if Mode = EM_MODIFY then
   begin
     ou.Enabled := False;
-    ou.text := Session.GetNameFromDN(dn);
+    ou.text := GetNameFromDn(dn);
     Caption := Format(cPropertiesOf, [ou.Text]);
-    Entry := TLDAPEntry.Create(Session, dn);
     Entry.Read;
-
-    for I := 0 to Entry.Items.Count - 1 do
+    for C := 0 to ComponentCount - 1 do
     begin
-      attrName := lowercase(Entry.Items[i]);
-      attrValue := PChar(Entry.Items.Objects[i]);
-      for C := 0 to ComponentCount - 1 do
-      begin
-        if AnsiStrIComp(PChar(Components[C].Name), PChar(attrName)) = 0 then
-        begin
-          if Components[C] is TMemo then
-            TMemo(Components[C]).Text := FormatMemoInput(attrValue)
-          else
-            TEdit(Components[C]).Text := attrValue;
-        end;
-      end;
+      if Components[C] is TEdit then with TEdit(Components[C]) do
+        Text := Entry.AttributesByName[Name].AsString;
     end;
-
+    postalAddress.Text := FormatMemoInput(Entry.AttributesByName['postalAddress'].AsString);
   end;
-
 end;
 
 procedure TOuDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -161,6 +127,11 @@ begin
   if ModalResult = mrOK then
     Save;
   Action := caFree;
+end;
+
+procedure TOuDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
 end;
 
 end.

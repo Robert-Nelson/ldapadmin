@@ -99,7 +99,7 @@ var
   v: string;
 begin
   inherited Create(AOwner);
-  Session.SplitRdn(Session.GetRdn(dn), RdnAttribute, v);
+  SplitRdn(GetRdnFromDn(dn), RdnAttribute, v);
   edName.Text := v;
   MainSessionIdx := cbConnections.Items.IndexOf(AccountName);
   if MainSessionIdx = -1 then

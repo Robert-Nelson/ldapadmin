@@ -1,5 +1,5 @@
   {      LDAPAdmin - Group.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -27,11 +27,6 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, RegAccnt, Constant;
 
-const
-
-  USR_ADD           =  1;
-  USR_DEL           = -1;
-
 type
   TGroupDlg = class(TForm)
     Label1: TLabel;
@@ -46,11 +41,6 @@ type
     AddUserBtn: TButton;
     RemoveUserBtn: TButton;
     TabSheet2: TTabSheet;
-    AddResBtn: TButton;
-    DelResBtn: TButton;
-    EditResBtn: TButton;
-    ResourceList: TListBox;
-    TabSheet3: TTabSheet;
     cbSambaDomain: TComboBox;
     Label3: TLabel;
     RadioGroup1: TRadioGroup;
@@ -65,12 +55,6 @@ type
     procedure AddUserBtnClick(Sender: TObject);
     procedure RemoveUserBtnClick(Sender: TObject);
     procedure UserListDeletion(Sender: TObject; Item: TListItem);
-    procedure edDescriptionChange(Sender: TObject);
-    procedure edNameChange(Sender: TObject);
-    procedure AddResBtnClick(Sender: TObject);
-    procedure EditResBtnClick(Sender: TObject);
-    procedure DelResBtnClick(Sender: TObject);
-    procedure ResourceListClick(Sender: TObject);
     procedure ListViewColumnClick(Sender: TObject; Column: TListColumn);
     procedure ListViewCompare(Sender: TObject; Item1, Item2: TListItem;
       Data: Integer; var Compare: Integer);
@@ -79,22 +63,27 @@ type
     procedure RadioGroup1Click(Sender: TObject);
     procedure cbBuiltinChange(Sender: TObject);
     procedure cbSambaGroupClick(Sender: TObject);
+    procedure edNameChange(Sender: TObject);
+    procedure edDescriptionChange(Sender: TObject);
+    procedure edDisplayNameChange(Sender: TObject);
+    procedure edRidChange(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
-    EditMode: TEditMode;
     ParentDn: string;
     Session: TLDAPSession;
     RegAccount: TAccountEntry;
-    Group: TPosixGroup;
-    IsSambaGroup, IsResourceGroup: Boolean;
+    Entry: TLdapEntry;
+    PosixGroup: TPosixGroup;
+    SambaGroup: TSamba3Group;
+    IsSambaGroup: Boolean;
     ColumnToSort: Integer;
     Descending: Boolean;
     DomList: TDomainList;
     procedure EnableControls(const Controls: array of TControl; Color: TColor; Enable: Boolean);
-    procedure EnableResButtons(Enable: Boolean);
     procedure Load;
     function FindDataString(dstr: PChar): Boolean;
     procedure Save;
-    function GroupType: Integer;
+    function GetGroupType: Integer;
   public
     constructor Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
@@ -130,86 +119,68 @@ begin
   end;
 end;
 
-procedure TGroupDlg.EnableResButtons(Enable: Boolean);
-begin
-  Enable := Enable and (ResourceList.ItemIndex > -1);
-  DelResBtn.Enabled := Enable;
-  EditResBtn.Enabled := Enable;
-end;
-
 { Note: Item.Caption = uid, Item.Data = dn }
 procedure TGroupDlg.Load;
 var
   ListItem: TListItem;
   i: Integer;
-  attrname: string;
 begin
-  Group.Read;
-  edName.Text := Group.Cn;
-  edDescription.Text := Group.Description;
-  for i := 0 to Group.Members.Count - 1 do
+  Entry.Read;
+  edName.Text := PosixGroup.Cn;
+  edDescription.Text := PosixGroup.Description;
+  for i := 0 to PosixGroup.MembersCount - 1 do
   begin
     ListItem := UserList.Items.Add;
-    ListItem.Caption := Group.Members[i];
+    ListItem.Caption := PosixGroup.Members[i];
     //ListItem.Data := StrNew(PChar(GetDirectory(Format(sACCNTBYUID, [PCharArray(ppcVals)[I]]))));
-    ListItem.Data := StrNew(PChar(Session.GetDN(Format(sACCNTBYUID, [Group.Members[i]]))));
-    ListItem.SubItems.Add(Session.CanonicalName(Session.GetDirFromDN(PChar(ListItem.Data))));
+    ListItem.Data := StrNew(PChar(Session.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
+    ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
   end;
   if UserList.Items.Count > 0 then
     RemoveUserBtn.Enabled := true;
-  for i := 0 to Group.Items.Count - 1 do //TODO: ResourceObject
-  begin
-    attrname := lowercase(Group.Items[i]);
-    if attrname = 'resource' then
-      ResourceList.Items.Add(PChar(Group.Items.Objects[i]))
-    else
-    if (attrname = 'objectclass') and (lowercase(PChar(Group.Items.Objects[i])) = 'sambagroupmapping') then
-      IsSambaGroup := true;
-  end;
+  IsSambaGroup := Entry.AttributesByName['objectclass'].IndexOf('sambagroupmapping') <> -1;
 end;
 
 constructor TGroupDlg.Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode);
 var
-  Temp: TPosixGroup;
   n: Integer;
 begin
   inherited Create(AOwner);
   ParentDn := dn;
   Self.Session := Session;
   Self.RegAccount := RegAccount;
-  EditMode := Mode;
-  Group := TPosixGroup.Create(Session, dn);
-  if EditMode = EM_MODIFY then
+  Entry := TLdapEntry.Create(Session, dn);
+  PosixGroup := TPosixGroup.Create(Entry);
+  if Mode = EM_MODIFY then
   begin
     Load;
     if IsSambaGroup then
     begin
-      Temp := Group;
-      Group := TSamba3Group.Copy(Temp);
-      Temp.Free;
+      //SambaGroup := TSamba3Group.Create(Entry); -> happens in cbSambaGroupOnCheck
       cbSambaGroup.Checked := true;
       with RadioGroup1 do
-      case TSamba3Group(Group).GroupType of
+      case SambaGroup.GroupType of
         2: ItemIndex := 0;
         4: ItemIndex := 1;
         5: begin
              ItemIndex := 2;
-             n := StrToInt(TSamba3Group(Group).Rid) - 512;
+             n := StrToInt(SambaGroup.Rid) - 512;
              if (n >=0) and (n < cbBuiltin.Items.Count) then
                cbBuiltin.ItemIndex := n
              else
                cbBuiltin.ItemIndex := -1;
            end;
-
       end;
-      edRid.Text := TSamba3Group(Group).Rid;
-      edDisplayName.Text := TSamba3Group(Group).DisplayName;
+      edRid.Text := SambaGroup.Rid;
+      edRid.Enabled := false;
+      edDisplayName.Text := SambaGroup.DisplayName;
     end;
     edName.Enabled := false;
     Caption := Format(cPropertiesOf, [edName.Text]);
     UserList.AlphaSort;
-  end;
-  IsResourceGroup := ResourceList.Items.Count > 0;
+  end
+  else
+    PosixGroup.New;
 end;
 
 procedure TGroupDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -220,87 +191,17 @@ begin
 end;
 
 procedure TGroupDlg.Save;
-var
-  i: Integer;
-  Temp: TPosixGroup;
-  arid: string;
 begin
-
-  if edName.Text = '' then
+  if edName.Text = '' then //TODO: Need this?
     raise Exception.Create(stGroupNameReq);
-
-  try
-    with Group do
-    begin
-      Cn := edName.Text;
-      if EditMode = EM_ADD then
-      begin
-        dn := PChar('cn=' + edName.Text + ',' + ParentDn);
-        Description := edDescription.Text;
-        GidNumber := Session.GetFreeGidNumber(RegAccount.posixFirstGid, RegAccount.posixLastGID);
-      end;
-    end;
-
-    if cbSambaGroup.Checked then
-    begin
-      if not IsSambaGroup then
-      begin
-        if cbSambaDomain.ItemIndex = -1 then
-          raise Exception.Create(stSmbDomainReq);
-        Temp := Group;
-        Group := TSamba3Group.Copy(Temp);
-        Temp.Free;
-        with TSamba3Group(Group) do
-        begin
-          if EditMode = EM_MODIFY then
-            Add;
-          if edDisplayName.Text <> '' then
-            DisplayName := edDisplayName.Text
-          else
-            DisplayName := CN;
-          GroupType := Self.GroupType;
-          arid := edRid.Text;
-          if arid = '' then
-            arid := IntToStr(2 * Group.gidNumber + DomList.Items[cbSambaDomain.ItemIndex].AlgorithmicRIDBase + 1);
-          Sid := Format('%s-%s', [DomList.Items[cbSambaDomain.ItemIndex].SID, arid])
-        end;
-      end;
-    end
-    else
-    if IsSambaGroup then
-       TSamba3Group(Group).Remove;
-
-    with Group do
-    begin
-
-      // Handle Resources
-      if ResourceList.Tag = 1 then with ResourceList do
-      begin
-        // First delete all attributes/value pairs
-        if IsResourceGroup then
-          AddAttr('resource', '', LDAP_MOD_DELETE);
-        if Items.Count > 0 then
-        begin
-          if not IsResourceGroup then
-            AddAttr('objectclass', 'resourceObject', LDAP_MOD_ADD);
-          for i := 0 to ResourceList.Items.Count - 1 do
-            AddAttr('resource', ResourceList.Items[i], LDAP_MOD_ADD);
-        end
-        else
-        if IsResourceGroup then
-          AddAttr('objectclass', 'resourceObject', LDAP_MOD_DELETE);
-      end;
-
-      if EditMode = EM_ADD then
-        New
-      else
-        Modify;
-    end;
-  except
-    Group.ClearAttrs;
-    raise;
+  if cbSambaGroup.Checked and Assigned(DomList) and (cbSambaDomain.ItemIndex = -1) then
+    raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
+  if esNew in Entry.State then
+  begin
+    PosixGroup.GidNumber := Session.GetFreeGidNumber(RegAccount.posixFirstGid, RegAccount.posixLastGID);
+    edRidChange(nil);  // Update sambaSid
   end;
-
+  Entry.Write;
 end;
 
 function TGroupDlg.FindDataString(dstr: PChar): Boolean;
@@ -334,8 +235,8 @@ begin
           UserItem := UserList.Items.Add;
           UserItem.Caption := SelItem.Caption;
           UserItem.Data := StrNew(SelItem.Data);
-          UserItem.SubItems.Add(Session.CanonicalName(Session.GetDirFromDN(PChar(SelItem.Data))));
-          Group.AddMember(Session.GetNameFromDN(PChar(SelItem.Data)));
+          UserItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(SelItem.Data))));
+          PosixGroup.AddMember(GetNameFromDN(PChar(SelItem.Data)));
         end;
         SelItem := GetNextItem(SelItem, sdAll, [isSelected]);
       end;
@@ -359,7 +260,7 @@ begin
     idx := Selected.Index;
     dn := PChar(Selected.Data);
     Selected.Delete;
-    Group.RemoveMember(Session.GetNameFromDN(dn));
+    PosixGroup.RemoveMember(GetNameFromDN(dn));
     OkBtn.Enabled := true;
     if idx = Items.Count then
       Dec(idx);
@@ -374,63 +275,6 @@ procedure TGroupDlg.UserListDeletion(Sender: TObject; Item: TListItem);
 begin
   if Assigned(Item.Data) then
     StrDispose(Item.Data);
-end;
-
-procedure TGroupDlg.edDescriptionChange(Sender: TObject);
-begin
-  OkBtn.Enabled := true;
-end;
-
-procedure TGroupDlg.edNameChange(Sender: TObject);
-begin
-  OkBtn.Enabled := edName.Text <> '';
-end;
-
-procedure TGroupDlg.AddResBtnClick(Sender: TObject);
-var
-  s: string;
-begin
-  s := '';
-  if InputDlg(cNewResource, cResource, s) then
-  begin
-    ResourceList.Items.Add(s);
-    ResourceList.tag := 1;
-    EnableResButtons(true);
-  end;
-end;
-
-procedure TGroupDlg.EditResBtnClick(Sender: TObject);
-var
-  s: string;
-begin
-  s := ResourceList.Items[ResourceList.ItemIndex];
-  if InputDlg(cEditResource, cResource, s) then
-  begin
-    ResourceList.Items[ResourceList.ItemIndex] := s;
-    ResourceList.tag := 1;
-  end;
-end;
-
-procedure TGroupDlg.DelResBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with ResourceList do begin
-    idx := ItemIndex;
-    Items.Delete(idx);
-    if idx < Items.Count then
-      ItemIndex := idx
-    else
-      ItemIndex := Items.Count - 1;
-    Tag := 1;
-    if Items.Count = 0 then
-      EnableResButtons(false);
-  end;
-end;
-
-procedure TGroupDlg.ResourceListClick(Sender: TObject);
-begin
-  EnableResButtons(true);
 end;
 
 procedure TGroupDlg.ListViewColumnClick(Sender: TObject; Column: TListColumn);
@@ -475,13 +319,13 @@ begin
     DomList := TDomainList.Create(Session);
     with cbSambaDomain do
     begin
-      if (Group is TSamba3Group) and (EditMode = EM_MODIFY) then
+      if Assigned(SambaGroup) and not (esNew in Entry.State) then
       begin
         if RadioGroup1.ItemIndex = 2 then
           EnableControls([cbBuiltin], clWindow, false);
         i := DomList.Count - 1;
         while (i >= 0) do begin
-          if (Group as TSamba3Group).DomainSid = DomList.Items[i].SID then
+          if SambaGroup.DomainSid = DomList.Items[i].SID then
           begin
             Items.Add(DomList.Items[i].DomainName);
             ItemIndex := 0;
@@ -509,12 +353,13 @@ procedure TGroupDlg.cbSambaDomainChange(Sender: TObject);
 var
   AlgRidBase: Integer;
 begin
-  if (Group.gidNumber <> 0) and (cbSambaDomain.ItemIndex <> -1) then
+  if (PosixGroup.gidNumber <> 0) and (cbSambaDomain.ItemIndex <> -1) then
   begin
+    RadioGroup1.Enabled := true;
     if cbBuiltin.ItemIndex = -1 then
     begin
       AlgRidBase := DomList.Items[cbSambaDomain.ItemIndex].AlgorithmicRIDBase + 1;
-      edRid.Text := IntToStr(2 * Group.gidNumber + AlgRidBase);
+      edRid.Text := IntToStr(2 * PosixGroup.gidNumber + AlgRidBase);
     end;
   end
   else
@@ -536,7 +381,7 @@ begin
     cbBuiltin.ItemIndex := -1;
     cbSambaDomainChange(nil); // Refresh RID
   end;
-
+  SambaGroup.GroupType := GetGroupType;
 end;
 
 procedure TGroupDlg.cbBuiltinChange(Sender: TObject);
@@ -545,7 +390,7 @@ begin
     edRid.Text := IntToStr(WKRids[cbBuiltin.ItemIndex + 2]);
 end;
 
-function TGroupDlg.GroupType: Integer;
+function TGroupDlg.GetGroupType: Integer;
 begin
   case RadioGroup1.ItemIndex of
     1: Result := 4;
@@ -562,21 +407,75 @@ var
 begin
   if cbSambaGroup.Checked then
   begin
+    SambaGroup := TSamba3Group.Create(Entry);
+    if not SambaGroup.Activated then
+      SambaGroup.New;
     Color := clWindow;
     Enable := not IsSambaGroup;
   end
   else begin
+    RadioGroup1.ItemIndex := 0;
+    SambaGroup.Remove;
+    IsSambaGroup := false;
+    FreeAndNil(SambaGroup);
+    cbSambaDomain.ItemIndex := -1;
+    edDisplayName.Text := '';
+    edRid.Text := '';
     Color := clBtnFace;
     Enable := false;
   end;
-  EnableControls([edDisplayName, cbSambaDomain, edRid, RadioGroup1], Color, Enable);
+  RadioGroup1.Enabled := false;
+  EnableControls([edDisplayName, cbSambaDomain, edRid], Color, Enable);
   if RadioGroup1.ItemIndex = 2 then
     cbBuiltin.Color := Color;
-  if not (Group is TSamba3Group) then
+  if Assigned(SambaGroup) then
   begin
-    edDisplayName.Text := Group.Cn;
+    if edDisplayName.Text = '' then
+      edDisplayName.Text := PosixGroup.Cn;
     cbSambaDomainChange(nil); // Refresh Rid
   end;
 end;
-        
+
+procedure TGroupDlg.edNameChange(Sender: TObject);
+begin
+  if esNew in Entry.State then
+    Entry.Dn := 'cn=' + edName.Text + ',' + ParentDn;
+  PosixGroup.Cn := edName.Text;
+  OkBtn.Enabled := edName.Text <> '';
+end;
+
+procedure TGroupDlg.edDescriptionChange(Sender: TObject);
+begin
+  PosixGroup.Description := edDescription.Text;
+  OkBtn.Enabled := edName.Text <> '';
+end;
+
+procedure TGroupDlg.edDisplayNameChange(Sender: TObject);
+begin
+  if Assigned(SambaGroup) then
+  begin
+    SambaGroup.DisplayName := edDisplayName.Text;
+    OkBtn.Enabled := edName.Text <> '';
+  end;
+end;
+
+procedure TGroupDlg.edRidChange(Sender: TObject);
+var
+  arid: string;
+begin
+  if Assigned(SambaGroup) and Assigned(DomList) then
+  begin
+    arid := edRid.Text;
+    if arid = '' then
+      arid := IntToStr(2 * PosixGroup.gidNumber + DomList.Items[cbSambaDomain.ItemIndex].AlgorithmicRIDBase + 1);
+    SambaGroup.Sid := Format('%s-%s', [DomList.Items[cbSambaDomain.ItemIndex].SID, arid]);
+    OkBtn.Enabled := edName.Text <> '';
+  end;
+end;
+
+procedure TGroupDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
+end;
+
 end.

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Export.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -100,67 +100,29 @@ end;
 
 function TExportDlg.DumpTree(const Filter: string): Integer;
 var
-  plmSearch, plmEntry: PLDAPMessage;
-  pld: PLDAP;
-  attrs: PCharArray;
-  pszdn: PChar;
-  Entry: TLDAPEntry;
+  EntryList: TLdapEntryList;
   ldif: TLDIFFile;
-
+  i: Integer;
 begin
-
   ldif := TLDIFFile.Create(edFileName.Text, fmWrite);
-
   try
-
-  // set result to objectclass only
-  SetLength(attrs, 2);
-  attrs[0] := 'objectclass';
-  attrs[1] := nil;
-  pld := Session.pld;
-  LdapCheck(ldap_search_s(pld, PChar(dn), LDAP_SCOPE_SUBTREE, PChar(Filter), PChar(attrs), 0, plmSearch));
-
-  try
-
-    Result := 0;
-    plmEntry := ldap_first_entry(pld, plmSearch);
-
-    ProgressBar.Max := ldap_count_entries(pld, plmSearch);
-
-    while Assigned(plmEntry) do
-    begin
-
-      pszdn := ldap_get_dn(pld, plmEntry);
-
-      if Assigned(pszdn) then
-      try
-        Entry := TLDAPEntry.Create(Session, pszdn);
-        try
-          Entry.Read;
-          ldif.dn := Entry.dn;
-          ldif.WriteRecord(Entry.Items);
-        finally
-          Entry.Free;
-        end;
-      finally
-        ldap_memfree(pszdn);
+    EntryList := TLdapEntryList.Create;
+    try
+      Session.Search(Filter, dn, LDAP_SCOPE_SUBTREE, nil, false, EntryList);
+      ProgressBar.Max := EntryList.Count;
+      Result := 0;
+      for i := 0 to EntryList.Count - 1 do
+      begin
+        ldif.WriteRecord(EntryList[i]);
+        inc(Result);
+        ProgressBar.StepIt;
       end;
-
-      inc(Result);
-      ProgressBar.StepIt;
-
-      plmEntry := ldap_next_entry(pld, plmEntry);
-
+    finally
+      EntryList.Free;
     end;
-  finally
-    // free search results
-    LDAPCheck(ldap_msgfree(plmSearch));
-  end;
-
   finally
     ldif.Free;
   end;
-
 end;
 
 

@@ -1,5 +1,5 @@
   {      LDAPAdmin - EditEntry.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -26,10 +26,11 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, WinLDAP, Grids, ToolWin, LDAPClasses, Constant,
-  Menus, ImgList;
+  Menus, ImgList, ActnList;
 
 const
-  cNewRow = Pointer(-1);
+  cBinary = Pointer(-1);
+  sBinary = '*BINARY**BINARY**BINARY**BINARY**BINARY**BINARY**BINARY**BINARY**BINARY**BINARY**BINARY**BINARY*...';
 
 type
   TEditEntryFrm = class(TForm)
@@ -66,6 +67,40 @@ type
     PasteBtn: TToolButton;
     DeleteBtn: TToolButton;
     ToolButton8: TToolButton;
+    PopupMenu1: TPopupMenu;
+    mbInsertRow1: TMenuItem;
+    mbDeleteRow1: TMenuItem;
+    N4: TMenuItem;
+    mbRestore1: TMenuItem;
+    mbCut1: TMenuItem;
+    mbCopy1: TMenuItem;
+    mbPaste1: TMenuItem;
+    mbDelete1: TMenuItem;
+    N3: TMenuItem;
+    mbLoadFromFile: TMenuItem;
+    mbSaveToFile: TMenuItem;
+    mbViewBinary: TMenuItem;
+    N5: TMenuItem;
+    OpenFileDialog: TOpenDialog;
+    SaveFileDialog: TSaveDialog;
+    N8: TMenuItem;
+    mbLoadFromFile1: TMenuItem;
+    mbSaveToFile1: TMenuItem;
+    N9: TMenuItem;
+    mbViewBinary1: TMenuItem;
+    ActionList1: TActionList;
+    ActSave: TAction;
+    ActClose: TAction;
+    ActInsertRow: TAction;
+    ActDeleteRow: TAction;
+    ActUndo: TAction;
+    ActCut: TAction;
+    ActCopy: TAction;
+    ActPaste: TAction;
+    ActDelete: TAction;
+    ActLoadFile: TAction;
+    ActSaveFile: TAction;
+    ActBinView: TAction;
     procedure StringGridKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure StringGridSelectCell(Sender: TObject; ACol, ARow: Integer;
@@ -76,18 +111,27 @@ type
     procedure mbDeleteRowClick(Sender: TObject);
     procedure PushShortCutClick(Sender: TObject);
     procedure ToolBtnClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure StringGridSetEditText(Sender: TObject; ACol, ARow: Integer;
+      const Value: String);
+    procedure mbLoadFromFileClick(Sender: TObject);
+    procedure mbSaveToFileClick(Sender: TObject);
+    procedure mbViewBinaryClick(Sender: TObject);
+    procedure StringGridMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure StringGridEnter(Sender: TObject);
+    procedure ActionList1Update(Action: TBasicAction;
+      var Handled: Boolean);
   private
     Entry: TLDAPEntry;
-    fdn: string;
-    fSession: TLDAPSession;
-    EditMode: TEditMode;
     SaveVal: string;
-    procedure PushShortCut(Command: TMenuItem);
+    procedure SimulateCellClick(ACol, ARow: Integer);
+    procedure PushShortCut(Command: TAction);
     procedure AddRow;
     procedure InsertRow(Index: Integer);
     procedure DeleteRow(Index: Integer);
     procedure Load;
-    procedure Modify;
+    function NewValue(Attr: TLdapAttribute): TLdapAttributeData;
   public
     constructor Create(const AOwner: TComponent; const adn: string;
                        const ASession: TLDAPSession; const Mode: TEditMode); reintroduce; overload;
@@ -98,9 +142,39 @@ var
 
 implementation
 
+uses BinView, Misc, Main;
+
 {$R *.DFM}
 
-procedure TEditEntryFrm.PushShortCut(Command: TMenuItem);
+function IsString(s: string): Boolean;
+var
+  l: Cardinal;
+begin
+  l := Cardinal(Length(s));
+  Result := (l < Word(-1)) and (StrLen(PChar(s)) = l);
+end;
+
+procedure TEditEntryFrm.SimulateCellClick(ACol, ARow: Integer);
+var
+  Rect: TRect;
+  X, Y: Integer;
+  DeltaX, DeltaY: Double;
+begin
+  DeltaX := (65536.0 / Screen.Width);
+  DeltaY := (65536.0 / Screen.Height);
+  X := Round(Mouse.CursorPos.X * DeltaX);
+  Y := Round(Mouse.CursorPos.Y * DeltaY);
+  Rect := StringGrid.CellRect(ACol, ARow);
+  Rect.BottomRight := StringGrid.ClientToScreen(Rect.BottomRight);
+  Rect.BottomRight.x := Round((Rect.BottomRight.x - 1) * DeltaX);
+  Rect.BottomRight.y := Round((Rect.BottomRight.y - 1) * DeltaY);
+  mouse_event(MOUSEEVENTF_ABSOLUTE + MOUSEEVENTF_MOVE, Rect.Right, Rect.Bottom, 0, 0);
+  mouse_event(MOUSEEVENTF_LEFTDOWN + MOUSEEVENTF_ABSOLUTE, Rect.Right, Rect.Bottom, 0, 0);
+  mouse_event(MOUSEEVENTF_LEFTUP + MOUSEEVENTF_ABSOLUTE, Rect.Right, Rect.Bottom, 0, 0);
+  mouse_event(MOUSEEVENTF_ABSOLUTE + MOUSEEVENTF_MOVE, X, Y, 0, 0);
+end;
+
+procedure TEditEntryFrm.PushShortCut(Command: TAction);
 var
   vKey, shift: word;
   c: byte;
@@ -132,10 +206,7 @@ end;
 
 procedure TEditEntryFrm.AddRow;
 begin
-  with StringGrid do begin
-    RowCount := RowCount + 1;
-    Objects[0,RowCount - 1] := cNewRow;
-  end;
+  with StringGrid do RowCount := RowCount + 1;
 end;
 
 procedure TEditEntryFrm.InsertRow(Index: Integer);
@@ -145,11 +216,11 @@ begin
   with StringGrid do
   begin
     AddRow;
+    Col := 0;
     for i := RowCount downto row + 1 do
       Rows[i] := Rows[i-1];
     Rows[Row].Clear;
-    Objects[0,Row] := cNewRow;
-    Col := 0;
+    SetFocus;
   end;
 end;
 
@@ -159,12 +230,14 @@ var
 begin
   with StringGrid do
   begin
-    Rows[Row].Clear;
+    if Assigned(Objects[1, Index]) then
+      TLdapAttributeData(Objects[1, Index]).Delete;
+    Rows[Index].Clear;
     if RowCount > 2 then
     begin
-      for i := row to RowCount - 2 do
+      for i := Index to RowCount - 2 do
         Rows[i] := Rows[i+1];
-      if Row = RowCount - 1 then
+      if (Row = Index) and (Index = RowCount - 1) then
         Row := Row - 1;
       Rows[RowCount-1].Clear;
       RowCount := RowCount - 1;
@@ -177,9 +250,7 @@ constructor TEditEntryFrm.Create(const AOwner: TComponent; const adn: string;
                                  const ASession: TLDAPSession; const Mode: TEditMode);
 begin
   inherited Create(AOwner);
-  fdn := adn;
-  fSession := ASession;
-  EditMode := Mode;
+  Entry := TLDAPEntry.Create(ASession, adn);
   if Mode = EM_MODIFY then
   begin
     Caption := Format(cEditEntry, [adn]);
@@ -221,89 +292,78 @@ end;
 
 procedure TEditEntryFrm.Load;
 var
-  I: Integer;
+  i, j: Integer;
+  fItems: TStringList;
+  s: string;
 begin
-  Entry := TLDAPEntry.Create(fSession, fdn);
   Entry.Read;
-  Entry.Items.Sort;
+  fItems := TStringList.Create;
+  for i := 0 to Entry.Attributes.Count - 1 do with Entry.Attributes[i] do
+  for j := 0 to ValueCount - 1 do
+    fItems.AddObject(Name, Values[j]);
+  fItems.Sorted := true;
+
   with StringGrid do
   begin
     RowCount := 2;
     Rows[1].Clear;
-    for I := 0 to Entry.Items.Count - 1 do
+    for I := 0 to fItems.Count - 1 do
     begin
       if I = RowCount - 1 then
         RowCount := RowCount + 1;
-      Cells[0, I + 1] := Entry.Items[I];
-      Cells[1, I + 1] := PChar(Entry.Items.Objects[I]);
-      Objects[0, I + 1] := Pointer(I);
-    end;
-  end;
-end;
-
-procedure TEditEntryFrm.Modify;
-var
-  i, idx: Integer;
-begin
-  with StringGrid do
-  begin
-    Entry.ClearAttrs;
-    // First pass: handle replaced or deleted attribute/value pairs
-    idx := 0;
-    for i := 1 to RowCount - 1 do
-    begin
-      if (Objects[0, i] <> cNewRow) and (Cells[0, i] <> '') then
+      Cells[0, I + 1] := fItems[I];
+      s := TLdapAttributeData(fItems.Objects[I]).AsString;
+      if IsString(s) then
+        Cells[1, I + 1] := s
+      else
       begin
-        while (Integer(Objects[0, i]) <> idx) and (idx < Entry.Items.Count - 1) do
-        begin
-          Entry.AddAttr(Entry.Items[idx], PChar(Entry.Items.Objects[idx]), LDAP_MOD_DELETE);
-          inc(idx);
-          Objects[0, i] := Pointer(idx);
-        end;
-        if AnsiStrIComp(PChar(Cells[0, i]), PChar(Entry.Items[idx])) <> 0 then
-        begin
-          Entry.AddAttr(Entry.Items[idx], PChar(Entry.Items.Objects[idx]), LDAP_MOD_DELETE);
-          Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_ADD);
-        end;
-        inc(idx)
+        Objects[0, I + 1] := cBinary;
+        Cells[1, I + 1] := sBinary;
       end;
+      Objects[1, I + 1] := fItems.Objects[I];
     end;
-    // Second pass: handle modified attributes
-    for i := 1 to RowCount - 1 do
-    begin
-      if (Objects[0, i] <> cNewRow) and (Cells[0, i] <> '') then
-        Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_REPLACE)
-    end;
-    // Third pass: handle added attributes
-    for i := 1 to RowCount - 1 do
-      if (Objects[0, i] = cNewRow) and (Cells[0, i] <> '') then
-        Entry.AddAttr(Cells[0, i], Cells[1, i], LDAP_MOD_ADD);
-
-    Entry.Modify;
   end;
-
+  fItems.Free;
 end;
 
+{ Yet again workaround for to attributes with no equality matching rule }
+function TEditEntryFrm.NewValue(Attr: TLdapAttribute): TLdapAttributeData;
+begin
+  if (Attr.ValueCount = 1) and (Attr.Values[0].ModOp = LdapOpDelete) then
+    Result := Attr.Values[0]
+  else
+    Result := Attr.AddValue;
+end;
 
 procedure TEditEntryFrm.StringGridSelectCell(Sender: TObject; ACol, ARow: Integer; var CanSelect: Boolean);
 begin
-  SaveVal := StringGrid.Cells[ACol, ARow];
+  with StringGrid do
+  begin
+    if (ACol = 1) and (Cells[0, ARow] = '') then
+    begin
+      CanSelect := false;
+      exit;
+    end;
+    SimulateCellClick(ACol, ARow);
+    SaveVal := StringGrid.Cells[ACol, ARow];
+    if ((ACol = 0 ) and (Cells[0, ARow] = '')) or ((ACol = 1) and (Objects[0, ARow] <> cBinary)) then
+      Options := Options + [goEditing]
+    else
+      Options := StringGrid.Options - [goEditing];
+  end;
 end;
 
 procedure TEditEntryFrm.mbSaveClick(Sender: TObject);
-var
-  i: Integer;
 begin
-  if EditMode = EM_ADD then
-  begin
-    Entry := TLDAPEntry.Create(fSession, EditDN.Text);
-    for i := 1 to StringGrid.RowCount - 1 do
-      Entry.AddAttr(StringGrid.Cells[0, i], StringGrid.Cells[1, i], LDAP_MOD_ADD);
-    Entry.New;
-  end
-  else
-    Modify;
+  if esNew in Entry.State then
+    Entry.Dn := EditDn.Text;
+  Entry.Write;
   Close;
+  with MainFrm, LdapTree do
+  begin
+    if Assigned(Selected) and (PChar(Selected.Data) = Entry.dn) then
+      LDAPTreeChange(nil, LDAPTree.Selected);
+  end;
 end;
 
 procedure TEditEntryFrm.mbExitClick(Sender: TObject);
@@ -323,25 +383,160 @@ end;
 
 procedure TEditEntryFrm.PushShortCutClick(Sender: TObject);
 begin
-  PushShortCut(Sender as TMenuItem);
+  PushShortCut(Sender as TAction);
 end;
 
 procedure TEditEntryFrm.ToolBtnClick(Sender: TObject);
 begin
   if Sender = UndoBtn then
-    PushShortcut(mbRestore)
+    PushShortcut(ActUndo)
   else
   if Sender = CutBtn then
-    PushShortcut(mbCut)
+    PushShortcut(ActCut)
   else
   if Sender = CopyBtn then
-    PushShortcut(mbCopy)
+    PushShortcut(ActCopy)
   else
   if Sender = PasteBtn then
-    PushShortcut(mbPaste)
+    PushShortcut(ActPaste)
   else
   if Sender = DeleteBtn then
-    PushShortcut(mbDelete)
+    PushShortcut(ActDelete)
+end;
+
+procedure TEditEntryFrm.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
+end;
+
+procedure TEditEntryFrm.StringGridSetEditText(Sender: TObject; ACol, ARow: Integer; const Value: String);
+begin
+  if (ACol = 1) and (Value <> '') then with StringGrid do
+  begin
+    if not Assigned(Objects[ACol, ARow]) then
+    begin
+      //Objects[ACol, ARow] := Entry.AttributesByName[Cells[0, ARow]].AddValue;
+      Objects[ACol, ARow] := NewValue(Entry.AttributesByName[Cells[0, ARow]]);
+      { Object assign invalidates cell causing the inplace editor to select the text.
+        Since we have no access to inplace editor to unselect or prevent selecting
+        we simulate a mouseclick which will unselect the text automatically }
+      SimulateCellClick(ACol, ARow);
+    end;
+    if Objects[0, ARow] <> cBinary then
+      TLdapAttributeData(Objects[ACol, ARow]).AsString := Value;
+  end;
+end;
+
+procedure TEditEntryFrm.mbLoadFromFileClick(Sender: TObject);
+var
+  FileStream: TFileStream;
+  s: string;
+begin
+  if not OpenFileDialog.Execute then Exit;
+  FileStream := TFileStream.Create(OpenFileDialog.FileName, fmOpenRead);
+  with StringGrid do
+  try
+    if Cells[0, Row] <> '' then
+    begin
+      if not Assigned(Objects[1, Row]) then
+        //Objects[1, Row] := Entry.AttributesByName[Cells[0, Row]].AddValue;
+        Objects[1, Row] := NewValue(Entry.AttributesByName[Cells[0, Row]]);
+      FileStream.Position := 0;
+      TLdapAttributeData(Objects[1, Row]).LoadFromStream(FileStream);
+      s := TLdapAttributeData(Objects[1, Row]).AsString;
+      if IsString(s) then
+        Cells[1, Row] := s
+      else begin
+        Objects[0, Row] := cBinary;
+        Cells[1, Row] := sBinary;
+        Col := 0;
+      end;
+    end;
+  finally
+    FileStream.Free;
+  end;
+end;
+
+procedure TEditEntryFrm.mbSaveToFileClick(Sender: TObject);
+var
+  FileStream: TFileStream;
+begin
+  with SaveFileDialog do
+  begin
+    if not Execute or (FileExists(FileName) and
+       (MessageDlg(Format(stFileOverwrite, [FileName]), mtConfirmation, [mbYes, mbCancel], 0) <> mrYes)) then Exit;
+    with StringGrid do
+    if Assigned(Objects[1, Row]) then
+    begin
+      FileStream := TFileStream.Create(FileName, fmCreate);
+      with TLdapAttributeData(Objects[1, Row]) do
+      try
+        SaveToStream(FileStream);
+      finally
+        FileStream.Free;
+      end;
+    end;
+  end;
+end;
+
+procedure TEditEntryFrm.mbViewBinaryClick(Sender: TObject);
+begin
+  with StringGrid do
+  if Assigned(Objects[1, Row]) then
+  with THexView.Create(Self) do try
+    StreamCopy(TLdapAttributeData(Objects[1, Row]).SaveToStream, LoadFromStream);
+    ShowModal;
+  finally
+    Free;
+  end;
+end;
+
+procedure TEditEntryFrm.StringGridMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  p: Tpoint;
+  ACol, ARow: Integer;
+begin
+  if ssRight in Shift then with StringGrid do
+  begin
+    MouseToCell(X, Y, ACol, ARow);
+    if ((ACol = 0 ) and (Cells[0, ARow] = '')) or ((ACol = 1) and (Objects[0, ARow] <> cBinary)) then
+      Options := Options + [goEditing]
+    else
+      Options := Options - [goEditing];
+    if (ARow > 0) and (ARow < RowCount) and (ACol >= 0) and (ACol < ColCount) then
+    begin
+      try
+        OnSelectCell := nil;
+        Row := ARow;
+        Col := ACol;
+      finally
+        OnSelectCell := StringGridSelectCell;
+      end;
+      p.x := 0;
+      p.y := 0;
+      p := ClientToScreen(p);
+      PopupMenu1.Popup(X + p.x, y + p.y);
+    end;
+  end;
+end;
+
+procedure TEditEntryFrm.StringGridEnter(Sender: TObject);
+begin
+  with StringGrid do
+  if (Col = 0) and (Row=1) and (Cells[Col, Row] = '') then
+    SimulateCellClick(Col, Row);
+end;
+
+procedure TEditEntryFrm.ActionList1Update(Action: TBasicAction; var Handled: Boolean);
+var
+  Enable: Boolean;
+begin
+  with StringGrid do Enable := (Col = 1) and (Objects[0, Row] <> cBinary);
+  ActUndo.Enabled := Enable;
+  ActCut.Enabled := Enable;
+  ActCopy.Enabled := Enable;
+  ActPaste.Enabled := Enable;
+  ActDelete.Enabled := Enable;
 end;
 
 end.

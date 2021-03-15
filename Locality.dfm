@@ -14,6 +14,7 @@ object LocalityDlg: TLocalityDlg
   OldCreateOrder = False
   Position = poScreenCenter
   OnClose = FormClose
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object NameLabel: TLabel

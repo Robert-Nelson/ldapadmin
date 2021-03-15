@@ -14,6 +14,7 @@ object MailGroupDlg: TMailGroupDlg
   OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object Label1: TLabel
@@ -46,6 +47,7 @@ object MailGroupDlg: TMailGroupDlg
     Width = 377
     Height = 21
     TabOrder = 1
+    OnChange = edDescriptionChange
   end
   object OkBtn: TButton
     Left = 248
@@ -118,18 +120,26 @@ object MailGroupDlg: TMailGroupDlg
     object TabSheet2: TTabSheet
       Caption = 'E-Mail Addresses'
       ImageIndex = 1
+      object Label3: TLabel
+        Left = 8
+        Top = 240
+        Width = 97
+        Height = 13
+        Caption = 'Mail &routing address:'
+      end
       object mail: TListBox
         Left = 8
         Top = 8
         Width = 369
-        Height = 249
+        Height = 195
         ItemHeight = 13
         TabOrder = 0
         OnClick = mailClick
+        OnDblClick = EditMailBtnClick
       end
       object AddMailBtn: TButton
         Left = 8
-        Top = 264
+        Top = 208
         Width = 65
         Height = 25
         Caption = '&Add'
@@ -138,7 +148,7 @@ object MailGroupDlg: TMailGroupDlg
       end
       object EditMailBtn: TButton
         Left = 80
-        Top = 264
+        Top = 208
         Width = 65
         Height = 25
         Caption = '&Edit'
@@ -148,7 +158,7 @@ object MailGroupDlg: TMailGroupDlg
       end
       object DelMailBtn: TButton
         Left = 152
-        Top = 264
+        Top = 208
         Width = 65
         Height = 25
         Caption = '&Remove'
@@ -156,25 +166,13 @@ object MailGroupDlg: TMailGroupDlg
         TabOrder = 3
         OnClick = DelMailBtnClick
       end
-      object UpBtn: TButton
-        Left = 232
-        Top = 264
-        Width = 73
-        Height = 25
-        Caption = '&Up'
-        Enabled = False
+      object edMailRoutingAddress: TEdit
+        Left = 8
+        Top = 256
+        Width = 369
+        Height = 21
         TabOrder = 4
-        OnClick = UpBtnClick
-      end
-      object DownBtn: TButton
-        Left = 304
-        Top = 264
-        Width = 73
-        Height = 25
-        Caption = '&Down'
-        Enabled = False
-        TabOrder = 5
-        OnClick = DownBtnClick
+        OnChange = edMailRoutingAddressChange
       end
     end
   end

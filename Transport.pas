@@ -1,5 +1,5 @@
   {      LDAPAdmin - Transport.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -35,12 +35,12 @@ type
     Label1: TLabel;
     transport: TEdit;
     Label2: TLabel;
-    procedure cnChange(Sender: TObject);
+    procedure AttributeChange(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormDestroy(Sender: TObject);
   private
     dn: string;
-    ldSession: TLDAPSession;
-    EditMode: TEditMode;
+    Entry: TLDAPEntry;
   public
     constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
@@ -58,51 +58,40 @@ constructor TTransportDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPS
 begin
   inherited Create(AOwner);
   Self.dn := dn;
-  ldSession := Session;
-  EditMode := Mode;
-  if EditMode = EM_MODIFY then
+  Entry := TLDAPEntry.Create(Session, dn);
+  if Mode = EM_ADD then
   begin
+    Entry.AttributesByName['objectclass'].AddValue('top');
+    Entry.AttributesByName['objectclass'].AddValue('transportTable');
+  end
+  else begin
+    Entry.Read;
     cn.Enabled := False;
-    cn.text := ldSession.GetNameFromDN(dn);
-    Caption := Format(cPropertiesOf, [cn.text]);
-    //TODO: LookupList: func gets attrs list returns list or array of results
-    //cn.text := ldSession.Lookup(dn, sANYCLASS, 'cn', LDAP_SCOPE_BASE);
-    transport.text := ldSession.Lookup(dn, sANYCLASS, 'transport', LDAP_SCOPE_BASE);
+    cn.Text := Entry.AttributesByName['cn'].AsString;
+    transport.Text := Entry.AttributesByName['transport'].AsString;
   end;
 end;
 
-procedure TTransportDlg.cnChange(Sender: TObject);
+procedure TTransportDlg.AttributeChange(Sender: TObject);
 begin
   OKBtn.Enabled := (cn.Text <> '') and (transport.Modified) and (transport.Text <> '');
+  with Sender as TEdit do
+    Entry.AttributesByName[Name].AsString := Text;
 end;
 
 procedure TTransportDlg.FormClose(Sender: TObject; var Action: TCloseAction);
-var
-  Entry: TLDAPEntry;
 begin
   if ModalResult = mrOk then
   begin
-    if EditMode = EM_ADD then
-      dn := 'cn=' + cn.Text + ',' + dn;
-    Entry := TLDAPEntry.Create(ldSession, dn);
-    with Entry do
-    try
-      if EditMode = EM_ADD then
-      begin
-        AddAttr('objectclass', 'top', LDAP_MOD_ADD);
-        AddAttr('objectclass', 'transportTable', LDAP_MOD_ADD);
-        AddAttr('cn', cn.Text, LDAP_MOD_ADD);
-        AddAttr('transport', transport.Text, LDAP_MOD_ADD);
-        New;
-      end
-      else begin
-        AddAttr('transport', transport.Text, LDAP_MOD_REPLACE);
-        Modify;
-      end;
-    finally
-      Entry.Free;
-    end;
+    if esNew in Entry.State then
+      Entry.dn := 'cn=' + cn.Text + ',' + Self.dn;
+    Entry.Write;
   end;
+end;
+
+procedure TTransportDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
 end;
 
 end.

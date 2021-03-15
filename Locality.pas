@@ -41,10 +41,8 @@ type
     OKBtn: TButton;
     CancelBtn: TButton;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormDestroy(Sender: TObject);
   private
-    dn: string;
-    Session: TLDAPSession;
-    EditMode: TEditMode;
     Entry: TLDAPEntry;
     procedure Save;
   public
@@ -61,95 +59,40 @@ uses Misc, WinLDAP;
 {$R *.DFM}
 
 procedure TLocalityDlg.Save;
-var
-  C, Mode: Integer;
-  Component: TComponent;
-  s: string;
 begin
-
   if l.Text = '' then
     raise Exception.Create(Format(stReqNoEmpty, [NameLabel.Caption]));
-
-  try
-    if EditMode = EM_ADD then
+  if esNew in Entry.State then
+  begin
+    Entry.dn := 'l=' + l.Text + ',' + Entry.dn;
+    with Entry.AttributesByName['objectclass'] do
     begin
-      Entry := TLDAPEntry.Create(Session, 'l=' + l.Text + ',' + dn);
-      Entry.AddAttr('objectclass', 'top', LDAP_MOD_ADD);
-      Entry.AddAttr('objectclass', 'locality', LDAP_MOD_ADD);
-      Entry.AddAttr('l', l.Text, LDAP_MOD_ADD);
+      AddValue('top');
+      AddValue('locality');
     end;
-
-    for C := 0 to GroupBox1.ControlCount - 1 do
-    begin
-      Component := GroupBox1.Controls[c];
-      if (Component is TCustomEdit) and (TCustomEdit(Component).Modified) then
-      begin
-        if Component is TMemo then
-          s := FormatMemoOutput(TMemo(Component).Text)
-        else
-          s := TEdit(Component).Text;
-        if EditMode = EM_ADD then
-        begin
-          if s <> '' then
-            Entry.AddAttr(Component.Name, s, LDAP_MOD_ADD);
-        end
-        else begin
-          if s = '' then
-            Mode := LDAP_MOD_DELETE
-          else
-            Mode := LDAP_MOD_REPLACE;
-          Entry.AddAttr(Component.Name, s, Mode)
-        end;
-      end;
-    end;
-
-    if EditMode = EM_ADD then
-      Entry.New
-    else
-      Entry.Modify;
-  except
-    {Entry.ClearAttrs;}
-    raise;
+    Entry.AttributesByName['l'].AddValue(l.Text);
   end;
-
+  Entry.AttributesByName['description'].AsString := description.Text;
+  Entry.AttributesByName['st'].AsString := st.Text;
+  Entry.AttributesByName['street'].AsString := FormatMemoOutput(street.Text);
+  Entry.Write;
 end;
 
 
 constructor TLocalityDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
-var
-  I, C: Integer;
-  attrName, attrValue: string;
 begin
   inherited Create(AOwner);
-  Self.dn := dn;
-  Self.Session := Session;
-  EditMode := Mode;
-  if EditMode = EM_MODIFY then
+  Entry := TLDAPEntry.Create(Session, dn);
+  if Mode = EM_MODIFY then
   begin
     l.Enabled := False;
-    l.text := Session.GetNameFromDN(dn);
+    l.text := GetNameFromDn(dn);
     Caption := Format(cPropertiesOf, [l.Text]);
-    Entry := TLDAPEntry.Create(Session, dn);
     Entry.Read;
-
-    for I := 0 to Entry.Items.Count - 1 do
-    begin
-      attrName := lowercase(Entry.Items[i]);
-      attrValue := PChar(Entry.Items.Objects[i]);
-      for C := 0 to ComponentCount - 1 do
-      begin
-        if AnsiStrIComp(PChar(Components[C].Name), PChar(attrName)) = 0 then
-        begin
-          if Components[C] is TMemo then
-            TMemo(Components[C]).Text := FormatMemoInput(attrValue)
-          else
-            TEdit(Components[C]).Text := attrValue;
-        end;
-      end;
-    end;
-
+    description.Text := Entry.AttributesByName['description'].AsString;
+    st.Text := Entry.AttributesByName['st'].AsString;
+    street.Text := FormatMemoInput(Entry.AttributesByName['street'].AsString)
   end;
-
 end;
 
 procedure TLocalityDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -157,6 +100,11 @@ begin
   if ModalResult = mrOK then
     Save;
   Action := caFree;
+end;
+
+procedure TLocalityDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
 end;
 
 end.

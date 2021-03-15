@@ -35,6 +35,12 @@ const
   bmSambaDomainSel = 25;
   bmIdPool         = 26;
   bmIdPoolSel      = 26;
+  bmSchema         = 27;
+  bmSchemaSel      = 27;
+  bmLocked         = 28;
+  bmLockedSel      = 28;
+  bmUnlocked       = 29;
+  bmUnlockedSel    = 29;
 
   ncDummyNode      = -1;
 
@@ -60,7 +66,7 @@ const
 type
   TEditMode = (EM_ADD, EM_MODIFY);
 
-resourcestring
+const
 
 // Search filters
 
@@ -92,21 +98,23 @@ resourcestring
   cEditEntry        = 'Edit entry:';
   cNewEntry         = 'New entry';
   cSurname          = 'Second name';
+  cName             = 'Name';
+  cIpAddress        = 'IP Address';
+  cUsername         = 'Username';
   cHomeDir          = 'Home Directory';
   cMaildrop         = 'Maildrop';
-  cSamba2Accnt      = '-Samba2 Account-';
   cAddConn          = 'New connection';
   cRename           = 'Rename';
   cNewName          = 'New name:';
   cDeleting         = 'Deleting:';
-  cCopyTo           = 'Copy %s to...';
-  cMoveTo           = 'Move %s to...';
+  cCopyTo           = 'Copy ''%s'' to...';
+  cMoveTo           = 'Move ''%s'' to...';
   cMoving           = 'Moving...';
   cCopying          = 'Copying...';
   cAddHost          = 'Add Host';
   cEditHost         = 'Edit Host';
   cHostName         = 'Host Name:';
-
+  cSambaDomain      = 'Samba Domain';
 
 // Messages
 
@@ -136,9 +144,17 @@ resourcestring
   stLdifSuccess     = '%d Object(s) succesfully imported!';
   stLdifFailure     = '%d Object(s) could not be imported!';
   stLdifEof         = 'End of file reached!';
+  stLdifInvalidUrl  = 'Invalid URL!';
+  stLdifUrlNotSupp  = 'URL method not supported!';
   stInvalidLdapOp   = 'Invalid Ldap operation!';
   stSkipRecord      = '%s'#10#13'Skip this record?';
-
+  stFileOverwrite   = 'File ''%s'' exists, overwrite?';
+  stCertNotFound    = 'Issuer certificate not found';
+  stCertSelfSigned  = 'The certificate is self-signed root certificate';
+  stCertInvalidSig  = 'Signature check failed!';
+  stCertInvalidTime = 'The security certificate has expired or is not yet valid!';
+  stCertInvalidName = 'The name of the security certificate is invalid or does not match the server name!';
+  stCertConfirmConn = 'The server you are trying to connect to is using a certificate which could not be verified!'#10#13#10#13'%s'#10#13'Do you want to proceed?';
 implementation
 
 end.

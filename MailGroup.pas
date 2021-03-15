@@ -46,8 +46,8 @@ type
     AddMailBtn: TButton;
     EditMailBtn: TButton;
     DelMailBtn: TButton;
-    UpBtn: TButton;
-    DownBtn: TButton;
+    edMailRoutingAddress: TEdit;
+    Label3: TLabel;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure AddUserBtnClick(Sender: TObject);
     procedure RemoveUserBtnClick(Sender: TObject);
@@ -59,10 +59,12 @@ type
     procedure AddMailBtnClick(Sender: TObject);
     procedure EditMailBtnClick(Sender: TObject);
     procedure DelMailBtnClick(Sender: TObject);
-    procedure UpBtnClick(Sender: TObject);
-    procedure DownBtnClick(Sender: TObject);
     procedure mailClick(Sender: TObject);
+    procedure edDescriptionChange(Sender: TObject);
+    procedure edMailRoutingAddressChange(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
+    Entry: TLdapEntry;
     EditMode: TEditMode;
     ParentDn: string;
     Session: TLDAPSession;
@@ -92,24 +94,22 @@ procedure TMailGroupDlg.Load;
 var
   ListItem: TListItem;
   i: Integer;
-  attrname: string;
 begin
-  Group.Read;
+  Entry.Read;
   edName.Text := Group.Cn;
-  for i := 0 to Group.Mails.Count - 1 do
-    mail.Items.Add(Group.Mails[i]);
+  edMailRoutingAddress.Text := Group.MailRoutingAddress;
+  for i := 0 to Group.AddressCount - 1 do
+    mail.Items.Add(Group.Addresses[i]);
   edDescription.Text := Group.Description;
-  for i := 0 to Group.Members.Count - 1 do
+  for i := 0 to Group.MemberCount - 1 do
   begin
     ListItem := UserList.Items.Add;
-    ListItem.Caption := Session.GetNameFromDN(Group.Members[i]);
+    ListItem.Caption := GetNameFromDn(Group.Members[i]);
     ListItem.Data := StrNew(PChar(Group.Members[i]));
-    ListItem.SubItems.Add(Session.CanonicalName(PChar(Session.GetDirFromDN(Group.Members[i]))));
+    ListItem.SubItems.Add(CanonicalName(PChar(GetDirFromDn(Group.Members[i]))));
   end;
   if UserList.Items.Count > 0 then
     RemoveUserBtn.Enabled := true;
-  for i := 0 to Group.Items.Count - 1 do 
-    attrname := lowercase(Group.Items[i]);
   OkBtn.Enabled := (edName.Text <> '') and (mail.Items.Count > 0);
 end;
 
@@ -120,14 +120,17 @@ begin
   Self.Session := Session;
   Self.RegAccount := RegAccount;
   EditMode := Mode;
-  Group := TMailGroup.Create(Session, dn);
+  Entry := TLdapEntry.Create(Session, dn);
+  Group := TMailGroup.Create(Entry);
   if EditMode = EM_MODIFY then
   begin
     Load;
     edName.Enabled := false;
     Caption := Format(cPropertiesOf, [edName.Text]);
     UserList.AlphaSort;
-  end;
+  end
+  else
+    Group.New;
 end;
 
 procedure TMailGroupDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -143,26 +146,7 @@ begin
     raise Exception.Create(stGroupNameReq);
   if mail.Items.Count = 0 then
     raise Exception.Create(stGroupMailReq);
-
-  try
-    with Group do
-    begin
-      Cn := edName.Text;
-      Description := edDescription.Text;
-      if EditMode = EM_ADD then
-        dn := PChar('cn=' + edName.Text + ',' + ParentDn);
-    end;
-
-    with Group do
-      if EditMode = EM_ADD then
-        New
-      else
-        Modify;
-  except
-    Group.ClearAttrs;
-    raise;
-  end;
-
+  Entry.Write;
 end;
 
 function TMailGroupDlg.FindDataString(dstr: PChar): Boolean;
@@ -197,7 +181,7 @@ begin
           UserItem := UserList.Items.Add;
           UserItem.Caption := SelItem.Caption;
           UserItem.Data := StrNew(SelItem.Data);
-          UserItem.SubItems.Add(Session.CanonicalName(Session.GetDirFromDN(PChar(SelItem.Data))));
+          UserItem.SubItems.Add(CanonicalName(GetDirFromDn(PChar(SelItem.Data))));
           Group.AddMember({Session.GetNameFromDN(}PChar(SelItem.Data){)});
         end;
         SelItem := GetNextItem(SelItem, sdAll, [isSelected]);
@@ -242,6 +226,9 @@ end;
 procedure TMailGroupDlg.edNameChange(Sender: TObject);
 begin
   OkBtn.Enabled := (edName.Text <> '') and (mail.Items.Count > 0);
+  if esNew in Entry.State then
+    Entry.Dn := 'cn=' + edName.Text + ',' + ParentDn;
+  Group.Cn := edName.Text;
 end;
 
 procedure TMailGroupDlg.ListViewColumnClick(Sender: TObject; Column: TListColumn);
@@ -282,8 +269,6 @@ begin
   Enable := Enable and (mail.ItemIndex > -1);
   DelMailBtn.Enabled := Enable;
   EditMailBtn.Enabled := Enable;
-  UpBtn.Enabled := Enable;
-  DownBtn.Enabled := Enable;
 end;
 
 procedure TMailGroupDlg.AddMailBtnClick(Sender: TObject);
@@ -307,7 +292,8 @@ begin
   s := mail.Items[mail.ItemIndex];
   if InputDlg(cEditAddress, cSmtpAddress, s) then
   begin
-    Group.ModifyMail(mail.Items[mail.ItemIndex], s);
+    Group.RemoveMail(mail.Items[mail.ItemIndex]);
+    Group.AddMail(s);
     mail.Items[mail.ItemIndex] := s;
     edNameChange(Sender);
   end;
@@ -331,37 +317,24 @@ begin
   end;
 end;
 
-procedure TMailGroupDlg.UpBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with mail do begin
-    idx := ItemIndex;
-    if idx > 0 then
-    begin
-      Items.Move(idx, idx - 1);
-      ItemIndex := idx - 1;
-    end;
-  end;
-end;
-
-procedure TMailGroupDlg.DownBtnClick(Sender: TObject);
-var
-  idx: Integer;
-begin
-  with mail do begin
-    idx := ItemIndex;
-    if idx < Items.Count - 1 then
-    begin
-      Items.Move(idx, idx + 1);
-      ItemIndex := idx + 1;
-    end;
-  end;
-end;
-
 procedure TMailGroupDlg.mailClick(Sender: TObject);
 begin
   MailButtons(true);
+end;
+
+procedure TMailGroupDlg.edDescriptionChange(Sender: TObject);
+begin
+  edDescription.Text := Group.Description;
+end;
+
+procedure TMailGroupDlg.edMailRoutingAddressChange(Sender: TObject);
+begin
+  Group.MailRoutingAddress := edMailRoutingAddress.Text;
+end;
+
+procedure TMailGroupDlg.FormDestroy(Sender: TObject);
+begin
+  Entry.Free;
 end;
 
 end.

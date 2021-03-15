@@ -2,7 +2,7 @@ object GroupDlg: TGroupDlg
   Left = 396
   Top = 179
   BorderStyle = bsDialog
-  Caption = 'Create group'
+  Caption = 'Create Group'
   ClientHeight = 472
   ClientWidth = 411
   Color = clBtnFace
@@ -13,6 +13,7 @@ object GroupDlg: TGroupDlg
   Font.Style = []
   OldCreateOrder = False
   OnClose = FormClose
+  OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
   object Label1: TLabel
@@ -191,6 +192,7 @@ object GroupDlg: TGroupDlg
         Width = 89
         Height = 21
         TabOrder = 3
+        OnChange = edRidChange
       end
       object cbSambaGroup: TCheckBox
         Left = 24
@@ -207,48 +209,7 @@ object GroupDlg: TGroupDlg
         Width = 337
         Height = 21
         TabOrder = 1
-      end
-    end
-    object TabSheet3: TTabSheet
-      Caption = '&Resources'
-      ImageIndex = 1
-      object AddResBtn: TButton
-        Left = 8
-        Top = 248
-        Width = 75
-        Height = 25
-        Caption = '&Add'
-        TabOrder = 0
-        OnClick = AddResBtnClick
-      end
-      object DelResBtn: TButton
-        Left = 168
-        Top = 248
-        Width = 75
-        Height = 25
-        Caption = '&Remove'
-        Enabled = False
-        TabOrder = 1
-        OnClick = DelResBtnClick
-      end
-      object EditResBtn: TButton
-        Left = 88
-        Top = 248
-        Width = 75
-        Height = 25
-        Caption = '&Edit...'
-        Enabled = False
-        TabOrder = 2
-        OnClick = EditResBtnClick
-      end
-      object ResourceList: TListBox
-        Left = 8
-        Top = 8
-        Width = 369
-        Height = 233
-        ItemHeight = 13
-        TabOrder = 3
-        OnClick = ResourceListClick
+        OnChange = edDisplayNameChange
       end
     end
   end

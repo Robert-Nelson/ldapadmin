@@ -2,8 +2,14 @@ unit Misc;
 
 interface
 
+uses Classes;
+
+type
+  TStreamProcedure = procedure(Stream: TStream) of object;
+
 function FormatMemoInput(const Text: string): string;
 function FormatMemoOutput(const Text: string): string;
+procedure StreamCopy(pf, pt: TStreamProcedure);
 
 implementation
 
@@ -45,5 +51,18 @@ begin
   end;
 end;
 
+procedure StreamCopy(pf, pt: TStreamProcedure);
+var
+  Stream: TMemoryStream;
+begin
+  Stream := TMemoryStream.Create;
+  try
+    pf(Stream);
+    Stream.Position := 0;
+    pt(Stream);
+  finally
+    Stream.Free;
+  end;
+end;
 
 end.

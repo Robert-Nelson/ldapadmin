@@ -1,5 +1,5 @@
   {      LDAPAdmin - Samba.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,7 +23,7 @@ unit Samba;
 
 interface
 
-uses Classes, Posix, LDAPClasses, WinLDAP;
+uses Classes, PropertyObject, Posix, LDAPClasses, WinLDAP, Constant;
 
 const
   WKRids: array[0..4] of Integer  = (
@@ -33,6 +33,11 @@ const
                                           513,    // Domain Users
                                           514     // Domain Guests
                                      );
+
+  { TDateTime value equivalent to Unix timestamp of 2147483647 }
+  SAMBA_MAX_KICKOFF_TIME          = 50424.134803;
+
+{ TDomainList }
 
 type
   PDomainRec = ^TDomainRec;
@@ -50,103 +55,32 @@ type
       property Items[Index: Integer]: PDomainRec read Get;
     end;
 
-const
-    eRid              = 100;
-    ePrimaryGroupID   = 101;
-    ePwdMustChange    = 102;
-    ePwdCanChange     = 103;
-    ePwdLastSet       = 104;
-    eKickoffTime      = 105;
-    eLogOnTime        = 106;
-    eLogoffTime       = 107;
-    eAcctFlags        = 108;
-    eNTPassword       = 109;
-    eLMPassword       = 110;
-    ehomeDrive        = 111;
-    esmbHome          = 112;
-    escriptPath       = 113;
-    eprofilePath      = 114;
+
+{ TSambaAccount }
 
 const
-  PropAttrNames: array[eRid..eProfilePath] of string = (
-    'rid',
-    'primaryGroupID',
-    'pwdMustChange',
-    'pwdCanChange',
-    'pwdLastSet',
-    'kickoffTime',
-    'logOnTime',
-    'logoffTime',
-    'acctFlags',
-    'ntPassword',
-    'lmPassword',
-    'homeDrive',
-    'smbHome',
-    'scriptPath',
-    'profilePath'
-);
-
-type
-  TSambaAccount = class(TPosixAccount)
-  private
-    Properties: array[eRid..eProfilePath] of string;
-    procedure SetInt(Index: TProperties; Value: Integer);
-    function  GetInt(Index: TProperties): Integer;
-    procedure SetFlag(Index: Integer; Value: Boolean);
-    function  GetFlag(Index: Integer): Boolean;
-  protected
-    procedure SetUserPassword(const Password: string); override;
-  public
-    constructor Create(const ASession: TLDAPSession; const adn: string); override;
-    constructor Copy(const CEntry: TLdapEntry); override;
-    procedure New; override;
-    procedure Modify; override;
-    procedure Read; override;
-    procedure Add; virtual;
-    procedure Remove; virtual;
-    property Rid: Integer index eRid read GetInt write SetInt;
-    property PrimaryGroupID: Integer index ePrimaryGroupID read GetInt write SetInt;
-    property PwdLastSet: Integer index ePwdLastSet read GetInt;
-    property AcctFlags: string read Properties[eAcctFlags];// write Properties[eAcctFlags];
-    property NTPassword: string read Properties[eNTPassword];
-    property LMPassword: string read Properties[eLMPassword];
-    property HomeDrive: string read Properties[eHomeDrive] write Properties[eHomeDrive];
-    property SmbHome: string read Properties[eSmbHome] write Properties[eSmbHome];
-    property ScriptPath: string read Properties[eScriptPath] write Properties[eScriptPath];
-    property ProfilePath: string read Properties[eProfilePath] write Properties[eProfilePath];
-    property UserAccount: Boolean Index Ord('U') read GetFlag write SetFlag;
-    property ComputerAccount: Boolean Index Ord('W') read GetFlag write SetFlag;
-    property DomainTrust: Boolean Index Ord('I') read GetFlag write SetFlag;
-    property ServerTrust: Boolean Index Ord('S') read GetFlag write SetFlag;
-    property Disabled: Boolean Index Ord('D') read GetFlag write SetFlag;
-    property RequestHomeDir: Boolean Index Ord('H') read GetFlag write SetFlag;
-    property NoPasswordExpiration: Boolean Index Ord('X') read GetFlag write SetFlag;
-  end;
-
-{ Samba 3 }
+    eSambaSID                  = 00;
+    eSambaPrimaryGroupSID      = 01;
+    eSambaPwdMustChange        = 02;
+    eSambaPwdCanChange         = 03;
+    eSambaPwdLastSet           = 04;
+    eSambaKickoffTime          = 05;
+    eSambaLogOnTime            = 06;
+    eSambaLogoffTime           = 07;
+    eSambaAcctFlags            = 08;
+    eSambaNTPassword           = 09;
+    eSambaLMPassword           = 10;
+    eSambaHomeDrive            = 11;
+    eSambaHomePath             = 12;
+    eSambaLogonScript          = 13;
+    eSambaProfilePath          = 14;
+    eSambaUserWorkstations     = 15;
+    eSambaDomainName           = 16;
+    eSambaGroupType            = 17;
+    eInetOrgDisplayName        = 18;
 
 const
-    eSambaSID                  = 200;
-    eSambaPrimaryGroupSID      = 201;
-    eSambaPwdMustChange        = 202;
-    eSambaPwdCanChange         = 203;
-    eSambaPwdLastSet           = 204;
-    eSambaKickoffTime          = 205;
-    eSambaLogOnTime            = 206;
-    eSambaLogoffTime           = 207;
-    eSambaAcctFlags            = 208;
-    eSambaNTPassword           = 209;
-    eSambaLMPassword           = 210;
-    eSambaHomeDrive            = 211;
-    eSambaHomePath             = 212;
-    eSambaLogonScript          = 213;
-    eSambaProfilePath          = 214;
-    eSambaUserWorkstations     = 215;
-    eSambaDomainName           = 216;
-    eSambaGroupType            = 217;
-
-const
-  Prop3AttrNames: array[eSambaSID..eSambaGroupType] of string = (
+  Prop3AttrNames: array[eSambaSid..eInetOrgDisplayName] of string = (
     'sambaSID',
     'sambaPrimaryGroupSID',
     'sambaPwdMustChange',
@@ -164,52 +98,54 @@ const
     'sambaProfilePath',
     'sambaUserWorkstations',
     'sambaDomainName',
-    'sambaGroupType'
+    'sambaGroupType',
+    'displayName'
     );
 
 type
-  TSamba3Account = class(TPosixAccount)
+  TSamba3Account = class(TPropertyObject)
   private
-    Properties: array[eSambaSID..eSambaGroupType] of string;
-    procedure SetInt(Index: TProperties; Value: Integer);
-    function  GetInt(Index: TProperties): Integer;
+    pDomainData: PDomainRec;
+    fPosixAccount: TPosixAccount;
+    procedure SetSid(Value: Integer);
+    procedure SetUidNumber(Value: Integer);
+    function  GetUidNumber: Integer;
+    procedure SetGidNumber(Value: Integer);
+    function  GetGidNumber: Integer;
+    procedure SetDomainRec(pdr: PDomainRec);
     procedure SetFlag(Index: Integer; Value: Boolean);
     function  GetFlag(Index: Integer): Boolean;
     function  GetDomainSid: string;
     function  GetRid: string;
     function  GetDomainName: string;
-  protected
-    procedure SetUserPassword(const Password: string); override;
-    procedure SetProperty(Index: TProperties; Value: string; var AProperty: string); override;
   public
-    constructor Create(const ASession: TLDAPSession; const adn: string); override;
-    constructor Copy(const CEntry: TLdapEntry); override;
+    constructor Create(const Entry: TLdapEntry); override;
     procedure New; override;
-    procedure Modify; override;
-    procedure Read; override;
-    procedure Add; virtual;
-    procedure Remove; virtual;
-    property Sid: string read Properties[eSambaSID] write Properties[eSambaSID];
+    procedure Remove; override;
+    procedure SetUserPassword(const Password: string); virtual;
+    property DomainData: PDomainRec write SetDomainRec;
+    property UidNumber: Integer read GetUidNumber write SetUidNumber;
+    property GidNumber: Integer read GetGidNumber write SetGidNumber;
+    property Sid: string index eSambaSID read GetString;// write SetString;
     property DomainSID: string read GetDomainSid;
     property Rid: string read GetRid;
-    property GroupSID: string read Properties[eSambaPrimaryGroupSID] write Properties[eSambaPrimaryGroupSID];
+    property GroupSID: string index eSambaPrimaryGroupSID read GetString write SetString;
     property PwdMustChange: Integer index eSambaPwdMustChange read GetInt write SetInt;
     property PwdCanChange: Integer index eSambaPwdCanChange read GetInt write SetInt;
-    property PwdLastSet: Integer index eSambaPwdLastSet read GetInt;
-    property KickoffTime: Integer index eSambaKickoffTime read GetInt;
+    property PwdLastSet: TDateTime index eSambaPwdLastSet read GetFromUnixTime;
+    property KickoffTime: TDateTime index eSambaKickoffTime read GetFromUnixTime write SetAsUnixTime;
     property LogonTime: Integer index eSambaLogonTime read GetInt;
     property LogoffTime: Integer index eSambaLogoffTime read GetInt;
-    property AcctFlags: string read Properties[eSambaAcctFlags];// write Properties[eSambaAcctFlags];
-    property NTPassword: string read Properties[eSambaNTPassword];
-    property LMPassword: string read Properties[eSambaLMPassword];
-    property HomeDrive: string read Properties[eSambaHomeDrive] write Properties[eSambaHomeDrive];
-    property HomePath: string read Properties[eSambaHomePath] write Properties[eSambaHomePath];
-    property LogonScript: string read Properties[eSambaLogonScript] write Properties[eSambaLogonScript];
-    property ProfilePath: string read Properties[eSambaProfilePath] write Properties[eSambaProfilePath];
-    property UserWorkstations: string read Properties[eSambaUserWorkstations] write Properties[eSambaUserWorkstations];
-    //property DomainName: string read Properties[eSambaDomainName] write Properties[eSambaDomainName];
-    property DomainName: string read GetDomainName write Properties[eSambaDomainName];
-    property GroupType: string read Properties[eSambaGroupType] write Properties[eSambaGroupType];
+    property AcctFlags: string index eSambaAcctFlags read GetString;// write Properties[eSambaAcctFlags];
+    property NTPassword: string index eSambaNTPassword read GetString;
+    property LMPassword: string index eSambaLMPassword read GetString;
+    property HomeDrive: string index eSambaHomeDrive read GetString write SetString;
+    property HomePath: string index eSambaHomePath read GetString write SetString;
+    property LogonScript: string index eSambaLogonScript read GetString write SetString;
+    property ProfilePath: string index eSambaProfilePath read GetString write SetString;
+    property UserWorkstations: string index eSambaUserWorkstations read GetString write SetString;
+    property DomainName: string read GetDomainName;
+    property GroupType: string index eSambaGroupType read GetString write SetString;
     property UserAccount: Boolean Index Ord('U') read GetFlag write SetFlag;
     property ComputerAccount: Boolean Index Ord('W') read GetFlag write SetFlag;
     property DomainTrust: Boolean Index Ord('I') read GetFlag write SetFlag;
@@ -219,30 +155,31 @@ type
     property NoPasswordExpiration: Boolean Index Ord('X') read GetFlag write SetFlag;
   end;
 
-type
-  TSamba3Group = class(TPosixGroup)
+  TSamba3Computer = class(TSamba3Account)
   private
-    fGroupType: string;
-    fSid: string;
-    fDisplayName: string;
+    function  GetUid: string;
+    procedure SetUid(Value: string);
+    function  GetDescription: string;
+    procedure SetDescription(Value: string);
+  public
+    procedure New; override;
+    property ComputerName: string read GetUid write SetUid;
+    property Description: string read GetDescription write SetDescription;
+  end;
+
+  TSamba3Group = class(TPropertyObject)
+  private
     function GetDomainSid: string;
     function GetRid: string;
-    procedure SetGroupType(const GroupType: Integer);
-    function GetGroupType: Integer;
-  protected
-    procedure SyncProperties; override;
   public
-    constructor Copy(const CEntry: TLdapEntry); override;
+    constructor Create(const Entry: TLdapEntry); override;
     procedure New; override;
-    procedure Modify; override;
-    procedure Read; override;
-    procedure Add; virtual;
-    procedure Remove; virtual;
-    property GroupType: Integer read GetGroupType write SetGroupType;
-    property Sid: string read fSid write fSid;
+    procedure Remove; override;
+    property GroupType: Integer index eSambaGroupType read GetInt write SetInt;
+    property Sid: string index eSambaSID read GetString write SetString;
     property DomainSID: string read GetDomainSid;
     property Rid: string read GetRid;
-    property DisplayName: string read fDisplayName write fDisplayName;
+    property DisplayName: string index eInetOrgDisplayName read GetString write SetString;
   end;
 
 implementation
@@ -285,64 +222,37 @@ end;
 
 constructor TDomainList.Create(Session: TLDAPSession);
 var
-  plmSearch, plmEntry: PLDAPMessage;
-  ppcVals: PPChar;
-  pld: PLDAP;
   pDom: PDomainRec;
   attrs: PCharArray;
+  EntryList: TLdapEntryList;
+  i: Integer;
 begin
-
   inherited Create;
-
-  pld := Session.pld;
-
   // set result fields
   SetLength(attrs, 4);
   attrs[0] := 'sambaDomainName';
   attrs[1] := 'sambaAlgorithmicRIDBase';
   attrs[2] := 'sambaSID';
   attrs[3] := nil;
-
-  LdapCheck(ldap_search_s(pld, PChar(Session.Base), LDAP_SCOPE_SUBTREE,
-                               '(objectclass=sambadomain)', PChar(attrs), 0, plmSearch));
+  EntryList := TLdapEntryList.Create;
   try
-    plmEntry := ldap_first_entry(pld, plmSearch);
-    while Assigned(plmEntry) do
+    Session.Search('(objectclass=sambadomain)', Session.Base, LDAP_SCOPE_SUBTREE,
+                   attrs, false, EntryList);
+    for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
       New(pDom);
       Add(pDom);
       with pDom^ do
       begin
-
-        ppcVals := ldap_get_values(pld, plmEntry, attrs[0]);
-        if not Assigned(ppcVals) then
-          fail;
-          //raise Exception.Create( TODO
-        pDom^.DomainName := PCharArray(ppcVals)[0];
-
-        ppcVals := ldap_get_values(pld, plmEntry, attrs[1]);
-        if not Assigned(ppcVals) then
-          fail;
-          //raise Exception.Create( TODO
-        AlgorithmicRIDBase := StrToInt(PCharArray(ppcVals)[0]);
-
-        ppcVals := ldap_get_values(pld, plmEntry, attrs[2]);
-        if not Assigned(ppcVals) then
-          fail;
-          //raise Exception.Create( TODO
-        SID := PCharArray(ppcVals)[0];
+        DomainName := AttributesByName[attrs[0]].AsString;
+        AlgorithmicRidBase := StrToInt(AttributesByName[attrs[1]].AsString);
+        SID := AttributesByName[attrs[2]].AsString;
       end;
-
-      plmEntry := ldap_next_entry(pld, plmEntry);
-
     end;
   finally
-    // free search results
-    LDAPCheck(ldap_msgfree(plmSearch));
+    EntryList.Free;
   end;
-
 end;
-
 function TDomainList.Get(Index: Integer): PDomainRec;
 begin
   Result := inherited Items[Index];
@@ -350,142 +260,74 @@ end;
 
 { TSambaAccount }
 
-procedure TSambaAccount.SetInt(Index: TProperties; Value: Integer);
+procedure TSamba3Account.SetSid(Value: Integer);
 begin
-  SetProperty(Index, IntToStr(Value), Properties[Index]);
+  if Assigned(pDomaindata) then
+    SetString(eSambaSID, Format('%s-%d', [pDomainData^.SID, pDomainData^.AlgorithmicRIDBase + 2 * Value]))
+  else
+    SetString(eSambaSID, '');
 end;
 
-function TSambaAccount.GetInt(Index: TProperties): Integer;
+procedure TSamba3Account.SetDomainRec(pdr: PDomainRec);
 begin
-  Result := StrToInt(Properties[Index]);
-end;
-
-function TSambaAccount.GetFlag(Index: Integer): Boolean;
-begin
-  Result := Pos(Char(Index), Properties[eAcctFlags]) <> 0;
-end;
-
-procedure TSambaAccount.SetFlag(Index: Integer; Value: Boolean);
-var
-  i: Integer;
-begin
-  i := Pos(Char(Index), Properties[eAcctFlags]);
-  if Value then // set
+  pDomainData := pdr;
+  if Assigned(pDomaindata) then
   begin
-    if i = 0 then
-      Insert(Char(Index), Properties[eAcctFlags], 2);
-  end
-  else begin    // unset
-    if i <> 0 then
-      System.Delete(Properties[eAcctFlags], i, 1);
+    SetString(eSambaDomainName, pDomainData^.DomainName);
+    if not fPosixAccount.IsNull(eUidNumber) then
+      SetSid(UidNumber);
+    if not fPosixAccount.IsNull(eGidNumber) then
+      SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * GidNumber + 1001]));
   end;
 end;
 
-procedure TSambaAccount.SetUserPassword(const Password: string);
-var
-  Passwd: array[0..255] of Byte;
-  Hash: array[0..16] of Byte;
-  slen: Integer;
+procedure TSamba3Account.SetUidNumber(Value: Integer);
 begin
-  inherited;
-  { Get NT Password }
-  fillchar(passwd, 255, 0);
-  slen := PutUniCode(Passwd, PChar(Password));
-  fillchar(hash, 17, 0);
-  mdfour(hash, Passwd, slen);
-  Properties[eNTPassword] := HashToHex(@Hash, 16);
-  { Get Lanman Password }
-   Properties[eLMPassword] := HashToHex(PByteArray(e_p16(UpperCase(Password))), 16);
+  fPosixAccount.UidNumber := Value;
+  SetSid(Value);
 end;
 
-constructor TSambaAccount.Create(const ASession: TLDAPSession; const adn: string);
+function TSamba3Account.GetUidNumber: Integer;
 begin
-  inherited;
-  Properties[eAcctFlags] := '[]';
+  Result := fPosixAccount.UidNumber;
 end;
 
-constructor TSambaAccount.Copy(const CEntry: TLdapEntry);
-var
-  i: TProperties;
+procedure TSamba3Account.SetGidNumber(Value: Integer);
 begin
-  inherited;
-  if CEntry is TSambaAccount then
-  begin
-    for i := Low(Properties) to High(Properties) do
-      Properties[i] := (CEntry as TSambaAccount).Properties[i];
-  end
+  fPosixAccount.GidNumber := Value;
+  if Assigned(pDomainData) then
+    SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * Value + 1001]))
   else
-    SyncProperties(Properties, PropAttrNames)
+    SetString(eSambaPrimaryGroupSID, '');
 end;
 
-procedure TSambaAccount.New;
-var
-  i: TProperties;
+function TSamba3Account.GetGidNumber: Integer;
 begin
-  Add;
-  for i := eRid to eProfilePath do
-    if Properties[i] <> '' then
-      AddAttr(PropAttrNames[i], Properties[i], LDAP_MOD_ADD);
-  inherited;
-end;
-
-procedure TSambaAccount.Modify;
-begin
-  FlushProperties(Properties, PropAttrNames);
-  inherited;
-end;
-
-procedure TSambaAccount.Read;
-begin
-  inherited;
-  SyncProperties(Properties, PropAttrNames);
-end;
-
-procedure TSambaAccount.Add;
-begin
-  AddAttr('objectclass', 'sambaAccount', LDAP_MOD_ADD);
-end;
-
-procedure TSambaAccount.Remove;
-var
-  i: TProperties;
-begin
-  AddAttr('objectclass', 'sambaAccount', LDAP_MOD_DELETE);
-  for i := eRid to eProfilePath do
-    Properties[i] := '';
-end;
-
-{ TSamba3Account }
-
-procedure TSamba3Account.SetInt(Index: TProperties; Value: Integer);
-begin
-  SetProperty(Index, IntToStr(Value), Properties[Index]);
-end;
-
-function TSamba3Account.GetInt(Index: TProperties): Integer;
-begin
-  Result := StrToInt(Properties[Index]);
+  Result := fPosixAccount.GidNumber;
 end;
 
 function TSamba3Account.GetFlag(Index: Integer): Boolean;
 begin
-  Result := Pos(Char(Index), Properties[eSambaAcctFlags]) <> 0;
+  Result := Pos(Char(Index), GetString(eSambaAcctFlags)) <> 0;
 end;
 
 procedure TSamba3Account.SetFlag(Index: Integer; Value: Boolean);
 var
   i: Integer;
+  s: string;
 begin
-  i := Pos(Char(Index), Properties[eSambaAcctFlags]);
+  s := GetString(eSambaAcctFlags);
+  i := Pos(Char(Index), s);
   if Value then // set
   begin
     if i = 0 then
-      Insert(Char(Index), Properties[eSambaAcctFlags], 2);
+      Insert(Char(Index), s, 2);
   end
   else begin    // unset
     if i <> 0 then
-      System.Delete(Properties[eSambaAcctFlags], i, 1);
+      System.Delete(s, i, 1);
   end;
+  SetString(eSambaAcctFlags, s);
 end;
 
 function TSamba3Account.GetDomainSid: string;
@@ -508,11 +350,12 @@ function TSamba3Account.GetDomainName: string;
 var
   i: Integer;
 begin
-  if Properties[eSambaDomainName] <> '' then
-    Result := Properties[eSambaDomainName]
-  else // try to get domain name from sid
+  // TODO use pDomainData
+  //if not IsNull(eSambaDomainName) then
+  Result := GetString(eSambaDomainName);
+  if Result = '' then // try to get domain name from sid
   begin
-    with TDomainList.Create(Session) do
+    with TDomainList.Create(fEntry.Session) do
     try
       for i := 0 to Count - 1 do
         if Items[i].SID = DomainSID then
@@ -535,81 +378,69 @@ begin
   slen := PutUniCode(Passwd, PChar(Password));
   fillchar(hash, 17, 0);
   mdfour(hash, Passwd, slen);
-  Properties[eSambaNTPassword] := HashToHex(@Hash, 16);
+  SetString(eSambaNTPassword, HashToHex(@Hash, 16));
   { Get Lanman Password }
-  Properties[eSambaLMPassword] := HashToHex(PByteArray(e_p16(UpperCase(Password))), 16);
+  SetString(eSambaLMPassword, HashToHex(PByteArray(e_p16(UpperCase(Password))), 16));
   { Set changetime attribute }
-  //TODO: this should probably be UTC?
-  Properties[eSambaPwdLastSet] := IntToStr(Trunc((Now - 25569.0)*24*60*60));
+  SetAsUnixTime(eSambaPwdLastSet, Now);
 end;
 
-procedure TSamba3Account.SetProperty(Index: TProperties; Value: string; var AProperty: string);
+constructor TSamba3Account.Create(const Entry: TLdapEntry);
 begin
-  inherited;
-  if Index = eShadowExpire then
-  begin
-    if StrToInt(Value) = SHADOW_MAX_DATE then
-      Properties[eSambaKickoffTime] := ''
-    else
-      Properties[eSambaKickoffTime] := IntToStr(StrToInt(Value)*24*60*60);
-  end;
-end;
-
-constructor TSamba3Account.Create(const ASession: TLDAPSession; const adn: string);
-begin
-  inherited;
-  Properties[eSambaAcctFlags] := '[]';
-end;
-
-constructor TSamba3Account.Copy(const CEntry: TLdapEntry);
-var
-  i: TProperties;
-begin
-  inherited;
-  if CEntry is TSamba3Account then
-  begin
-    for i := Low(Properties) to High(Properties) do
-      Properties[i] := (CEntry as TSamba3Account).Properties[i];
-  end
-  else
-    SyncProperties(Properties, Prop3AttrNames)
+  inherited Create(Entry, 'sambaSamAccount', @Prop3AttrNames);
+  fPosixAccount := TPosixAccount.Create(Entry);
 end;
 
 procedure TSamba3Account.New;
-var
-  i: TProperties;
 begin
-  Add;
-  for i := Low(Properties) to High(Properties) do
-    if Properties[i] <> '' then
-      AddAttr(Prop3AttrNames[i], Properties[i], LDAP_MOD_ADD);
-  inherited;
-end;
-
-procedure TSamba3Account.Modify;
-begin
-  FlushProperties(Properties, Prop3AttrNames);
-  inherited;
-end;
-
-procedure TSamba3Account.Read;
-begin
-  inherited;
-  SyncProperties(Properties, Prop3AttrNames);
-end;
-
-procedure TSamba3Account.Add;
-begin
-  AddAttr('objectclass', 'sambaSamAccount', LDAP_MOD_ADD);
+  AddObjectClass(['sambaSamAccount']);
+  SetString(eSambaAcctFlags, '[]');
+  SetSid(UidNumber);
 end;
 
 procedure TSamba3Account.Remove;
 var
-  i: TProperties;
+  i: Integer;
 begin
-  AddAttr('objectclass', 'sambaSamAccount', LDAP_MOD_DELETE);
-  for i := Low(Properties) to High(Properties) do
-    Properties[i] := '';
+  RemoveObjectClass(['sambaSamAccount']);
+  for i := eSambaSid to eSambaGroupType do
+    SetString(i, '');
+end;
+
+{ TSamba3Computer }
+
+function TSamba3Computer.GetUid: string;
+begin
+  Result := fPosixAccount.uid;
+end;
+
+procedure TSamba3Computer.SetUid(Value: string);
+begin
+  Value := UpperCase(Value);
+  if Value[Length(Value)] <> '$' then
+    Value := Value + '$';
+  fPosixAccount.Uid := Value;
+  fPosixAccount.Cn := Value;
+end;
+
+function TSamba3Computer.GetDescription: string;
+begin
+  Result := fPosixAccount.Description;
+end;
+
+procedure TSamba3Computer.SetDescription(Value: string);
+begin
+  fPosixAccount.Description := Value;
+end;
+
+procedure TSamba3Computer.New;
+begin
+  inherited;
+  AddObjectClass(['top', 'account', 'posixAccount', 'shadowAccount']);
+  fPosixAccount.LoginShell := '/bin/false';
+  fPosixAccount.HomeDirectory := '/dev/null';
+  GidNumber := COMPUTER_GROUP;
+  ComputerAccount := true;
 end;
 
 { TSamba3Group }
@@ -619,7 +450,7 @@ var
   p: Integer;
 begin
   p := LastDelimiter('-', Sid);
-  Result := System.Copy(fSid, 1, p - 1);
+  Result := System.Copy(Sid, 1, p - 1);
 end;
 
 function TSamba3Group.GetRid: string;
@@ -630,85 +461,23 @@ begin
   Result := PChar(@Sid[p + 1]);
 end;
 
-procedure TSamba3Group.SetGroupType(const GroupType: Integer);
+constructor TSamba3Group.Create(const Entry: TLdapEntry);
 begin
-  fGroupType := IntToStr(GroupType);
-end;
-
-function TSamba3Group.GetGroupType: Integer;
-begin
-  Result := StrToInt(fGroupType);
-end;
-
-procedure TSamba3Group.SyncProperties;
-var
-  i: Integer;
-  attrname: string;
-begin
-  //inherited; 
-  if Assigned(Items) then
-  begin
-    for i := 0 to Items.Count - 1 do
-    begin
-      attrname := lowercase(Items[i]);
-      if attrname = 'sambagrouptype' then
-        fGroupType := PChar(Items.Objects[i])
-      else
-      if attrname = 'sambasid' then
-        fSid := PChar(Items.Objects[i])
-      else
-      if attrname = 'displayname' then
-        fDisplayName := PChar(Items.Objects[i]);
-    end;
-  end;
-end;
-
-constructor TSamba3Group.Copy(const CEntry: TLdapEntry);
-begin
-  inherited;
-  if CEntry is TSamba3Group then
-  begin
-    fGroupType := TSamba3Group(CEntry).fGroupType;
-    fSid := TSamba3Group(CEntry).fSid;
-  end
-  else
-    SyncProperties;
+  inherited Create(Entry, 'sambaGroupMapping', @Prop3AttrNames);
 end;
 
 procedure TSamba3Group.New;
 begin
-  Add;
-  FlushProperty('sambaGroupType', fGroupType);
-  FlushProperty('sambaSID', fSid);
-  FlushProperty('displayName', fDisplayName);
   inherited;
-end;
-
-procedure TSamba3Group.Modify;
-begin
-  FlushProperty('sambaGroupType', fGroupType);
-  FlushProperty('sambaSID', fSid);
-  FlushProperty('displayName', fDisplayName);
-  inherited;
-end;
-
-procedure TSamba3Group.Read;
-begin
-  inherited;
-  SyncProperties;
-end;
-
-procedure TSamba3Group.Add;
-begin
-  AddAttr('objectclass', 'sambaGroupMapping', LDAP_MOD_ADD);
+  GroupType := 2;
 end;
 
 procedure TSamba3Group.Remove;
 begin
-  AddAttr('objectclass', 'sambaGroupMapping', LDAP_MOD_DELETE);
-  fGroupType := '';
-  fSid := '';
-  fDisplayName := '';
+  inherited;
+  SetString(eSambaGroupType, '');
+  Sid := '';
+  DisplayName := '';
 end;
 
 end.
