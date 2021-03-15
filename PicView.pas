@@ -25,7 +25,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  ExtDlgs, ExtCtrls, ComCtrls, ToolWin, ImgList, LdapClasses, ActnList;
+  ExtDlgs, ExtCtrls, ComCtrls, ToolWin, ImgList, LdapClasses, ActnList,
+  System.Actions;
 
 type
   TViewPicFrmSaveMode = (smLdap, smReference, smNone);
@@ -82,7 +83,9 @@ var
 
 implementation
 
-uses jpeg, clipbrd, Constant, Misc;
+{$I LdapAdmin.inc}
+
+uses jpeg, clipbrd, Constant, Misc{$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 
@@ -220,7 +223,7 @@ begin
   with SaveDialog do
   begin
     if not Execute or (FileExists(FileName) and
-       (MessageDlg(Format(stFileOverwrite, [FileName]), mtConfirmation, [mbYes, mbCancel], 0) <> mrYes)) then Exit;
+       (MessageDlg(Format(stFileOverwrite, [FileName]), mtConfirmation, [mbYes, mbNo], 0) <> mrYes)) then Exit;
     Image1.Picture.SaveToFile(FileName);
   end;
 end;

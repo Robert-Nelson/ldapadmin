@@ -106,7 +106,10 @@ var
 
 implementation
 
-uses Pickup, WinLdap, PrefWiz, Main, Config;
+{$I LdapAdmin.inc}
+
+uses Pickup, WinLdap, PrefWiz, Main, Config
+     {$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 

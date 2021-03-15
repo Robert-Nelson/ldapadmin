@@ -1,5 +1,5 @@
   {      LDAPAdmin - ShaCrypt.pas
-  *      Copyright (C) 2011 Tihomir Karlovic
+  *      Copyright (C) 2011-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -36,11 +36,11 @@ function Sha512(const Key: string; const Salt: string = ''; Rounds: Integer = RO
 
 implementation
 
-uses DECHash, SysUtils;
+uses sha256, sha512, Hash, SysUtils;
 
-function b64_from_24bit(b2, b1, b0: Byte; n: Integer): string;
+function b64_from_24bit(b2, b1, b0: Byte; n: Integer): AnsiString;
 const
-  CHARS = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  CHARS: AnsiString = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 var
   w: Cardinal;
 begin
@@ -53,20 +53,29 @@ begin
   end;
 end;
 
+type
+  TDigestProc = function (const Ctx: AnsiString): AnsiString;
 
-function GetSha(const Key: string; var Salt: string; var Rounds: Integer; mdc: TDECHashClass; BlockSize: Integer): string;
+function GetSha256Digest(const Ctx: AnsiString): AnsiString;
 var
-  md: TDECHash;
-  Ctx, AltCtx, AltResult, TmpResult, PBytes, SBytes: String;
-  cnt: Integer;
+  Digest: TSha256Digest;
+begin
+  SHA256Full(Digest, @Ctx[1], Length(Ctx));
+  SetString(Result, PAnsiChar(@Digest[0]), SizeOf(Digest));
+end;
 
-  function GetDigest(const Ctx: string): string;
-  begin
-    md.Init;
-    md.Calc(Ctx[1], Length(Ctx));
-    md.Done;
-    SetString(Result, PChar(md.Digest), md.DigestSize);
-  end;
+function GetSha512Digest(const Ctx: AnsiString): AnsiString;
+var
+  Digest: TSha512Digest;
+begin
+  SHA512Full(Digest, @Ctx[1], Length(Ctx));
+  SetString(Result, PAnsiChar(@Digest[0]), SizeOf(Digest));
+end;
+
+function GetSha(const Key: AnsiString; var Salt: AnsiString; var Rounds: Integer; GetDigest: TDigestProc; BlockSize: Integer): AnsiString;
+var
+  Ctx, AltCtx, AltResult, TmpResult, PBytes, SBytes: AnsiString;
+  cnt: Integer;
 
 begin
 
@@ -88,8 +97,6 @@ begin
   Ctx := Key + Salt;
   AltCtx := Ctx + Key;
 
-  md := mdc.Create;
-  try
     AltResult := GetDigest(AltCtx);
 
     cnt := Length(Key);
@@ -172,20 +179,16 @@ begin
     end;
 
    Result := AltResult;
-
-  finally
-    md.Free;
-  end;
 end;
 
 function Sha256(const Key: string; const Salt: string = ''; Rounds: Integer = ROUNDS_DEFAULT): string;
 var
-  ASalt, AltResult: string;
+  ASalt, AltResult: AnsiString;
   bAltResult: PByteArray;
 
 begin
     ASalt := Salt;
-    AltResult := GetSha(Key, ASalt, Rounds, THash_SHA256, 32);
+    AltResult := GetSha(Key, ASalt, Rounds, GetSha256Digest, 32);
     bAltResult := @AltResult[1];
     Result := '$5$';
     if Rounds <> ROUNDS_DEFAULT then
@@ -206,12 +209,12 @@ end;
 
 function Sha512(const Key: string; const Salt: string = ''; Rounds: Integer = ROUNDS_DEFAULT): string;
 var
-  ASalt, AltResult: string;
+  ASalt, AltResult: AnsiString;
   bAltResult: PByteArray;
 
 begin
     ASalt := Salt;
-    AltResult := GetSha(Key, ASalt, Rounds, THash_SHA512, 64);
+    AltResult := GetSha(Key, ASalt, Rounds, GetSha512Digest, 64);
     bAltResult := @AltResult[1];
     Result := '$6$';
     if Rounds <> ROUNDS_DEFAULT then

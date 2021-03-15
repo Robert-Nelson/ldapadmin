@@ -22,6 +22,7 @@
 unit LAControls;
 
 interface
+
 uses Windows, Messages, Controls, StdCtrls, Classes, Graphics;
 
 type
@@ -114,17 +115,19 @@ type
   end;
 
 procedure DrawComboBtn(Canvas: TCanvas; Rect: TRect; BtnState: TBtnState);
-  
-implementation
 
-{$DEFINE XPSTYLE}
+implementation
+{$I LdapAdmin.inc}
+(*{$DEFINE XPSTYLE}
 
 {$IFDEF VER100} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 3
 {$IFDEF VER120} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 4
 {$IFDEF VER130} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 5
-{$IFDEF VER140} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 6
+{$IFDEF VER140} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 6*)
+
 
 uses Forms, SysUtils,
+{$IFDEF VER_XEH}System.Types, {$ENDIF}
 {$IFDEF XPSTYLE}
  Themes,
 {$ENDIF}

@@ -6,11 +6,7 @@ object MailGroupDlg: TMailGroupDlg
   ClientHeight = 472
   ClientWidth = 410
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
@@ -20,7 +16,7 @@ object MailGroupDlg: TMailGroupDlg
   object Label1: TLabel
     Left = 16
     Top = 16
-    Width = 61
+    Width = 62
     Height = 13
     Caption = '&Group name:'
     FocusControl = edName
@@ -28,7 +24,7 @@ object MailGroupDlg: TMailGroupDlg
   object Label2: TLabel
     Left = 16
     Top = 64
-    Width = 56
+    Width = 57
     Height = 13
     Caption = '&Description:'
     FocusControl = edDescription
@@ -124,7 +120,7 @@ object MailGroupDlg: TMailGroupDlg
       object Label3: TLabel
         Left = 8
         Top = 240
-        Width = 97
+        Width = 100
         Height = 13
         Caption = 'Mail &routing address:'
       end

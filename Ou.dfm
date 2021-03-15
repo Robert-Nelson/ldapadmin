@@ -6,11 +6,7 @@ object OuDlg: TOuDlg
   ClientHeight = 407
   ClientWidth = 358
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
@@ -40,7 +36,7 @@ object OuDlg: TOuDlg
     object Label18: TLabel
       Left = 16
       Top = 80
-      Width = 31
+      Width = 34
       Height = 13
       Caption = '&Street:'
     end
@@ -61,14 +57,14 @@ object OuDlg: TOuDlg
     object Label31: TLabel
       Left = 16
       Top = 176
-      Width = 20
+      Width = 23
       Height = 13
       Caption = '&City:'
     end
     object Label1: TLabel
       Left = 16
       Top = 24
-      Width = 56
+      Width = 57
       Height = 13
       Caption = '&Description:'
     end

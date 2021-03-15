@@ -27,7 +27,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, WinLDAP, Grids, ToolWin, LDAPClasses, Constant,
   Menus, ImgList, ActnList, IControls, Schema, Templates, TemplateCtrl, Sorter,
-  Connection;
+  Connection, DlgWrap, System.Actions;
 
 const
   NAMING_VALUE_TAG = -1;
@@ -78,7 +78,6 @@ type
     mbViewBinary: TMenuItem;
     N5: TMenuItem;
     OpenFileDialog: TOpenDialog;
-    SaveFileDialog: TSaveDialog;
     N8: TMenuItem;
     mbLoadFromFile1: TMenuItem;
     mbSaveToFile1: TMenuItem;
@@ -177,6 +176,7 @@ type
     fValueSorter: TStringGridSorter;
     fOcSorter: TStringGridSorter;
     fOnWrite: TNotifyEvent;
+    SaveDialog: TSaveDialogWrapper;
     procedure DataChange(Sender: TLdapAttributeData);
     procedure PushShortCut(Command: TAction);
     procedure HandleTabExit(InplaceAttribute: TInplaceAttribute);
@@ -208,7 +208,10 @@ var
 
 implementation
 
-uses BinView, PicView, Cert, Misc, Main, Config, ClipBrd;
+{$I LdapAdmin.inc}
+
+uses BinView, PicView, Cert, Misc, Main, Config, ClipBrd, TextFile
+     {$IFDEF VER_XEH}, System.Types, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 
@@ -446,6 +449,14 @@ var
   i, j: integer;
 begin
   inherited Create(AOwner);
+
+  SaveDialog := TSaveDialogWrapper.Create(Self);
+  with SaveDialog do begin
+    Filter := stAllFilesFilter;
+    FilterIndex := 1;
+    OverwritePrompt := true;
+  end;
+
   attrStringGrid.Doublebuffered := true;
   fConnection := AConnection;
   SchemaCheckBtn.Down := AConnection.Account.ReadBool(rEditorSchemaHelp, true);
@@ -485,7 +496,7 @@ begin
     edDn.Enabled := false;
     cbRdn.Enabled := false;
     edDn.Text := GetDirFromDn(adn);
-    cbRdn.Text := DecodeDNString(GetRdnFromDn(adn));
+    cbRdn.Text := DecodeLdapString(GetRdnFromDn(adn));
     Load;
   end
   else begin
@@ -791,7 +802,7 @@ var
     if Assigned(Value) then
     begin
       SplitRdn(Entry.dn, attr, val);
-      if (CompareText(Value.Attribute.Name, attr) = 0) and (CompareText(Value.AsString, DecodeDNString(val)) = 0) then
+      if (CompareText(Value.Attribute.Name, attr) = 0) and (CompareText(Value.AsString, DecodeLdapString(val)) = 0) then
       with Result do begin
         Enabled := false;
         Tag := NAMING_VALUE_TAG;
@@ -860,7 +871,7 @@ procedure TEditEntryFrm.mbSaveClick(Sender: TObject);
     i: Integer;
   begin
     i := AnsiPos('=', rdn);
-    Result := Copy(rdn, 1, i) + EncodeDNString(Copy(rdn, i + 1, Length(rdn) - i));
+    Result := Copy(rdn, 1, i) + EncodeLdapString(Copy(rdn, i + 1, Length(rdn) - i));
   end;
 
 begin
@@ -966,22 +977,27 @@ end;
 
 procedure TEditEntryFrm.mbSaveToFileClick(Sender: TObject);
 var
-  FileStream: TFileStream;
+  FileStream: TTextFile;
 begin
-  with SaveFileDialog do
-  begin
-    if not Execute or (FileExists(FileName) and
-       (MessageDlg(Format(stFileOverwrite, [FileName]), mtConfirmation, [mbYes, mbCancel], 0) <> mrYes)) then Exit;
-    with attrStringGrid do
+  with attrStringGrid do
     if Assigned(Objects[1, Row]) then
     begin
-      FileStream := TFileStream.Create(FileName, fmCreate);
-      with TInplaceAttribute(Objects[1, Row]).Value do
-      try
-        SaveToStream(FileStream);
-      finally
-        FileStream.Free;
-      end;
+      with TInplaceAttribute(Objects[1, Row]) do
+      begin
+        SaveDialog.EncodingCombo := Value.DataType = dtText;
+        if SaveDialog.Execute then
+        begin
+          FileStream := TTextFile.Create(SaveDialog.FileName, fmCreate);
+          if Value.DataType <> dtText then
+            FileStream.Encoding := feAnsi; // raw bytes for binary data
+          try
+            Value.SaveToStream(FileStream);
+            if Value.DataType = dtText then
+              FileStream.Encoding := SaveDialog.Encoding;
+          finally
+            FileStream.Free;
+          end;
+        end;
     end;
   end;
 end;
@@ -1064,23 +1080,10 @@ begin
                           (ActiveControl.Owner <> AttributeCombo);
 
   if ActiveControl is TCustomEdit then with TCustomEdit(ActiveControl) do
-  begin
-    DoEditItems(true, CanUndo, SelLength > 0, Text <> '');
-    {ActUndo.Enabled := CanUndo;
-    ActCut.Enabled := SelLength > 0;
-    ActCopy.Enabled := ActCut.Enabled;
-    ActPaste.Enabled := true;
-    ActDelete.Enabled := Text <> '';}
-  end else
+    DoEditItems(true, CanUndo, SelLength > 0, Text <> '')
+  else
   if ActiveControl is TCustomComboBox then with TCustomComboBox(ActiveControl) do
-  begin
-    DoEditItems(true, true, SelLength > 0, Text <> '');
-    {ActUndo.Enabled := true;
-    ActCut.Enabled := SelLength > 0;
-    ActCopy.Enabled := ActCut.Enabled;
-    ActPaste.Enabled := true;
-    ActDelete.Enabled := Text <> '';}
-  end
+    DoEditItems(true, true, SelLength > 0, Text <> '')
   else
     DoEditItems(false);
 end;

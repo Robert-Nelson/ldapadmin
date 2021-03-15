@@ -211,7 +211,7 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses {$IFDEF VARIANTS} variants, {$ENDIF} md4, smbdes, Sysutils, Misc, Config;
+uses {$IFDEF VARIANTS} variants, {$ENDIF} md4Samba, smbdes, Sysutils, Misc, Config;
 
 const
   CT_ALGORITHMIC_RID   = 0;
@@ -618,3 +618,4 @@ begin
 end;
 
 end.
+

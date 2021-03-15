@@ -33,9 +33,9 @@ type
     NameEd:     TEdit;
     Label2:     TLabel;
     StorageCbx: TComboBox;
-    OkBtn:      TBitBtn;
-    CancelBtn:  TBitBtn;
     Images:     TImageList;
+    OkBtn: TButton;
+    CancelBtn: TButton;
     procedure   StorageCbxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure OkBtnClick(Sender: TObject);
   private

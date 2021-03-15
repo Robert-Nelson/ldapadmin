@@ -1,5 +1,5 @@
   {      LDAPAdmin - LDAPClasses.pas
-  *      Copyright (C) 2003-2012 Tihomir Karlovic
+  *      Copyright (C) 2003-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -52,6 +52,10 @@ const
                                   'hasSubordinates,' +
                                   'entryCSN,' +
                                   'entryUUID';
+
+  LdapInvalidChars = ['=','+','"','\',',','>','<','#',';'];
+  LdapEscapableChars = LdapInvalidChars + [' ']; // Space is invalid only at the end or the beginning of the sting
+
 
 type
   ErrLDAP = class(Exception);
@@ -199,16 +203,15 @@ type
     procedure SetReferralHops(const Value: Integer);
     function  GetOperationalAttrs: string;
     procedure SetOperationalAttrs(const Value: string);
-    function  ISConnected: Boolean;
     procedure ProcessSearchEntry(const plmEntry: PLDAPMessage; Attributes: TLdapAttributeList);
     procedure ProcessSearchMessage(const plmSearch: PLDAPMessage; const NoValues: LongBool; Result: TLdapEntryList);
-    function  GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
-    function  GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+  protected
+    function  ISConnected: Boolean; virtual;
   public
     constructor Create;
     destructor Destroy; override;
-    procedure Connect;
-    procedure Disconnect;
+    procedure Connect; virtual;
+    procedure Disconnect; virtual;
     property pld: PLDAP read ldappld;
     property Server: string read ldapServer write SetServer;
     property User: string read ldapUser write SetUser;
@@ -227,21 +230,19 @@ type
     property ChaseReferrals: Boolean read fChaseReferrals write SetChaseReferrals;
     property ReferralHops: Integer read fReferralHops write SetReferralHops;
     property Connected: Boolean read IsConnected write SetConnect;
-    function Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
-    function GetDn(sFilter: string): string;
-    function GetFreeUidNumber(const MinUid, MaxUID: Integer; const Sequential: Boolean): Integer;
-    function GetFreeGidNumber(const MinGid, MaxGID: Integer; const Sequential: Boolean): Integer;
+    function Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string; virtual;
+    function GetDn(sFilter: string): string; virtual;
     procedure Search(const Filter, Base: string; const Scope: Cardinal; QueryAttrs: array of string; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload;
-    procedure Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload;
+    procedure Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload; virtual;
     procedure ModifySet(const Filter, Base: string;
                         const Scope: Cardinal;
                         argNames: array of string;
                         argVals: array of string;
                         argNewVals: array of string;
                         const ModOp: Cardinal);
-    procedure WriteEntry(Entry: TLdapEntry);
-    procedure ReadEntry(Entry: TLdapEntry);
-    procedure DeleteEntry(const adn: string);
+    procedure WriteEntry(Entry: TLdapEntry); virtual;
+    procedure ReadEntry(Entry: TLdapEntry); virtual;
+    procedure DeleteEntry(const adn: string); virtual;
     property  OnConnect: TNotifyEvents read FOnConnect;
     property  OnDisconnect: TNotifyEvents read FOnDisconnect;
     property  OperationalAttrs: string read GetOperationalAttrs write SetOperationalAttrs;
@@ -262,6 +263,8 @@ type
     function GetObjectClass: TLdapAttribute;
   protected
     procedure SetDn(const adn: string);
+    procedure SetUtf8Dn(const adn: AnsiString);
+    function  GetUtf8Dn: AnsiString;
   public
     ObjectId: Integer;
     property Session: TLDAPSession read fSession;
@@ -270,11 +273,24 @@ type
     procedure Read; virtual;
     procedure Write; virtual;
     procedure Delete; virtual;
+    procedure Clone(ToEntry: TLdapEntry); virtual;
     property Attributes: TLdapAttributeList read fAttributes;
     property AttributesByName[const Name: string]: TLdapAttribute read GetNamedAttribute;
     property OperationalAttributes: TLdapAttributeList read fOperationalAttributes;
   published
+    { dn is internally saved as escaped LDAP string, as returned from LDAP server.
+      We cannot encode dn on write, since we cannot decide reliably if the
+      particular ',' or '=' character should be escaped or not. This means that we
+      have to deal with encoding before we assign a value to the dn property which
+      is basically only when we deal with a user input. And, since vast majority of
+      dn assignments happens internally we have an advantage of no performance impact }
     property dn: string read fdn write SetDn;
+    { To avoid perpetual conversions, fdn is internaly coded as UNICODE and not as
+      Utf8. The ldap_add_s and ldap_modify_s Windows API functions need no converting,
+      since the corresponding API UNICODE functions, which insure propper handling,
+      are called. That leavs us with neccessity to convert dn specificaly to UTF8
+      for base64 encoding when exporting entry to LDIF or DSML, hence utf8dn property }
+    property utf8dn: AnsiString read GetUtf8Dn write SetUtf8Dn;
     property State: TLdapEntryStates read fState;
     property OnChange: TDataNotifyEvent read fOnChangeProc write fOnChangeProc;
     property OnRead: TNotifyEvent read fOnRead write fOnRead;
@@ -293,7 +309,9 @@ type
     destructor    Destroy; override;
     procedure     Add(Entry: TLdapEntry);
     procedure     Delete(Index: Integer);
+    procedure     Extract(Index: Integer);
     procedure     Clear;
+    function      IndexOf(adn: string): Integer;
     property      Items[Index: Integer]: TLdapEntry read GetNode; default;
     property      Count: Integer read GetCount;
     procedure     Sort(const Attributes: array of string; const Asc: boolean); overload;
@@ -302,8 +320,8 @@ type
   end;
 
 { Name handling routines }
-function  DecodeDNString(const Src: string; const Escape: Char ='\'): string;
-function  EncodeDNString(const Src: string; const Escape: Char ='\'): string;
+function  DecodeLdapString(const Src: string; const Escape: Char ='\'): string;
+function  EncodeLdapString(const Src: string; const Escape: Char ='\'): string;
 function  IsValidDn(Value: string): Boolean;
 function  CanonicalName(dn: string): string;
 procedure SplitRdn(const dn: string; var attrib, value: string);
@@ -320,72 +338,71 @@ const
   PSEUDOATTR_RDN        = '*RDN*';
   PSEUDOATTR_PATH       = '*PATH*';
 
+var
+  RawLdapStrings: Boolean = false;
+
 implementation
 
-uses Misc, Input, Dialogs, Cert, Gss;
+{$I LdapAdmin.inc}
+
+uses Misc, Input, Dialogs, Cert, Gss{$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 { Name handling routines }
 
-const
-  InvalidDNChars = ['=','+','"','\',',','>','<','#',';'];
-
-function DecodeDNString(const Src: string; const Escape: Char ='\'): string;
+function DecodeLdapString(const Src: string; const Escape: Char ='\'): string;
 var
-  p0, p, p1, pr: PChar;
+  i, d, l: Integer;
 begin
-  p := PChar(Src);
-  p1 := StrScan(p, Escape);
-  if p1 = nil then
-  begin
-    Result := Src;
+  Result := Src;
+  if RawLdapStrings then
     exit;
-  end;
-  SetLength(Result, length(Src));
-  pr := PChar(Result);
-  p0 := pr;
-  while p^ <> #0 do
+  l := Length(Src);
+  if l = 0 then
+    exit;
+  i := 1;
+  d := 1;
+  while i < l do
   begin
-    p1 := CharNext(p);
-    if p^ = Escape then
+    if Src[i] = Escape then
     begin
-      p := p1;
-      if not (p^ in InvalidDNChars) then
+      Delete(Result, d, 1);
+      inc(i);
+      if not (Src[i] in LdapEscapableChars) then
       begin
-        p1 := CharNext(p);
-        p1 := CharNext(p1);
-        HexToBin(p, pr, p1-p);
-        pr := CharNext(pr);
+        HexToBin(PChar(@Src[i]), @Result[d], 1);
+        inc(i);
+        Delete(Result, d + 1, 1);
       end;
-      p := p1;
-      //p1 := CharNext(p1);
-      continue;
     end;
-    pr^:= p^;
-    p := p1;
-    pr := CharNext(pr);
+    inc(d);
+    inc(i);
   end;
-  SetLength(Result, pr - p0);
 end;
 
-function EncodeDNString(const Src: string; const Escape: Char ='\'): string;
+function EncodeLdapString(const Src: string; const Escape: Char ='\'): string;
 var
-  p0, p: PChar;
+  i, d, l: Integer;
 begin
-  p := PChar(Src);
-  p0 := p;
-  Result := '';
-  while (p^ <> #0) do
+  Result := Src;
+  if RawLdapStrings then
+    exit;
+  l := Length(Src);
+  if l = 0 then
+    exit;
+  d := 2;
+  for i := 2 to l - 1 do
   begin
-    if p^ in InvalidDNChars then
+    if Src[i] in LdapInvalidChars then
     begin
-      Result := Result + Copy(p0, 1, p - p0) + Escape + p^;
-      p := CharNext(p);
-      p0 := p;
-    end
-    else
-      p := CharNext(p);
+      Insert(Escape, Result, d);
+      inc(d);
+    end;
+    inc(d);
   end;
-  Result := Result + Copy(p0, 1, Length(Src));
+  if Src[1] in LdapEscapableChars then
+    Insert(Escape, Result, 1);
+  if Src[l] in LdapEscapableChars then
+    Insert(Escape, Result, Length(Result));
 end;
 
 function IsValidDn(Value: string): Boolean;
@@ -423,6 +440,20 @@ begin
   ldap_value_free(comp);
 end;
 
+function SkipEscaped(p: PChar): PChar; inline;
+begin
+  Result := CharNext(p);
+  if Result^ = #0 then
+    exit;
+  if not (Result^ in LdapEscapableChars) then
+  begin
+    Result := CharNext(p);  // skip the two-byte hex code
+    if Result^ = #0 then
+      exit;
+    Result := CharNext(p);
+  end;
+end;
+
 procedure SplitRdn(const dn: string; var attrib, value: string);
 var
   p, p0, p1: PChar;
@@ -438,7 +469,7 @@ begin
   begin
     if p1^ = '\' then
     begin
-      p1 := CharNext(p1);
+      p1 := SkipEscaped(p1);
       if p1^ = #0 then
         break;
     end;
@@ -471,7 +502,7 @@ begin
   begin
     if p1^ = '\' then
     begin
-      p1 := CharNext(p1);
+      p1 := SkipEscaped(p1);
       if p1^ = #0 then
         break;
     end;
@@ -490,7 +521,7 @@ begin
   begin
     if p1^ = '\' then
     begin
-      p1 := CharNext(p1);
+      p1 := SkipEscaped(p1);
       if p1^ = #0 then
         break;
     end;
@@ -508,7 +539,7 @@ begin
   begin
     if p^ = '\' then
     begin
-      p := CharNext(p);
+      p := SkipEscaped(p);
       if p^ = #0 then
         break;
     end
@@ -880,93 +911,6 @@ begin
   LdapCheck(ldap_delete_s(pld, PChar(adn)));
 end;
 
-{ Get random free number from the pool of available numbers, return -1 if
-  no more free numbers are available }
-function TLDAPSession.GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
-var
-  i: Integer;
-  uidpool: array of Word;
-  r, N: Word;
-begin
-  N := Max - Min + 1;
-  SetLength(uidpool, N);
-  { Initialize the array }
-  for i := 0 to N - 1 do
-    uidpool[i] := i;
-  Randomize;
-  while N > 0 do
-  begin
-    r := Random(N);
-    Result := Min + uidpool[r];
-    if Lookup(Base, Format('(&(objectclass=%s)(%s=%d))', [Objectclass, id, Result]), 'objectclass', LDAP_SCOPE_SUBTREE) = '' then
-      exit;
-    uidpool[r] := uidpool[N - 1];
-    dec(N);
-  end;
-  Result := -1;
-end;
-
-{ Get sequential free number from the pool of available numbers, return -1 if
-  no more free numbers are available }
-function TLDAPSession.GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
-var
-  plmSearch, plmEntry: PLDAPMessage;
-  attrs: PCharArray;
-  ppcVals: PPCHAR;
-  n: Integer;
-begin
-    Result := Min;
-    SetLength(attrs, 2);
-    attrs[0] := PChar(id);
-    attrs[1] := nil;
-    // perform search
-    LdapCheck(ldap_search_s(pld, PChar(Base), LDAP_SCOPE_SUBTREE, PChar(Format('(objectclass=%s)', [Objectclass])), PChar(attrs), 0, plmSearch));
-    try
-      plmEntry := ldap_first_entry(pld, plmSearch);
-      while Assigned(plmEntry) do
-      begin
-        ppcVals := ldap_get_values(pld, plmEntry, attrs[0]);
-        try
-          if Assigned(ppcVals) then
-          begin
-            n := StrToInt(pchararray(ppcVals)[0]);
-            if (n <= Max) and (n >= Result) then
-              Result :=  n + 1;
-          end;
-        finally
-          LDAPCheck(ldap_value_free(ppcVals), false);
-        end;
-        plmEntry := ldap_next_entry(pld, plmEntry);
-      end;
-    finally
-      // free search results
-      LDAPCheck(ldap_msgfree(plmSearch), false);
-    end;
-
-    if Result > Max then
-      Result := -1;
-end;
-
-function TLDAPSession.GetFreeUidNumber(const MinUid, MaxUID: Integer; const Sequential: Boolean): Integer;
-begin
-  if Sequential then
-    Result := GetSequentialNumber(MinUid, MaxUid, 'posixAccount', 'uidNumber')
-  else
-    Result := GetFreeNumber(MinUid, MaxUid, 'posixAccount', 'uidNumber');
-  if Result = -1 then
-    raise Exception.Create(Format(stNoMoreNums, ['uidNumber']));
-end;
-
-function TLDAPSession.GetFreeGidNumber(const MinGid, MaxGid: Integer; const Sequential: Boolean): Integer;
-begin
-  if Sequential then
-    Result := GetSequentialNumber(MinGid, MaxGid, 'posixGroup', 'gidNumber')
-  else
-    Result := GetFreeNumber(MinGid, MaxGid, 'posixGroup', 'gidNumber');
-  if Result = -1 then
-    raise Exception.Create(Format(stNoMoreNums, ['gidNumber']));
-end;
-
 function TLDAPSession.Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
 var
   plmSearch, plmEntry: PLDAPMessage;
@@ -1315,6 +1259,22 @@ function TLDapAttributeData.GetType: TDataType;
 var
   w: Word;
 
+  {$IFDEF CPUX64}
+  function LengthAsStr(P: Pointer; Length: Integer): Cardinal;
+  var
+    c: Integer;
+  begin
+    c := Length;
+    while (c > 0) do
+    begin
+      if PByte(P)^ = 0 then
+        break;
+      dec(c);
+      inc(PByte(P));
+    end;
+    Result := Length - c;
+  end;
+  {$ELSE}
   function LengthAsStr(P: Pointer; Length: Integer): Cardinal; assembler;
   asm
         PUSH    EDI
@@ -1326,6 +1286,7 @@ var
         SUB     EAX,ECX
         POP     EDI
   end;
+  {$ENDIF}
 
 begin
   if (Attribute.fDataType = dtUnknown) and (DataSize > 0) then
@@ -1408,7 +1369,12 @@ begin
   inherited Create;
 end;
 
-{ Same as Result := (DataSize <> Length) or not (Assigned(fBerval.Bv_Val) and CompareMem(P, Data, Length)); }
+{$IFDEF CPUX64}
+function TLDapAttributeData.CompareData(P: Pointer; Length: Integer): Boolean;
+begin
+  Result := (DataSize = Length) and CompareMem(P, Data, Length);
+end;
+{$ELSE}
 function TLDapAttributeData.CompareData(P: Pointer; Length: Integer): Boolean; assembler;
 asm
         PUSH    ESI
@@ -1427,6 +1393,7 @@ asm
 @@2:    POP     EDI
 @@3:    POP     ESI
 end;
+{$ENDIF}
 
 procedure TLdapAttributeData.SetData(AData: Pointer; ADataSize: Cardinal);
 var
@@ -1759,7 +1726,7 @@ begin
       SplitRDN(adn, attrib, value);
       with AttributesByName[attrib] do
         if AsString <> '' then
-          AsString := DecodeDNString(value);
+          AsString := DecodeLdapString(value);
     end;
     // Reset all flags
     i := Attributes.Count - 1;
@@ -1786,6 +1753,16 @@ begin
       fState := fState + [esModified];
   end;
   fdn := adn;
+end;
+
+procedure TLDAPEntry.SetUtf8Dn(const adn: AnsiString);
+begin
+  SetDn(UTF8Decode(adn));
+end;
+
+function  TLDAPEntry.GetUtf8Dn: AnsiString;
+begin
+  Result := UTF8Encode(dn);
 end;
 
 constructor TLDAPEntry.Create(const ASession: TLDAPSession; const adn: string);
@@ -1845,6 +1822,35 @@ begin
   fState := fState + [esDeleted];
 end;
 
+procedure TLDAPEntry.Clone(ToEntry: TLdapEntry);
+
+  procedure CopyAttrList(FromList, ToList: TLdapAttributeList);
+  var
+    i, j: Integer;
+    attr: TLdapAttribute;
+    val: TLdapAttributeData;
+  begin
+    for i := 0 to FromList.Count - 1 do with FromList[i] do
+    begin
+      attr := ToList.Add(fName);
+      attr.fState := fState;
+      attr.fDataType := fDataType;
+      for j := 0 to ValueCount - 1 do with Values[j] do
+      if DataSize > 0 then
+      begin
+        val := ToList[i].AddValue;
+        val.SetData(Data, DataSize);
+        val.fModOp := fModOp;
+        val.fUtf8 := fUtf8;
+      end;
+    end;
+  end;
+
+begin
+  CopyAttrList(fAttributes, ToEntry.fAttributes);
+  CopyAttrList(fOperationalAttributes, ToEntry.fOperationalAttributes);
+end;
+
 function TLDAPEntry.GetNamedAttribute(const AName: string): TLdapAttribute;
 var
   i: Integer;
@@ -1899,6 +1905,12 @@ end;
 
 procedure TLdapEntryList.Delete(Index: Integer);
 begin
+  TObject(fList[Index]).Free;
+  fList.Delete(Index)
+end;
+
+procedure TLdapEntryList.Extract(Index: Integer);
+begin
   fList.Delete(Index)
 end;
 
@@ -1910,6 +1922,17 @@ begin
     for i := 0 to fList.Count - 1 do
       TLdapEntry(fList[i]).Free;
   fList.Clear;
+end;
+
+function TLdapEntryList.IndexOf(adn: string): Integer;
+begin
+  Result := fList.Count - 1;
+  while Result >= 0 do
+  begin
+    if AnsiCompareText(adn, Items[Result].dn) = 0 then
+      break;
+    dec(Result);
+  end;
 end;
 
 procedure TLdapEntryList.Sort(const Attributes: array of string; const Asc: boolean);

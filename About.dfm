@@ -9,7 +9,7 @@ object AboutDlg: TAboutDlg
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
-  Font.Name = 'MS Sans Serif'
+  Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
   Position = poScreenCenter
@@ -20,12 +20,12 @@ object AboutDlg: TAboutDlg
   object Label1: TLabel
     Left = 56
     Top = 16
-    Width = 160
-    Height = 37
+    Width = 174
+    Height = 34
     Caption = 'LDAP Admin'
     Font.Charset = ANSI_CHARSET
     Font.Color = clNavy
-    Font.Height = -32
+    Font.Height = -29
     Font.Name = 'Arial Narrow'
     Font.Style = [fsBold, fsItalic]
     ParentFont = False
@@ -173,18 +173,30 @@ object AboutDlg: TAboutDlg
     Width = 249
     Height = 145
     BevelOuter = bvLowered
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
     TabOrder = 1
     object Label2: TLabel
       Left = 24
       Top = 24
-      Width = 38
+      Width = 39
       Height = 13
       Caption = 'Version:'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
     end
     object Label3: TLabel
       Left = 24
       Top = 48
-      Width = 34
+      Width = 37
       Height = 13
       Caption = 'Author:'
     end
@@ -198,39 +210,39 @@ object AboutDlg: TAboutDlg
     object Label5: TLabel
       Left = 72
       Top = 24
-      Width = 5
+      Width = 3
       Height = 13
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
-      Font.Name = 'MS Sans Serif'
+      Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
     end
     object Label6: TLabel
       Left = 72
       Top = 48
-      Width = 92
+      Width = 91
       Height = 13
       Caption = 'Tihomir Karlovic'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
-      Font.Name = 'MS Sans Serif'
+      Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
     end
     object Label7: TLabel
       Left = 72
       Top = 72
-      Width = 124
+      Width = 128
       Height = 13
       Cursor = crHandPoint
       Caption = 'http://www.ldapadmin.org'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clBlue
       Font.Height = -11
-      Font.Name = 'MS Sans Serif'
+      Font.Name = 'Tahoma'
       Font.Style = []
       ParentFont = False
       OnClick = Label7Click
@@ -238,9 +250,15 @@ object AboutDlg: TAboutDlg
     object Label8: TLabel
       Left = 56
       Top = 112
-      Width = 144
+      Width = 145
       Height = 13
-      Caption = '(c) 2003-2015 Tihomir Karlovic'
+      Caption = '(c) 2003-2016 Tihomir Karlovic'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
     end
   end
   object BtnClose: TButton

@@ -3,17 +3,15 @@ object AccountCopyDlg: TAccountCopyDlg
   Top = 114
   BorderStyle = bsDialog
   BorderWidth = 8
-  Caption = 'AccountCopyDlg'
   ClientHeight = 98
   ClientWidth = 289
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = False
   Position = poOwnerFormCenter
+  DesignSize = (
+    289
+    98)
   PixelsPerInch = 96
   TextHeight = 13
   object Label1: TLabel
@@ -26,7 +24,7 @@ object AccountCopyDlg: TAccountCopyDlg
   object Label2: TLabel
     Left = 0
     Top = 40
-    Width = 40
+    Width = 42
     Height = 13
     Caption = 'Storage:'
   end
@@ -45,29 +43,25 @@ object AccountCopyDlg: TAccountCopyDlg
     Height = 22
     Style = csOwnerDrawFixed
     Anchors = [akLeft, akTop, akRight]
-    ItemHeight = 16
     TabOrder = 1
     OnDrawItem = StorageCbxDrawItem
   end
-  object OkBtn: TBitBtn
-    Left = 134
-    Top = 73
+  object OkBtn: TButton
+    Left = 131
+    Top = 72
     Width = 75
     Height = 25
-    Anchors = [akRight, akBottom]
-    Caption = 'OK'
+    Caption = 'Ok'
     Default = True
     ModalResult = 1
     TabOrder = 2
     OnClick = OkBtnClick
   end
-  object CancelBtn: TBitBtn
-    Left = 214
-    Top = 73
+  object CancelBtn: TButton
+    Left = 212
+    Top = 72
     Width = 75
     Height = 25
-    Anchors = [akRight, akBottom]
-    Cancel = True
     Caption = 'Cancel'
     ModalResult = 2
     TabOrder = 3
@@ -76,7 +70,7 @@ object AccountCopyDlg: TAccountCopyDlg
     Left = 16
     Top = 53
     Bitmap = {
-      494C010102000400040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
+      494C010102000400100010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000001000000001002000000000000010
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000

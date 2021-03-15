@@ -400,12 +400,16 @@ procedure TConnPropDlg.MethodChange(Sender: TObject);
 begin
   if AuthMethod = AUTH_SIMPLE then
   begin
+    cbSSL.Enabled := true;
+    cbTLS.Enabled := true;
     cbSASL.Checked := false;
     cbSASL.Enabled := false;
     cbAnonymous.Caption := cAnonymousConn;
   end
   else begin
     cbSASL.Enabled := true;
+    cbSSL.Enabled := false;
+    cbTLS.Enabled := false;
     cbAnonymous.Caption := cSASLCurrUser;
   end;
 end;
@@ -487,6 +491,7 @@ begin
     ASession.Password   := self.Password;
     ASession.AuthMethod := self.AuthMethod;
     ASession.SSL        := Self.SSL;
+    ASession.TLS        := Self.TLS;
 
     Screen.Cursor:=crHourGlass;
     Asession.Connect;
@@ -582,11 +587,12 @@ end;
 procedure TConnPropDlg.cbSSLClick(Sender: TObject);
 begin
   if SSL then
-    PortEd.Text := IntToStr(LDAP_SSL_PORT)
+  begin
+    PortEd.Text := IntToStr(LDAP_SSL_PORT);
+    cbTLS.Checked := false;
+  end
   else
     PortEd.Text := IntToStr(LDAP_PORT);
-  cbTLS.Enabled := not SSL;
-  cbSasl.Enabled := not SSL;
 end;
 
 procedure TConnPropDlg.cbSASLClick(Sender: TObject);
@@ -596,14 +602,12 @@ begin
     cbSSL.Checked := false;
     cbTLS.Checked := false;
   end;
-  cbSSL.Enabled := not cbSASL.Checked;
-  cbTLS.Enabled := cbSSL.Enabled;
 end;
 
 procedure TConnPropDlg.cbTLSClick(Sender: TObject);
 begin
-  cbSSL.Enabled := not TLS;
-  cbSASL.Enabled := not TLS;
+  if TLS then
+    cbSSL.Checked := false;
 end;
 
 end.

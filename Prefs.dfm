@@ -6,11 +6,7 @@ object PrefDlg: TPrefDlg
   ClientHeight = 435
   ClientWidth = 554
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
@@ -35,9 +31,9 @@ object PrefDlg: TPrefDlg
         Caption = 'Defaults:'
         TabOrder = 0
         object lblHomeDir: TLabel
-          Left = 38
+          Left = 36
           Top = 92
-          Width = 76
+          Width = 78
           Height = 13
           Alignment = taRightJustify
           Caption = 'Home Directory:'
@@ -51,17 +47,17 @@ object PrefDlg: TPrefDlg
           Caption = 'Login shell:'
         end
         object lblUsername: TLabel
-          Left = 64
+          Left = 63
           Top = 28
-          Width = 51
+          Width = 52
           Height = 13
           Alignment = taRightJustify
           Caption = 'Username:'
         end
         object lblDisplayname: TLabel
-          Left = 48
+          Left = 47
           Top = 60
-          Width = 66
+          Width = 67
           Height = 13
           Alignment = taRightJustify
           Caption = 'Display name:'
@@ -103,9 +99,9 @@ object PrefDlg: TPrefDlg
         Caption = 'Groups:'
         TabOrder = 1
         object lblPosixGroup: TLabel
-          Left = 52
+          Left = 51
           Top = 31
-          Width = 60
+          Width = 61
           Height = 13
           Alignment = taRightJustify
           Caption = 'Posix Group:'
@@ -141,7 +137,6 @@ object PrefDlg: TPrefDlg
           Width = 233
           Height = 21
           Style = csDropDownList
-          ItemHeight = 13
           TabOrder = 3
           Items.Strings = (
             'GroupOfUniqueNames'
@@ -152,6 +147,10 @@ object PrefDlg: TPrefDlg
     object tsID: TTabSheet
       Caption = '&ID Settings'
       ImageIndex = 3
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object gbUserLimits: TGroupBox
         Left = 16
         Top = 136
@@ -160,9 +159,9 @@ object PrefDlg: TPrefDlg
         Caption = 'User ID limitations:'
         TabOrder = 1
         object lblFirstUId: TLabel
-          Left = 40
+          Left = 38
           Top = 36
-          Width = 44
+          Width = 46
           Height = 13
           Alignment = taRightJustify
           Caption = 'First UID:'
@@ -198,9 +197,9 @@ object PrefDlg: TPrefDlg
         Caption = 'Group ID limitations:'
         TabOrder = 2
         object lblFirstGid: TLabel
-          Left = 37
+          Left = 35
           Top = 32
-          Width = 44
+          Width = 46
           Height = 13
           Alignment = taRightJustify
           Caption = 'First GID:'
@@ -245,6 +244,10 @@ object PrefDlg: TPrefDlg
     object tsSamba: TTabSheet
       Caption = '&Samba'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object gbServer: TGroupBox
         Left = 16
         Top = 16
@@ -253,17 +256,17 @@ object PrefDlg: TPrefDlg
         Caption = 'Server:'
         TabOrder = 0
         object lblNetbios: TLabel
-          Left = 24
+          Left = 28
           Top = 36
-          Width = 81
+          Width = 77
           Height = 13
           Alignment = taRightJustify
           Caption = 'NETBIOS Name:'
         end
         object lblDomainName: TLabel
-          Left = 35
+          Left = 36
           Top = 68
-          Width = 70
+          Width = 69
           Height = 13
           Alignment = taRightJustify
           Caption = 'Domain Name:'
@@ -281,7 +284,6 @@ object PrefDlg: TPrefDlg
           Width = 353
           Height = 21
           Style = csDropDownList
-          ItemHeight = 0
           TabOrder = 1
         end
       end
@@ -294,34 +296,38 @@ object PrefDlg: TPrefDlg
         TabOrder = 1
         object TabSheet1: TTabSheet
           Caption = 'Default &paths'
+          ExplicitLeft = 0
+          ExplicitTop = 0
+          ExplicitWidth = 0
+          ExplicitHeight = 0
           object lblScript: TLabel
-            Left = 72
+            Left = 71
             Top = 91
-            Width = 30
+            Width = 31
             Height = 13
             Alignment = taRightJustify
             Caption = 'Script:'
           end
           object lblHomeShare: TLabel
-            Left = 43
+            Left = 42
             Top = 27
-            Width = 60
+            Width = 61
             Height = 13
             Alignment = taRightJustify
             Caption = 'Home share:'
           end
           object lblProfilePath: TLabel
-            Left = 48
+            Left = 45
             Top = 123
-            Width = 56
+            Width = 59
             Height = 13
             Alignment = taRightJustify
             Caption = 'Profile path:'
           end
           object lblHomeDrive: TLabel
-            Left = 48
+            Left = 47
             Top = 59
-            Width = 57
+            Width = 58
             Height = 13
             Alignment = taRightJustify
             Caption = 'Home drive:'
@@ -353,7 +359,6 @@ object PrefDlg: TPrefDlg
             Width = 65
             Height = 21
             Style = csDropDownList
-            ItemHeight = 13
             TabOrder = 3
             Items.Strings = (
               'C:'
@@ -385,6 +390,10 @@ object PrefDlg: TPrefDlg
         object TabSheet2: TTabSheet
           Caption = '&Options'
           ImageIndex = 1
+          ExplicitLeft = 0
+          ExplicitTop = 0
+          ExplicitWidth = 0
+          ExplicitHeight = 0
           object Bevel1: TBevel
             Left = 24
             Top = 112
@@ -418,6 +427,10 @@ object PrefDlg: TPrefDlg
     object tsMAil: TTabSheet
       Caption = '&Mail'
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object gbMailDefaults: TGroupBox
         Left = 16
         Top = 24
@@ -426,17 +439,17 @@ object PrefDlg: TPrefDlg
         Caption = 'Default settings:'
         TabOrder = 0
         object lblMD: TLabel
-          Left = 64
+          Left = 62
           Top = 84
-          Width = 80
+          Width = 82
           Height = 13
           Alignment = taRightJustify
           Caption = 'Default Maildrop:'
         end
         object lblMA: TLabel
-          Left = 40
+          Left = 38
           Top = 44
-          Width = 100
+          Width = 102
           Height = 13
           Alignment = taRightJustify
           Caption = 'Default Mail Address:'

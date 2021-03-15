@@ -1,5 +1,5 @@
   {      LDAPAdmin - Export.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -24,13 +24,13 @@ unit Export;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, Dialogs, WinLdap, LDAPClasses, ComCtrls, Xml;
+  Buttons, ExtCtrls, Dialogs, WinLdap, LDAPClasses, ComCtrls, Xml, DlgWrap,
+  TextFile;
 
 type
   TExportDlg = class(TForm)
     OKBtn: TButton;
     CancelBtn: TButton;
-    SaveDialog: TSaveDialog;
     Notebook: TNotebook;
     Bevel1: TBevel;
     Label1: TLabel;
@@ -44,6 +44,9 @@ type
     Label5: TLabel;
     ExportingLabel: TLabel;
     Label4: TLabel;
+    cbEncoding: TComboBox;
+    Label6: TLabel;
+    cbGenerateComments: TCheckBox;
     procedure BrowseBtnClick(Sender: TObject);
     procedure edFileNameChange(Sender: TObject);
     procedure OKBtnClick(Sender: TObject);
@@ -51,7 +54,9 @@ type
     procedure SubDirsCbkClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure cbEncodingChange(Sender: TObject);
   private
+    SaveDialog:   TSaveDialogWrapper;
     fEntryList:   TLdapEntryList;
     fdnList:      TStringList;
     fCount:       Integer;
@@ -60,6 +65,7 @@ type
     Session:      TLDAPSession;
     fTickCount:   Cardinal;
     fTickStep:    Cardinal;
+    fEncoding:    TFileEncode;
     procedure     SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
     procedure     XmlCallback(Node: TXmlNode);
     procedure     Prepare(const Filter: string);
@@ -114,7 +120,7 @@ end;
 
 procedure TExportDlg.XmlCallback(Node: TXmlNode);
 begin
-  if Node.Name = 'directory-entry' then
+  if Node.Name = 'dsml:entry' then
   begin
     ProgressBar.StepIt;
     inc(fCount);
@@ -124,6 +130,14 @@ end;
 constructor TExportDlg.Create(const ASession: TLDAPSession; const CanSubDirs: boolean=true);
 begin
   inherited Create(nil);
+  SaveDialog := TSaveDialogWrapper.Create(Self);
+  with SaveDialog do begin
+    EncodingCombo := false;
+    Filter := 'Ldif file, Windows format (CR/LF) (*.ldif)|*.ldif|Ldif file, Unix format (LF only) (*.ldif)|*.ldif|DSML (*.xml)|*.xml';
+    DefaultExt := 'ldif';
+    FilterIndex := 1;
+  end;
+  fEncoding := feUtf8;
   fEntryList := TLdapEntryList.Create;
   fdnList := TStringList.Create;
   Session := ASession;
@@ -149,8 +163,20 @@ end;
 
 procedure TExportDlg.BrowseBtnClick(Sender: TObject);
 begin
+  SaveDialog.DefaultFolder := ExtractFileDir(edFileName.Text);
   if SaveDialog.Execute then
     edFileName.Text := SaveDialog.FileName;
+end;
+
+procedure TExportDlg.cbEncodingChange(Sender: TObject);
+begin
+  case cbEncoding.ItemIndex of
+    0: fEncoding := feAnsi;
+    2: fEncoding := feUnicode_LE;
+    3: fEncoding := feUnicode_BE;
+  else
+    fEncoding := feUtf8;
+  end;
 end;
 
 procedure TExportDlg.Prepare(const Filter: string);
@@ -186,6 +212,8 @@ var
 begin
   ldif := TLDIFFile.Create(edFileName.Text, fmWrite);
   ldif.UnixWrite := UnixWrite;
+  ldif.Encoding := fEncoding;
+  ldif.GenerateComments := cbGenerateComments.Checked;
   try
     Prepare(sANYCLASS);
     fCount := 0;
@@ -206,6 +234,8 @@ var
 begin
   Prepare(sANYCLASS);
   dsml := TDsmlTree.Create(fEntryList);
+  dsml.Encoding := fEncoding;
+  dsml.GenerateComments := cbGenerateComments.Checked;
   try
     dsml.SaveToFile(edFileName.Text, XmlCallback);
   finally
@@ -220,9 +250,13 @@ end;
 
 procedure TExportDlg.OKBtnClick(Sender: TObject);
 begin
+  if FileExists(edFileName.Text) and
+     (MessageDlg(Format(stFileOverwrite, [edFileName.Text]), mtConfirmation, [mbYes, mbNo], 0) <> mrYes) then Exit;
   Notebook.PageIndex := 1;
   Application.ProcessMessages;
   try
+    if lowercase(ExtractFileExt(edFileName.Text)) = '.xml' then
+      SaveDialog.FilterIndex := 3;
     case SaveDialog.FilterIndex of
       1, 2: WriteToLdif(SaveDialog.FilterIndex = 2);
       3:    WriteToDsml;

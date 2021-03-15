@@ -38,7 +38,7 @@ uses
   InetOrg in 'InetOrg.pas',
   PropertyObject in 'PropertyObject.pas',
   Shadow in 'Shadow.pas',
-  Password in 'password.pas',
+  password in 'password.pas',
   uSchemaDlg in 'uSchemaDlg.pas' {SchemaDlg},
   Schema in 'Schema.pas',
   BinView in 'BinView.pas' {HexView},
@@ -80,7 +80,11 @@ uses
   Lang in 'Lang.pas',
   VCLFixes in 'VCLFixes.pas',
   ListViewDlg in 'ListViewDlg.pas' {ListViewDlg},
-  Bookmarks in 'Bookmarks.pas' {BookmarkDlg};
+  Bookmarks in 'Bookmarks.pas' {BookmarkDlg},
+  ast in 'ast.pas',
+  DBLoad in 'DBLoad.pas' {DBLoadDlg},
+  DlgWrap in 'DlgWrap.pas',
+  EncodedDn in 'EncodedDn.pas';
 
 {$R *.RES}
 

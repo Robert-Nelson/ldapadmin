@@ -1,5 +1,5 @@
   {      LDAPAdmin - Misc.pas
-  *      Copyright (C) 2003-2014 Tihomir Karlovic
+  *      Copyright (C) 2003-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -33,9 +33,7 @@ type
 function  UTF8ToStringLen(const src: PAnsiChar; const Len: Integer): widestring;
 function  StringToUTF8Len(const src: PChar; const Len: Integer): AnsiString;
 function  WideStringToUtf8Len(const src: PWideChar; const Len: Integer): AnsiString;
-{$IFNDEF UNICODE}
-function  StringToWide(const S: string): WideString;
-{$ENDIF}
+function  StringToWide(const S: AnsiString): WideString;
 function  CStrToString(cstr: String): String;
 function  GetValueAsText(Value: TLdapAttributeData): string;
 { Time conversion routines }
@@ -50,6 +48,7 @@ function  FormatMemoInput(const Text: string): string;
 function  FormatMemoOutput(const Text: string): string;
 function  FileReadString(const FileName: TFileName): String;
 procedure FileWriteString(const FileName: TFileName; const Value: string);
+function  Matches(Wildcard, Text: string; CaseSensitive: boolean = false): Boolean;
 { URL handling routines }
 procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port, version: integer; var auth: TLdapAuthMethod);
 { Some handy dialogs }
@@ -96,17 +95,15 @@ end;
 { String conversion routines }
 
 { Note: these functions ignore conversion errors }
-{$IFNDEF UNICODE}
-function StringToWide(const S: string): WideString;
+function StringToWide(const S: AnsiString): WideString;
 var
   DestLen: Integer;
 begin
-  DestLen := MultiByteToWideChar(0, 0, PChar(S), Length(S), nil, 0) + 1;
+  DestLen := MultiByteToWideChar(0, 0, PAnsiChar(S), Length(S), nil, 0);
   SetLength(Result, DestLen);
-  MultiByteToWideChar(0, 0, PChar(S), Length(S), PWideChar(Result), DestLen);
-  Result[DestLen] := #0;
+  MultiByteToWideChar(0, 0, PAnsiChar(S), Length(S), PWideChar(Result), DestLen);
 end;
-{$ENDIF}
+
 function UTF8ToStringLen(const src: PAnsiChar; const Len: Integer): widestring;
 var
   l: Integer;
@@ -123,15 +120,21 @@ end;
 function StringToUTF8Len(const src: PChar; const Len: Integer): AnsiString;
 var
   bsiz: Integer;
+  {$IFNDEF UNICODE}
   Temp: string;
+  {$ENDIF}
 begin
   if Len > 0 then
   begin
     bsiz := Len * 3;
+    SetLength(Result, bsiz);
+    {$IFNDEF UNICODE}
     SetLength(Temp, bsiz);
     StringToWideChar(src, PWideChar(Temp), bsiz);
-    SetLength(Result, bsiz);
     bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), -1, PAnsiChar(Result), bsiz, nil, nil);
+    {$ELSE}
+    bsiz := WideCharToMultiByte(CP_UTF8, 0, PChar(src), -1, PAnsiChar(Result), bsiz, nil, nil);
+    {$ENDIF}
     if bsiz > 0 then dec(bsiz);
     SetLength(Result, bsiz);
   end
@@ -564,6 +567,68 @@ begin
     finally
       sl.Free;
     end;
+end;
+
+{ Check if Wildcard matches Text. Wildcard may contain multiple wildcards '*' }
+function Matches(Wildcard, Text: string; CaseSensitive: boolean = false): Boolean;
+var
+  pw, pt, pa: PChar;
+  c: Char;
+begin
+  if not CaseSensitive then
+  begin
+    pw := PChar(lowercase(Wildcard));
+    pt := PChar(lowercase(Text));
+  end
+  else begin
+    pw := PChar(Wildcard);
+    pt := PChar(Text);
+  end;
+
+  while pw^ <> #0 do
+  begin
+    if pw^ = '*' then
+    begin
+      inc(pw);
+      if pw^ = #0 then // ends with wildcard, the rest of Text doesn't matter
+      begin
+        Result := true;
+        exit;
+      end;
+      pa := pw;
+      while (pw^ <> #0) and (pw^ <> '*') do
+        inc(pw);
+      c := pw^;
+      pw^:= #0;
+      if AnsiStrPos(pt, pa)= nil then
+      begin
+        Result := false;
+        exit;
+      end;
+      pw^ := c;
+      pt := pw;
+      continue;
+    end;
+
+    if pw^ = '\' then
+    begin
+      inc(pw);
+      if pw^= #0 then
+      begin
+        Result := false;
+        exit;
+      end;
+    end;
+
+    if pw^ <> pt^ then
+    begin
+      Result := false;
+      exit;
+    end;
+    inc(pw);
+    inc(pt);
+  end;
+  Result := pt^ = pw^;
 end;
 
 procedure StreamCopy(pf, pt: TStreamProcedure);

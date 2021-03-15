@@ -78,7 +78,9 @@ var
 
 implementation
 
-uses LDIF, TextFile, Constant;
+{$I LdapAdmin.inc}
+
+uses LDIF, TextFile, Constant{$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 
@@ -165,7 +167,7 @@ begin
             R.WriteLn('');
           except
             on E: EInOutError do
-              RaiseLastWin32Error
+              RaiseLastOSError
             else
               raise;
           end;

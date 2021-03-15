@@ -1,5 +1,5 @@
   {      LDAPAdmin - Alias.pas
-  *      Copyright (C) 2013 Tihomir Karlovic
+  *      Copyright (C) 2013-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -24,7 +24,7 @@ unit Alias;
 interface
 
 uses
-  SysUtils, Windows, Messages, Classes, Graphics, Controls,
+  SysUtils, Windows, Messages, Classes, Graphics, Controls, EncodedDn,
   StdCtrls, ExtCtrls, Forms, LDAPClasses, Connection, Constant;
 
 type
@@ -52,9 +52,14 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure edObjectDNChange(Sender: TObject);
   private
-    fdn:        string;
-    fEntry:     TLdapEntry;
-    fOnWrite:   TNotifyEvent;
+    fdn:         string;
+    fObjectDn:   TEncodedDn;
+    fAliasDir:   TEncodedDn;
+    fAliasDn:    TEncodedDn;
+    fAliasAttr:  TEncodedDn;
+    fAliasValue: TEncodedDn;
+    fEntry:      TLdapEntry;
+    fOnWrite:    TNotifyEvent;
   public
     constructor Create(AOwner: TComponent; dn: string; Connection: TConnection; Mode: TEditMode; ObjectPath: Boolean = false); reintroduce;
     property    OnWrite: TNotifyEvent read fOnWrite write fOnWrite;
@@ -74,6 +79,11 @@ var
   i, j: Integer;
 begin
   inherited Create(AOwner);
+  fObjectDn.Attach(edObjectDn);
+  fAliasDn.Attach(edAliasDn);
+  fAliasDir.Attach(edAliasDir);
+  fAliasValue.Attach(edAliasNameValue);
+  fAliasAttr.Attach(cbAliasNameAttr);
 
   fdn := dn;
 
@@ -87,19 +97,19 @@ begin
   if Mode = EM_MODIFY then
   begin
     fEntry.Read;
-    edObjectDN.Text := fEntry.AttributesByName['aliasedObjectName'].AsString;
-    cbAliasNameAttr.Text := DecodeDNString(GetAttributeFromDn(dn));
-    edAliasNameValue.Text := DecodeDNString(GetNameFromDn(dn));
-    edAliasDN.Text := dn;
-    edAliasDir.Text := DecodeDNString(GetDirFromDN(dn));
+    fObjectDN.Encoded := fEntry.AttributesByName['aliasedObjectName'].AsString;
+    fAliasAttr.Encoded := GetAttributeFromDn(dn);
+    fAliasValue.Encoded := GetNameFromDn(dn);
+    fAliasDN.Encoded := dn;
+    fAliasDir.Encoded := GetDirFromDN(dn);
     Caption := Format(cPropertiesOf, [edAliasNameValue.Text]);
     Label1.Caption := cParentDir;
   end
   else
   if ObjectPath then
-    edObjectDN.Text := dn
+    fObjectDn.Encoded := dn
   else
-    edAliasDir.Text := dn;
+    fAliasDir.Encoded := dn;
 end;
 
 procedure TAliasDlg.btnObjDNClick(Sender: TObject);
@@ -108,7 +118,7 @@ var
 begin
   s := MainFrm.PickEntry(cSelectEntry);
   if s <> '' then
-    edObjectDN.Text := s;
+    fObjectDn.Encoded := s;
 end;
 
 procedure TAliasDlg.btnAliasDirClick(Sender: TObject);
@@ -117,15 +127,15 @@ var
 begin
   s := MainFrm.PickEntry(cSelectAliasDir);
   if s <> '' then
-   edAliasDir.Text := s;
+    fAliasDir.Encoded := s;
 end;
 
 procedure TAliasDlg.edAliasDNChange(Sender: TObject);
 begin
   if (edAliasDir.Text = '') or (cbAliasNameAttr.Text = '') or (edAliasNameValue.Text = '') then
-    edAliasDN.Text := ''
+    fAliasDn.Encoded := ''
   else
-    edAliasDN.Text := cbAliasNameAttr.Text + '=' + edAliasNameValue.Text + ',' + edAliasDir.Text
+    fAliasDn.Encoded := fAliasAttr.Encoded + '=' + fAliasValue.Encoded + ',' + fAliasDir.Encoded;
 end;
 
 procedure TAliasDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -146,9 +156,8 @@ begin
         AddValue('extensibleObject');
       end;
     end;
-    fEntry.dn := edAliasDN.Text;
-    fEntry.AttributesByName[cbAliasNameAttr.Text].AsString := edAliasNameValue.Text;
-    fEntry.AttributesByName['aliasedObjectName'].AsString := edObjectDN.Text;
+    fEntry.dn := fAliasDn.Encoded;
+    fEntry.AttributesByName['aliasedObjectName'].AsString := fObjectDN.Encoded;
     fEntry.Write;
     { If editing and dn was changed a copy of the alias object is created at new dn }
     { so we need to delete the original entry effectively moving the entry to new dn }
@@ -166,8 +175,14 @@ end;
 
 procedure TAliasDlg.edObjectDNChange(Sender: TObject);
 begin
-  cbAliasNameAttr.Text := GetAttributeFromDn(edObjectDN.Text);
-  edAliasNameValue.Text := GetNameFromDn(edObjectDN.Text);
+  if not edAliasNameValue.Modified then
+  begin
+    fAliasValue.Verbatim := fObjectDn.Verbatim;
+    fAliasValue.Encoded := GetNameFromDn(fObjectDn.Encoded);
+  end;
+  fAliasAttr.Verbatim := fObjectDn.Verbatim;
+  fAliasAttr.Encoded := GetAttributeFromDn(fObjectDn.Encoded);
 end;
 
 end.
+

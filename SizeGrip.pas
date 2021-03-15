@@ -43,7 +43,7 @@
 
 unit SizeGrip;
 
-{$I VER.INC}
+//{$I VER.INC}
 
 interface
 
@@ -83,8 +83,10 @@ type
 
 implementation
 
+{$I LdapAdmin.inc}
+
 {$IFDEF VER_D7H}
-uses UxTheme, Themes;
+uses UxTheme, Themes{$IFDEF VER_XEH}, System.Types{$ENDIF};
 {$ENDIF}
 
 type

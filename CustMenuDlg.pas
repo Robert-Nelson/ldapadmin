@@ -130,7 +130,9 @@ function CustomizeMenu(AOwner: TComponent; AImageList: TImageList; Connection: T
 
 implementation
 
-uses Templates, Misc, SizeGrip, Constant;
+{$I LdapAdmin.inc}
+
+uses Templates, Misc, SizeGrip, Constant{$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 

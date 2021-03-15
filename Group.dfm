@@ -6,11 +6,7 @@ object GroupDlg: TGroupDlg
   ClientHeight = 472
   ClientWidth = 411
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = True
   Position = poMainFormCenter
   OnClose = FormClose
@@ -20,14 +16,14 @@ object GroupDlg: TGroupDlg
   object Label1: TLabel
     Left = 16
     Top = 16
-    Width = 61
+    Width = 62
     Height = 13
     Caption = '&Group name:'
   end
   object Label2: TLabel
     Left = 16
     Top = 64
-    Width = 56
+    Width = 57
     Height = 13
     Caption = '&Description:'
   end
@@ -133,7 +129,7 @@ object GroupDlg: TGroupDlg
       object Label4: TLabel
         Left = 272
         Top = 112
-        Width = 37
+        Width = 36
         Height = 13
         Caption = 'NT-Rid:'
       end
@@ -147,7 +143,7 @@ object GroupDlg: TGroupDlg
       object Label5: TLabel
         Left = 24
         Top = 64
-        Width = 66
+        Width = 67
         Height = 13
         Caption = 'Display name:'
       end
@@ -157,7 +153,6 @@ object GroupDlg: TGroupDlg
         Width = 233
         Height = 21
         Style = csDropDownList
-        ItemHeight = 0
         TabOrder = 2
         OnChange = cbSambaDomainChange
       end
@@ -183,7 +178,6 @@ object GroupDlg: TGroupDlg
         Style = csDropDownList
         Color = clBtnFace
         Enabled = False
-        ItemHeight = 13
         TabOrder = 5
         OnChange = cbBuiltinChange
         Items.Strings = (

@@ -123,7 +123,9 @@ type
 
 implementation
 
-uses Math, Export, WinLdap, Constant, Misc;
+{$I LdapAdmin.inc}
+
+uses Math, Export, WinLdap, Constant, Misc{$IFDEF VER_XEH}, System.Types{$ENDIF};
 
 const
   FOLDER_IMG          = 0;

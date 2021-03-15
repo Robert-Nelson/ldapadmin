@@ -1,5 +1,5 @@
   {      LDAPAdmin - Connlist.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, StdCtrls, Menus, ImgList, ExtCtrls, Buttons, Config, ToolWin,
-  ActnList, LDAPClasses;
+  ActnList, LDAPClasses, DlgWrap, System.Actions;
 
 type
   TConnListFrm = class(TForm)
@@ -69,9 +69,8 @@ type
     ActOpenStorage: TAction;
     ActCopyAccount: TAction;
     ActPropertiesAccount: TAction;
-    SaveDialog: TSaveDialog;
     ToolButton8: TToolButton;
-    ActDeleteStrorage: TAction;
+    ActDeleteStorage: TAction;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ListViewEditing(Sender: TObject; Item: TListItem;
       var AllowEdit: Boolean);
@@ -96,10 +95,11 @@ type
     procedure ActNewStorageExecute(Sender: TObject);
     procedure ActOpenStorageExecute(Sender: TObject);
     procedure ViewStyleMenuPopup(Sender: TObject);
-    procedure ActDeleteStrorageExecute(Sender: TObject);
+    procedure ActDeleteStorageExecute(Sender: TObject);
     procedure FormResize(Sender: TObject);
   private
     FStorage: TConfigStorage;
+    SaveDialog: TSaveDialogWrapper;
     procedure SetViewStyle(Style: integer);
     procedure RefreshAccountsView;
     procedure RefreshStoragesList(ItemIndex: integer=-1);
@@ -111,18 +111,28 @@ type
 
 implementation
 
-uses ConnProp, Constant, Math, uAccountCopyDlg, SizeGrip;
+{$R *.DFM}
+{$I LdapAdmin.inc}
+
+uses ConnProp, Constant, Math, uAccountCopyDlg, SizeGrip
+     {$IFDEF VER_XEH}, System.Types{$ENDIF};
 
 const
   CONF_ACCLV_STYLE='ConList\AccountsView\Style';
   CONF_STORLIST_WIDTH='ConList\StorragesList\Width';
   CONF_STORLIST_INDEX='ConList\StorragesList\Index';
 
-{$R *.DFM}
 
 constructor TConnListFrm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  SaveDialog := TSaveDialogWrapper.Create(Self);
+  with SaveDialog do begin
+    Filter := CONNLIST_SAVE_FILTER;
+    FilterIndex := 1;
+    OverwritePrompt := true;
+    DefaultExt := 'ltf';
+  end;
   TSizeGrip.Create(Panel1);
   StoragesList.Width:=GlobalConfig.ReadInteger(CONF_STORLIST_WIDTH, StoragesList.Width);
   RefreshStoragesList(GlobalConfig.ReadInteger(CONF_STORLIST_INDEX, 0));
@@ -290,7 +300,7 @@ begin
   ActCopyAccount.Enabled:=OkBtn.Enabled;
   ActPropertiesAccount.Enabled:=OkBtn.Enabled;
 
-  ActDeleteStrorage.Enabled:=(FStorage<>nil) and (FStorage is TXmlConfigStorage);
+  ActDeleteStorage.Enabled:=(FStorage<>nil) and (FStorage is TXmlConfigStorage);
 end;
 
 procedure TConnListFrm.ActRenameAccountExecute(Sender: TObject);
@@ -424,7 +434,7 @@ begin
   end;
 end;
 
-procedure TConnListFrm.ActDeleteStrorageExecute(Sender: TObject);
+procedure TConnListFrm.ActDeleteStorageExecute(Sender: TObject);
 var
   i: integer;
 begin

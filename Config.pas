@@ -8,6 +8,7 @@
   *               Unicode Support        - T.Karlovic 11.06.2012
   *               TRegistryConfigStorage.Delete and
   *               TConfig.Delete         - T.Karlovic 09.11.2012
+  *               Unicode strings        - T.Karlovic 15.07.2016
   *
   * This file is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published by
@@ -325,14 +326,19 @@ const
   CONNECT_OPERATIONAL_ATTRS    = CONNECT_PREFIX + 'OperationalAttributes';
 
 
-  LAC_ROOTNAME    = 'LDAPAccounts';
+  LAC_ROOTNAME                 = 'LDAPAccounts';
+
+  cfAnsiStrings                = $0000;
+  cfUnicodeStrings             = $0001;
 
 procedure RegProtocol(Ext: string);
 
 implementation
 
+{$I LdapAdmin.inc}
+
 uses Constant, WinLdap, Dialogs, Forms, StdCtrls, Controls, ComObj, Base64,
-     Math;
+     Math {$IFDEF VER_XEH}, System.Types{$ENDIF};
 
 function CheckProto(Ext: string): boolean;
 var
@@ -769,12 +775,13 @@ end;
 procedure TAccount.ReadCredentials;
 { Format of credentials:
   Flags ........ 4 byte
-  User ......... 4 byte strlength + String
-  Password ..... 4 byte strlength + String }
+  User ......... 4 byte strlen*sizeof(char) + String
+  Password ..... 4 byte strlen*sizeof(char) + String }
 var
   Buffer: array of byte;
   len: Integer;
   Offset: integer;
+  Flags: Integer;
 
   function RdInteger: Integer;
   begin
@@ -787,7 +794,10 @@ var
     StrLen: Integer;
   begin
     StrLen := RdInteger;
-    SetString(Result, PAnsiChar(@Buffer[Offset]), StrLen);
+    if Flags and cfUnicodeStrings <> 0 then
+      SetString(Result, PWideChar(@Buffer[Offset]), StrLen div 2)
+    else
+      SetString(Result, PAnsiChar(@Buffer[Offset]), StrLen);
     inc(Offset, StrLen);
   end;
 
@@ -800,16 +810,16 @@ begin
   setlength(Buffer, len);
   ReadBinaryData(CONNECT_CREDIT, Buffer[0], len);
   Offset:=0;
-  RdInteger;        // Read flags
-  FUser:=RdStr;     // Read user name
-  FPassword:=RdStr; // Read password
+  Flags := RdInteger; // Read flags
+  FUser:=RdStr;       // Read user name
+  FPassword:=RdStr;   // Read password
 end;
 
 procedure TAccount.WriteCredentials;
 { Format of credentials:
   Flags ........ 4 byte
-  User ......... 4 byte strlength + String
-  Password ..... 4 byte strlength + String   }
+  User ......... 4 byte strlen*sizeof(char) + String
+  Password ..... 4 byte strlen*sizeof(char) + String   }
 var
   Buffer: array of byte;
   len: Integer;
@@ -821,20 +831,24 @@ var
     inc(len, SizeOf(i));
   end;
 
-  procedure WrString(s: ansistring);
+  procedure WrString(s: WideString);
+  var
+    size: Integer;
   begin
-    WrInteger(length(S));
-    setlength(Buffer, len+length(S));
-    System.Move(Pointer(s)^, Buffer[len], length(S));
-    Inc(len, length(S));
+    size := Length(S)*SizeOf(WideChar);
+    WrInteger(size);
+    setlength(Buffer, len+size);
+    System.Move(Pointer(s)^, Buffer[len], size);
+    Inc(len, size);
   end;
+
 begin
   if FStorage=nil then exit;
   len:=0;
   setlength(Buffer,0);
-  WrInteger(0);    // Write flags
-  WrString(FUser); // Write user name
-                   // Write password, if PasswordCanSave
+  WrInteger(cfUnicodeStrings);  // Write flags
+  WrString(FUser);              // Write user name
+                                // Write password, if PasswordCanSave
   if FStorage.PasswordCanSave then WrString(FPassword)
   else WrString('');
 

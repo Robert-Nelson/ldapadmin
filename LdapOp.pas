@@ -69,8 +69,9 @@ var
 implementation
 
 {$R *.DFM}
+{$I LdapAdmin.inc}
 
-uses Misc, Dialogs, Config, Constant;
+uses Misc, Dialogs, Config, Constant{$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 function TLdapOpDlg.CheckPathOverlap(const SourceDn, DestDn: string): Boolean;
 begin

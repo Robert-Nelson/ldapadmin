@@ -1,16 +1,12 @@
 object CustomMenuDlg: TCustomMenuDlg
   Left = 428
   Top = 183
-  Width = 695
-  Height = 548
   ActiveControl = TreeView
   Caption = 'Customize menu'
+  ClientHeight = 510
+  ClientWidth = 679
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   Menu = MainMenu
   OldCreateOrder = False
   Position = poMainFormCenter
@@ -19,22 +15,25 @@ object CustomMenuDlg: TCustomMenuDlg
   PixelsPerInch = 96
   TextHeight = 13
   object Panel2: TPanel
-    Left = 313
+    Left = 305
     Top = 0
     Width = 11
-    Height = 456
+    Height = 464
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 0
   end
   object Panel3: TPanel
     Left = 0
-    Top = 456
-    Width = 687
+    Top = 464
+    Width = 679
     Height = 46
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 1
+    DesignSize = (
+      679
+      46)
     object btnCancel: TButton
       Left = 599
       Top = 12
@@ -57,10 +56,10 @@ object CustomMenuDlg: TCustomMenuDlg
     end
   end
   object Panel4: TPanel
-    Left = 681
+    Left = 673
     Top = 0
     Width = 6
-    Height = 456
+    Height = 464
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 2
@@ -69,16 +68,16 @@ object CustomMenuDlg: TCustomMenuDlg
     Left = 0
     Top = 0
     Width = 6
-    Height = 456
+    Height = 464
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 3
   end
   object Panel1: TPanel
-    Left = 324
+    Left = 316
     Top = 0
     Width = 357
-    Height = 456
+    Height = 464
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 4
@@ -86,7 +85,7 @@ object CustomMenuDlg: TCustomMenuDlg
       Left = 0
       Top = 0
       Width = 357
-      Height = 456
+      Height = 464
       Align = alClient
       BevelInner = bvLowered
       BevelOuter = bvNone
@@ -102,7 +101,7 @@ object CustomMenuDlg: TCustomMenuDlg
         object Label1: TLabel
           Left = 16
           Top = 16
-          Width = 39
+          Width = 41
           Height = 13
           Caption = 'Ca&ption:'
         end
@@ -156,7 +155,6 @@ object CustomMenuDlg: TCustomMenuDlg
           Height = 22
           Style = csOwnerDrawFixed
           Enabled = False
-          ItemHeight = 16
           TabOrder = 3
           OnChange = cbTemplateChange
           OnDrawItem = cbTemplateDrawItem
@@ -167,7 +165,6 @@ object CustomMenuDlg: TCustomMenuDlg
           Width = 185
           Height = 22
           Style = csOwnerDrawFixed
-          ItemHeight = 16
           TabOrder = 4
           OnChange = cbDefaultActionChange
           OnDrawItem = cbDefaultActionDrawItem
@@ -208,7 +205,6 @@ object CustomMenuDlg: TCustomMenuDlg
           Top = 40
           Width = 97
           Height = 21
-          ItemHeight = 13
           TabOrder = 0
         end
         object cbCtrl: TCheckBox
@@ -241,8 +237,8 @@ object CustomMenuDlg: TCustomMenuDlg
   object TreeView: TTreeView
     Left = 6
     Top = 0
-    Width = 307
-    Height = 456
+    Width = 299
+    Height = 464
     Align = alClient
     DragCursor = crDefault
     DragMode = dmAutomatic
@@ -261,16 +257,16 @@ object CustomMenuDlg: TCustomMenuDlg
     OnStartDrag = TreeViewStartDrag
   end
   object MainMenu: TMainMenu
-    Left = 48
-    Top = 400
+    Left = 96
+    Top = 352
     object mbTest: TMenuItem
       Caption = '&Test'
     end
   end
   object PopupMenu: TPopupMenu
     OnPopup = PopupMenuPopup
-    Left = 80
-    Top = 400
+    Left = 160
+    Top = 352
     object mbAddItem: TMenuItem
       Caption = 'Add &item'
       OnClick = mbAddItemClick
@@ -291,7 +287,7 @@ object CustomMenuDlg: TCustomMenuDlg
   object ScrollTimer: TTimer
     Enabled = False
     OnTimer = ScrollTimerTimer
-    Left = 16
-    Top = 400
+    Left = 32
+    Top = 352
   end
 end

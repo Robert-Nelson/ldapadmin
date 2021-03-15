@@ -615,7 +615,7 @@ end;
 procedure TGroupDlg.edNameChange(Sender: TObject);
 begin
   if esNew in Entry.State then
-    Entry.Dn := 'cn=' + edName.Text + ',' + ParentDn;
+    Entry.Dn := 'cn=' + EncodeLdapString(edName.Text) + ',' + ParentDn;
   Entry.AttributesByName['cn'].AsString := edName.Text;
   OkBtn.Enabled := edName.Text <> '';
 end;

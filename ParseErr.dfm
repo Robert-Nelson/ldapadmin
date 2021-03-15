@@ -1,19 +1,18 @@
 object ParseErrDlg: TParseErrDlg
   Left = 508
   Top = 266
-  Width = 547
-  Height = 385
   ActiveControl = SrcMemo
   Caption = 'Parse error'
+  ClientHeight = 347
+  ClientWidth = 531
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = False
   OnActivate = FormActivate
   OnClose = FormClose
+  DesignSize = (
+    531
+    347)
   PixelsPerInch = 96
   TextHeight = 13
   object Bevel1: TBevel

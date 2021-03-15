@@ -7,11 +7,7 @@ object UserDlg: TUserDlg
   ClientHeight = 451
   ClientWidth = 394
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = True
   Position = poMainFormCenter
   OnClose = FormClose
@@ -36,49 +32,49 @@ object UserDlg: TUserDlg
       object Label1: TLabel
         Left = 16
         Top = 16
-        Width = 51
+        Width = 54
         Height = 13
         Caption = '&First name:'
       end
       object Label2: TLabel
         Left = 224
         Top = 16
-        Width = 69
+        Width = 68
         Height = 13
         Caption = '&Second name:'
       end
       object Label3: TLabel
         Left = 16
         Top = 64
-        Width = 66
+        Width = 67
         Height = 13
         Caption = '&Display name:'
       end
       object Label4: TLabel
         Left = 16
         Top = 112
-        Width = 51
+        Width = 52
         Height = 13
         Caption = '&Username:'
       end
       object Label5: TLabel
         Left = 160
         Top = 16
-        Width = 32
+        Width = 35
         Height = 13
         Caption = '&Initials:'
       end
       object Label9: TLabel
         Left = 16
         Top = 160
-        Width = 76
+        Width = 78
         Height = 13
         Caption = '&Home Directory:'
       end
       object Label12: TLabel
         Left = 16
         Top = 208
-        Width = 34
+        Width = 33
         Height = 13
         Caption = 'Gecos:'
       end
@@ -137,7 +133,6 @@ object UserDlg: TUserDlg
           Height = 72
           OnClickCheck = CheckListBoxClickCheck
           BorderStyle = bsNone
-          Color = clBtnFace
           Enabled = False
           Flat = False
           IntegralHeight = True
@@ -219,6 +214,10 @@ object UserDlg: TUserDlg
     object ShadowSheet: TTabSheet
       Caption = 'Shadow'
       ImageIndex = 6
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object RadioGroup1: TRadioGroup
         Left = 16
         Top = 264
@@ -237,15 +236,10 @@ object UserDlg: TUserDlg
         Top = 320
         Width = 97
         Height = 21
-        CalAlignment = dtaLeft
-        Date = 38076.7716250926
-        Time = 38076.7716250926
+        Date = 38076.771625092600000000
+        Time = 38076.771625092600000000
         Color = clBtnFace
-        DateFormat = dfShort
-        DateMode = dmComboBox
         Enabled = False
-        Kind = dtkDate
-        ParseInput = False
         TabOrder = 2
         OnChange = DateTimePickerChange
       end
@@ -259,14 +253,14 @@ object UserDlg: TUserDlg
         object Label35: TLabel
           Left = 32
           Top = 40
-          Width = 62
+          Width = 61
           Height = 13
           Caption = 'Min Shadow:'
         end
         object Label37: TLabel
           Left = 200
           Top = 40
-          Width = 82
+          Width = 83
           Height = 13
           Caption = 'Shadow warning:'
         end
@@ -287,7 +281,7 @@ object UserDlg: TUserDlg
         object Label40: TLabel
           Left = 32
           Top = 160
-          Width = 83
+          Width = 84
           Height = 13
           Caption = 'Shadow Inactive:'
         end
@@ -336,10 +330,14 @@ object UserDlg: TUserDlg
     object SambaSheet: TTabSheet
       Caption = '&Samba'
       ImageIndex = 5
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label6: TLabel
         Left = 16
         Top = 120
-        Width = 30
+        Width = 31
         Height = 13
         Caption = 'S&cript:'
       end
@@ -353,7 +351,7 @@ object UserDlg: TUserDlg
       object Label8: TLabel
         Left = 16
         Top = 168
-        Width = 56
+        Width = 59
         Height = 13
         Caption = '&Profile path:'
       end
@@ -367,7 +365,7 @@ object UserDlg: TUserDlg
       object Label21: TLabel
         Left = 16
         Top = 216
-        Width = 56
+        Width = 57
         Height = 13
         Caption = 'D&escription:'
       end
@@ -392,7 +390,6 @@ object UserDlg: TUserDlg
         Width = 57
         Height = 21
         Style = csDropDownList
-        ItemHeight = 13
         TabOrder = 2
         OnChange = sambaHomeDriveChange
         Items.Strings = (
@@ -451,7 +448,6 @@ object UserDlg: TUserDlg
         Width = 353
         Height = 21
         Style = csDropDownList
-        ItemHeight = 0
         TabOrder = 0
         OnChange = cbDomainChange
       end
@@ -495,17 +491,21 @@ object UserDlg: TUserDlg
     object MailSheet: TTabSheet
       Caption = '&Mail'
       ImageIndex = 6
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label10: TLabel
         Left = 16
         Top = 24
-        Width = 43
+        Width = 44
         Height = 13
         Caption = 'Maildrop:'
       end
       object Label11: TLabel
         Left = 16
         Top = 72
-        Width = 84
+        Width = 85
         Height = 13
         Caption = 'E-Mail Addresses:'
       end
@@ -560,17 +560,21 @@ object UserDlg: TUserDlg
     object OfficeSheet: TTabSheet
       Caption = '&Business'
       ImageIndex = 7
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label15: TLabel
         Left = 208
         Top = 208
-        Width = 31
+        Width = 32
         Height = 13
         Caption = 'P&ager:'
       end
       object Label18: TLabel
         Left = 16
         Top = 64
-        Width = 31
+        Width = 34
         Height = 13
         Caption = '&Street:'
       end
@@ -598,35 +602,35 @@ object UserDlg: TUserDlg
       object Label25: TLabel
         Left = 208
         Top = 64
-        Width = 31
+        Width = 33
         Height = 13
         Caption = '&Office:'
       end
       object Label27: TLabel
         Left = 208
         Top = 16
-        Width = 40
+        Width = 41
         Height = 13
         Caption = 'P&osition:'
       end
       object Label29: TLabel
         Left = 16
         Top = 16
-        Width = 47
+        Width = 49
         Height = 13
         Caption = 'C&ompany:'
       end
       object Label30: TLabel
         Left = 208
         Top = 160
-        Width = 20
+        Width = 22
         Height = 13
         Caption = '&Fax:'
       end
       object Label31: TLabel
         Left = 16
         Top = 160
-        Width = 20
+        Width = 23
         Height = 13
         Caption = '&City:'
       end
@@ -714,17 +718,21 @@ object UserDlg: TUserDlg
     object PrivateSheet: TTabSheet
       Caption = '&Personal'
       ImageIndex = 8
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label17: TLabel
         Left = 16
         Top = 24
-        Width = 41
+        Width = 43
         Height = 13
         Caption = '&Address:'
       end
       object Label23: TLabel
         Left = 16
         Top = 192
-        Width = 20
+        Width = 22
         Height = 13
         Caption = '&Fax:'
       end
@@ -745,7 +753,7 @@ object UserDlg: TUserDlg
       object Label41: TLabel
         Left = 224
         Top = 144
-        Width = 31
+        Width = 32
         Height = 13
         Caption = 'Photo:'
       end
@@ -822,17 +830,21 @@ object UserDlg: TUserDlg
     object GroupSheet: TTabSheet
       Caption = '&Membership'
       ImageIndex = 9
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label34: TLabel
         Left = 16
         Top = 72
-        Width = 41
+        Width = 42
         Height = 13
         Caption = 'M&ember:'
       end
       object Label33: TLabel
         Left = 16
         Top = 24
-        Width = 67
+        Width = 71
         Height = 13
         Caption = '&Primary group:'
       end
@@ -863,6 +875,7 @@ object UserDlg: TUserDlg
         Width = 75
         Height = 25
         Caption = '&Add'
+        Enabled = False
         TabOrder = 3
         OnClick = AddGroupBtnClick
       end
@@ -899,7 +912,6 @@ object UserDlg: TUserDlg
         Width = 169
         Height = 21
         Style = csDropDownList
-        ItemHeight = 13
         TabOrder = 5
         OnChange = cbxGroupsChange
         Items.Strings = (
@@ -939,7 +951,7 @@ object UserDlg: TUserDlg
     end
   end
   object OpenPictureDialog: TOpenPictureDialog
-    Left = 356
-    Top = 408
+    Left = 316
+    Top = 400
   end
 end

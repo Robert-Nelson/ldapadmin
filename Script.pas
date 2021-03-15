@@ -285,7 +285,7 @@ implementation
 {$I LdapAdmin.inc}
 
 uses {$IFDEF VARIANTS} variants, {$ENDIF} LdapClasses, Misc, Dialogs, Constant,
-     Connection, StdCtrls;
+     Connection, StdCtrls {$IFDEF VER_XEH}, System.Types{$ENDIF};
 
 var
   lastScriptExceptionMessage: string;
@@ -459,18 +459,18 @@ var
       varInteger, varBoolean:
         begin
           Integer(ParamPtr^) := Param;
-          Inc(Cardinal(ParamPtr), SizeOf(Integer));
+          Inc(PByte(ParamPtr), SizeOf(Integer));
         end;
       varString:
         begin
           CallDesc.ArgTypes[TypeIdx] := varStrArg;
           Pointer(ParamPtr^) := TVarData(Param).vString;
-          Inc(Cardinal(ParamPtr), SizeOf(Pointer));
+          Inc(PByte(ParamPtr), SizeOf(Pointer));
         end;
       varDispatch:
         begin
           Pointer(ParamPtr^) := TVarData(Param).vPointer;
-          Inc(Cardinal(ParamPtr), SizeOf(Pointer));
+          Inc(PByte(ParamPtr), SizeOf(Pointer));
         end;
       else
         raise Exception.Create(stScriptParamType);
@@ -593,7 +593,7 @@ type
     { IActiveScriptSite }
     function GetLCID(out lcid: LongWord): HResult; stdcall;
     function GetItemInfo(Name: PWideChar; ReturnMask: DWORD;
-      out unkItem: IUnknown; out Info: ITypeInfo): HResult; stdcall;
+      out unkItem: Pointer; out Info: Pointer): HResult; stdcall;
     function GetDocVersionString(out Version: PWideChar): HResult; stdcall;
     function OnScriptTerminate(const varResult: OleVariant;
       const ExcepInfo: TExcepInfo): HResult; stdcall;
@@ -625,7 +625,7 @@ begin
   Result := E_NOTIMPL;
 end;
 
-function TScriptSite.GetItemInfo(Name: PWideChar; ReturnMask: DWORD; out unkItem: IUnknown; out Info: ITypeInfo): HResult;
+function TScriptSite.GetItemInfo(Name: PWideChar; ReturnMask: DWORD; out unkItem: Pointer; out Info: Pointer): HResult;
 var
   Item: IScriptlet;
   S: string;
@@ -642,7 +642,7 @@ begin
       Item := FScript.FindScriptlet(S);
       if Item <> nil then
       begin
-        unkItem := Item;
+        unkItem := Pointer(Item);
         Result := S_OK;
       end;
     end;
@@ -1347,7 +1347,7 @@ end;
 { TObjectScriptlet }
 
 { Descendents of TObjectScriptlet should override the GetProperty method rather
- then OnGetPropherty to preserve preprocessing which is done in OnGetProperty }
+ then OnGetProperty to preserve preprocessing which is done in OnGetProperty }
 
 type
   TObjectScriptlet = class(TScriptlet, IObjectScriptlet)

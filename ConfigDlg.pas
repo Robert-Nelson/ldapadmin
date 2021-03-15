@@ -1,5 +1,5 @@
   {      LDAPAdmin - ConfigDlg.pas
-  *      Copyright (C) 2006 Tihomir Karlovic
+  *      Copyright (C) 2006-2015 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -28,7 +28,6 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
 
 type
   TConfigDlg = class(TForm)
-    OpenConfig: TOpenDialog;
     PageControl1: TPageControl;
     TabSheet1: TTabSheet;
     TabSheet2: TTabSheet;
@@ -67,6 +66,8 @@ type
     GroupBox7: TGroupBox;
     TranscodingTable: TStringGrid;
     Label3: TLabel;
+    btnEditLang: TButton;
+    cbDisplayEncoded: TCheckBox;
     procedure btnAddClick(Sender: TObject);
     procedure btnDelClick(Sender: TObject);
     procedure cbConnectClick(Sender: TObject);
@@ -79,6 +80,7 @@ type
     procedure btnAddLangClick(Sender: TObject);
     procedure btnDelLangClick(Sender: TObject);
     procedure ListMouseMove(Sender: TObject; Shift: TShiftState; X,Y: Integer);
+    procedure btnEditLangClick(Sender: TObject);
   private
     cbStartupConnection: TLAComboBox;
     procedure cbStartupConnectionDrawItem(Control: TWinControl;
@@ -90,7 +92,10 @@ type
 
 implementation
 
-uses FileCtrl, Config, Templates, Constant, Misc, Main;
+{$I LdapAdmin.inc}
+
+uses FileCtrl, Config, Templates, Constant, Misc, Main, Lang
+{$IFDEF VER_XEH}, System.Types, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 
@@ -112,6 +117,7 @@ begin
     Style := csOwnerDrawFixed;
     Color := clBtnFace;
     Enabled := False;
+    TabOrder := 1;
     OnDrawItem := cbStartupConnectionDrawItem;
     OnCanCloseUp := cbStartupConnectionCloseUp;
   end;
@@ -130,6 +136,7 @@ begin
     cbSmartDelete.Checked := ReadBool(rSmartDelete, true);
     cbTemplateIcons.Checked := ReadBool(rUseTemplateImages, false);
     CheckAssocCbk.Checked:= not ReadBool(rDontCheckProto, false);
+    cbDisplayEncoded.Checked := ReadBool(rEncodedLdapStrings, false);
 
     s := ReadString(rStartupSession);
     with cbStartupConnection do
@@ -216,6 +223,8 @@ begin
   begin
     TemplateParser.Paths := TemplateList.Items.CommaText;
     TemplateParser.AddPath(ExtractFileDir(application.ExeName) + '\*.' + TEMPLATE_EXT);
+    LanguageLoader.Paths := LanguageList.Items.CommaText;
+    LanguageLoader.AddPath(ExtractFileDir(application.ExeName) + '\*.' + LANG_EXT);
     WriteBool(rTemplateExtensions, cbTemplateExtensions.Checked);
     WriteBool(rTemplateAutoload, cbTemplateAutoload.Checked);
     WriteBool(rTemplateProperties, cbTemplateProperties.Checked);
@@ -224,6 +233,7 @@ begin
     WriteString(rTemplateDir, TemplateList.Items.CommaText);
     WriteString(rLanguageDir, LanguageList.Items.CommaText);
     WriteBool(rDontCheckProto, not CheckAssocCbk.Checked);
+    WriteBool(rEncodedLdapStrings, cbDisplayEncoded.Checked);
     with cbStartupConnection do
     begin
       if ItemIndex = -1 then
@@ -335,6 +345,21 @@ begin
       Hint := Items[i]
     else
       Hint := '';
+  end;
+end;
+
+procedure TConfigDlg.btnEditLangClick(Sender: TObject);
+var
+  Dir: string;
+begin
+  with LanguageList do
+  begin
+    if (ItemIndex <> -1) then
+    begin
+      Dir := Items[ItemIndex];
+      if InputQuery(cEditValue, cEnterNewValue, Dir) then
+        Items[ItemIndex] := Dir;
+    end;
   end;
 end;
 

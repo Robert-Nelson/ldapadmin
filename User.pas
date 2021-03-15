@@ -237,7 +237,10 @@ var
 
 implementation
 
-uses AdvSamba, Pickup, Input, Misc, Jpeg, Main, Templates, Config;
+{$I LdapAdmin.inc}
+
+uses AdvSamba, Pickup, Input, Misc, Jpeg, Main, Templates, Config
+     {$IFDEF VER_XEH}, System.UITypes{$ENDIF};
 
 {$R *.DFM}
 
@@ -592,14 +595,14 @@ end;
 procedure TUserDlg.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 var
   uidnr: Integer;
-  newdn: string;
+  newdn, olddn: string;
 begin
   if ModalResult = mrOk then
   begin
     CheckSchema;
     if esNew in Entry.State then
     begin
-      Entry.Dn := 'uid=' + PosixAccount.Uid + ',' + ParentDn;
+      Entry.Dn := 'uid=' + EncodeLdapString(PosixAccount.Uid) + ',' + ParentDn;
       if InetOrgPerson.DisplayName <> '' then
         PosixAccount.Cn := InetOrgPerson.DisplayName
       else
@@ -617,11 +620,13 @@ begin
     if uid.Modified then
     begin
       { Handle username change }
-      newdn := 'uid=' + uid.Text + ',' + GetDirFromDn(ParentDn);
+      newdn := 'uid=' + EncodeLdapString(uid.Text) + ',' + GetDirFromDn(ParentDn);
       if newdn <> Entry.Dn then
       begin
-        Entry.Delete;
+        //Entry.Delete; have to do it after move, in case of an error
+        olddn := Entry.dn;
         Entry.Dn := newdn;
+        Connection.DeleteEntry(olddn);
       end;
     end;
     Entry.Write;
@@ -1236,6 +1241,7 @@ begin
       s := FormatMemoInput(s);
     Entry.AttributesByName[TControl(Sender).Name].AsString := s;
   end;
+  AddGroupBtn.Enabled := uid.Text  <> '';
 end;
 
 procedure TUserDlg.cbShadowClick(Sender: TObject);
@@ -1320,8 +1326,8 @@ var
   Flags: Longint;
 begin
   with CheckListBox do begin
-    Canvas.Brush.Color := clBtnFace;
-    Canvas.Font.Color := clBlack;
+    Canvas.Brush.Color := Color;
+    Canvas.Font.Color := Font.Color;
     Canvas.FillRect(Rect);
     Flags := DrawTextBiDiModeFlags(DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
     Inc(Rect.Left, 2);

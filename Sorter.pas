@@ -91,7 +91,9 @@ type
 
 implementation
 
-uses SysUtils, CommCtrl;
+{$I LdapAdmin.inc}
+
+uses SysUtils, CommCtrl {$IFDEF VER_XEH}, System.Types, System.UiTypes{$ENDIF};
 
 { TListViewSorter }
 

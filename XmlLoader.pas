@@ -37,7 +37,7 @@ type
   public
     constructor     Create; virtual;
     destructor      Destroy; override;
-    procedure       Clear;
+    procedure       Clear; virtual;
     function        Parse(const FileName: string): TObject; virtual; abstract;
     procedure       AddPath(Path: string);
     property        Count: Integer read GetCount;
@@ -100,10 +100,11 @@ begin
   begin
     Dir := ExtractFileDir(Path) + '\';
     with fFiles do
-    begin
+    try
       AddFile(Dir + sr.Name);
       while FindNext(sr) = 0 do
         AddFile(Dir + sr.Name);
+    finally
       FindClose(sr);
     end;
   end;

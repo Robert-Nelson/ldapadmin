@@ -9,7 +9,7 @@ object HexView: THexView
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
-  Font.Name = 'MS Sans Serif'
+  Font.Name = 'Tahoma'
   Font.Style = []
   KeyPreview = True
   OldCreateOrder = False
@@ -58,9 +58,9 @@ object HexView: THexView
       Height = 30
     end
     object Label1: TLabel
-      Left = 272
+      Left = 273
       Top = 16
-      Width = 41
+      Width = 40
       Height = 13
       Alignment = taRightJustify
       Caption = 'Decimal:'
@@ -72,9 +72,9 @@ object HexView: THexView
       Height = 13
     end
     object Label3: TLabel
-      Left = 360
+      Left = 358
       Top = 16
-      Width = 32
+      Width = 34
       Height = 13
       Alignment = taRightJustify
       Caption = 'Binary:'
@@ -86,9 +86,9 @@ object HexView: THexView
       Height = 13
     end
     object Label2: TLabel
-      Left = 144
+      Left = 142
       Top = 16
-      Width = 41
+      Width = 43
       Height = 13
       Alignment = taRightJustify
       Caption = 'Address:'
@@ -164,8 +164,8 @@ object HexView: THexView
     OnChange = ScrollBar1Change
   end
   object PopupMenu: TPopupMenu
-    Left = 72
-    Top = 384
+    Left = 56
+    Top = 368
     object pbHex: TMenuItem
       Caption = 'Hex view'
       Checked = True

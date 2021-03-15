@@ -6,11 +6,7 @@ object HostDlg: THostDlg
   ClientHeight = 407
   ClientWidth = 404
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
-  Font.Style = []
+  ParentFont = True
   OldCreateOrder = True
   Position = poMainFormCenter
   OnClose = FormClose
@@ -20,21 +16,21 @@ object HostDlg: THostDlg
   object NameLabel: TLabel
     Left = 16
     Top = 16
-    Width = 54
+    Width = 55
     Height = 13
     Caption = '&Host name:'
   end
   object IPLabel: TLabel
     Left = 16
     Top = 64
-    Width = 54
+    Width = 56
     Height = 13
     Caption = 'IP &Address:'
   end
   object Label2: TLabel
     Left = 16
     Top = 112
-    Width = 56
+    Width = 57
     Height = 13
     Caption = '&Description:'
   end

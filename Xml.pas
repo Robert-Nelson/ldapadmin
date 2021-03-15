@@ -30,13 +30,15 @@
                                  TFileStream->TMemoryStream, T.Karlovic
    @Version 2013/12/18  v1.2.4.  Fixed TXmlNode.Add AAttribute assignment, T.Karlovic
    @Version 2014/01/03  v1.2.5.  Added Sort method, T.Karlovic
+   @Version 2016/06/18  v1.2.6   Unicode port. Support for UTF-16 types, T.Karlovic
+   @Version 2016/06/22  v1.2.7   LoadFromStream and WriteToStream use TTextFile now
   }
 
 unit Xml;
 
 interface
 
-uses windows, sysutils, Classes, Contnrs;
+uses windows, sysutils, TextFile, Classes, Contnrs;
 
 type
   TTagType=(tt_Open, tt_Close, tt_Single);
@@ -50,7 +52,7 @@ type
     FMessage2: string;
     FText: string;
   public
-    constructor Create(Stream: TStream; const TagName, ErrMsg: string);
+    constructor Create(Stream: TStream; const TagName, ErrMsg: string; CharSize: Integer);
     property Line: Integer read FLine;
     property Position: Integer read FPosition;
     property Tag: string read FTagName;
@@ -67,6 +69,7 @@ type
     FNodes:     TObjectList;
     FParent:    TXmlNode;
     FContent:   string;
+    FComment:   string;
     FCaseSens:  boolean;
     function    GetNodes(Index: integer): TXmlNode;
     function    GetCount: integer;
@@ -87,6 +90,7 @@ type
     procedure   Delete(Index: integer);
     function    NodeByName(AName: string; CaseSensitive: boolean=true; Lang: string=''): TXmlNode;
     procedure   Sort(Compare: TListSortCompare; Recurse: Boolean);
+    property    Comment: string read FComment write FComment;
   end;
 
   TStreamCallback = procedure (Node: TXmlNode) of object;
@@ -94,9 +98,15 @@ type
   TXmlTree=class
   private
     FRoot:      TXmlNode;
-    FUtf8:      Boolean;
+    FEncoding:  TFileEncode;
     FMarkups:   Boolean;
-    function    GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
+    {$IFNDEF UNICODE}
+    FBuffer:    WideString;
+    {$ELSE}
+    FBuffer:    string;
+    {$ENDIF}
+    FCurrBufferPos: Integer;
+    function    GetNextTag(Stream: TTextStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
     procedure   ParseAttributes(S: string; Attributes: TStringList);
     function    ClearContent(S: string): string;
     procedure   ParsePath(const Path: string; Result: TStrings);
@@ -107,22 +117,24 @@ type
     constructor Create; reintroduce;
     destructor  Destroy; override;
     property    Root: TXmlNode read FRoot;
-    procedure   LoadFromStream(const Stream: TStream); virtual;
-    procedure   SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil); virtual;
+    procedure   LoadFromStream(const Stream: TTextStream); virtual;
+    procedure   SaveToStream(const Stream: TTextStream; StreamCallback: TStreamCallback = nil); virtual;
     procedure   LoadFromFile(const FileName: string);
     procedure   SaveToFile(const FileName: string; StreamCallback: TStreamCallback = nil);
     procedure   Sort(Compare: TListSortCompare);
     function    ByPath(const APath: string): TXmlNode;
     function    Exist(const Path: string): boolean;
     property    CaseSensitive: boolean read GetCaseSens write SetCaseSens;
-    property    Utf8: Boolean read fUtf8 write fUtf8;
+    property    Encoding: TFileEncode read FEncoding write FEncoding; //SetEncoding;
     property    Markups: Boolean read FMarkups write FMarkups;
   end;
 
 
 implementation
 
-uses Misc, Constant;
+{$I LdapAdmin.inc}
+
+uses Misc, Cp, Constant {$IFDEF VER_XEH}, System.Types{$ENDIF};
 
 const
   TAB  = '   ';//#9;
@@ -130,15 +142,27 @@ const
 
 { EXmlException }
 
-constructor EXmlException.Create(Stream: TStream; const TagName, ErrMsg: string);
+constructor EXmlException.Create(Stream: TStream; const TagName, ErrMsg: string; CharSize: Integer);
   procedure CountLines(var Lines, Pos: Integer);
   var
     i, il, iend: Integer;
+    AnsiStr: AnsiString;
   begin
-    SetLength(FText, Stream.Size);
+
     iend := Stream.Position;
-    Stream.Position := 0;
-    Stream.Read(FText[1], Stream.Size);
+
+    if CharSize=1 then
+    begin
+      SetLength(AnsiStr, stream.Size);
+      Stream.Position := 0;
+      Stream.Read(AnsiStr[1], Stream.Size);
+      FText := StringTowide(AnsiStr);
+    end
+    else begin
+      SetLength(FText, (stream.Size - 2) div CharSize);
+      Stream.Position := 2;
+      Stream.Read(FText[1], Stream.Size);
+    end;
     i := 1;
     il := 1;
     Lines := 0;
@@ -292,11 +316,11 @@ begin
   inherited;
 end;
 
-function TXmlTree.GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
+function TXmlTree.GetNextTag(Stream: TTextStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
 type
   TState=(tsContent, tsScriptContent, tsTag, tsScriptTag, tsAttrs, tsEnd, tsSkip, tsComment, tsMarkup);
 var
-  c: AnsiChar;
+  c: WideChar;
   State: TState;
   quota: boolean;
   CommentState: byte;
@@ -314,10 +338,10 @@ var
       else raise Exception.CreateFmt('Unknown reference: %s', [s]);
     except
        on E: Exception do
-        raise EXmlException.Create(Stream, TagName, E.Message);
+        raise EXmlException.Create(Stream, TagName, E.Message, Stream.CharSize);
     end;
   end;
-  
+
 begin
   result:=false;
   PrevContent:='';
@@ -331,8 +355,9 @@ begin
   TagType:=tt_Open;
   quota:=false;
   CommentState:=0;
-  while (Stream.Position<Stream.Size) do begin
-    Stream.ReadBuffer(c, sizeof(c));
+  while (FCurrBufferPos < Length(FBuffer)) do begin
+    c := FBuffer[FCurrBufferPos];
+    inc(FCurrBufferPos);
     case State of
       //////////////////////////////////////////////////////////////////////////
       tsContent:  case c of
@@ -381,7 +406,7 @@ begin
                             PrevContent := PrevContent + DecodeMarkup(Markup);
                             State := tsContent;
                           end;
-                    '<':  raise EXmlException.Create(Stream, TagName, Format('Invalid (unclosed) reference: %s', [Markup]));                          
+                    '<':  raise EXmlException.Create(Stream, TagName, Format('Invalid (unclosed) reference: %s', [Markup]), Stream.CharSize);
                     else  Markup := Markup + c;
                   end;
     ////////////////////////////////////////////////////////////////////////////
@@ -424,7 +449,7 @@ begin
   end;
 end;
 
-procedure TXmlTree.LoadFromStream(const Stream: TStream);
+procedure TXmlTree.LoadFromStream(const Stream: TTextStream);
 var
   PrevContent, TagName: string;
   TagType: TTagType;
@@ -434,39 +459,40 @@ var
   procedure CheckEncoding;
   var
     s: TStringList;
+    val: string;
   begin
     if not GetNextTag(Stream, PrevContent, TagName, Attrs, TagType) then
-     raise EXmlException.Create(Stream, TagName, XML_NO_OPENING_TAG);
+     raise EXmlException.Create(Stream, TagName, XML_NO_OPENING_TAG, Stream.CharSize);
 
     if TagName = '?xml' then
     begin
       s := TStringList.Create;
       try
         ParseAttributes(attrs, s);
-         if s.Values['encoding'] = 'utf-8' then
-           utf8 := true;
+        val := lowercase(s.Values['encoding']);
+         if val = 'utf-8' then
+           Encoding := feUTF8
+         else
+         if (val = 'utf-16') or (val = 'utf-16le') then
+           Encoding := feUnicode_LE
+         else
+         if val = 'utf-16be' then
+           Encoding := feUnicode_BE
+         else
+           Encoding := feUTF8;
       finally
         s.Free;
       end;
       GetNextTag(Stream, PrevContent, TagName, Attrs, TagType);
-    end
-    else
-    if (Length(PrevContent) >= 3) and ((PInteger(@PrevContent[1])^ and $FFFFFF) = $BFBBEF) then // UTF8 BOF
-      utf8 := true;
-  end;
-
-  function EncodedString(const s: string): string;
-  begin
-    if utf8 then
-      Result := UTF8ToStringLen(PChar(s), Length(s))
-    else
-      Result := s;
+    end;
   end;
 
 begin
   if FRoot<>nil then FRoot.Free;
   FRoot:=nil;
   Node:=nil;
+  FBuffer := Stream.GetText;
+  FCurrBufferPos := 1;
   try
     CheckEncoding;
     repeat
@@ -477,18 +503,18 @@ begin
                     Node:=TXmlNode.Create(Node);
                     if FRoot=nil then FRoot:=Node;
 
-                    Node.FName:=EncodedString(TagName);
-                    ParseAttributes(EncodedString(attrs), Node.Attributes);
+                    Node.FName:=TagName;
+                    ParseAttributes(attrs, Node.Attributes);
 
-                    if Node.Parent<>nil then Node.Parent.Content:=EncodedString(ClearContent(Node.Parent.Content+PrevContent));
+                    if Node.Parent<>nil then Node.Parent.Content:=ClearContent(Node.Parent.Content+PrevContent);
                     if TagType=tt_Single then Node:=Node.Parent;
                   end;
         //////////////////////////////////////////////////////////////////////////
         tt_Close: begin
-                    if Node=nil then raise EXmlException.Create(Stream, TagName, format(XML_UNEXPECTED_CLOSE_TAG,[TagName]));
-                    if Node.Name<>TagName then raise EXmlException.Create(Stream, TagName, format(XML_BAD_CLOSE_TAG, [Node.Name, TagName]));
+                    if Node=nil then raise EXmlException.Create(Stream, TagName, format(XML_UNEXPECTED_CLOSE_TAG,[TagName]), Stream.CharSize);
+                    if Node.Name<>TagName then raise EXmlException.Create(Stream, TagName, format(XML_BAD_CLOSE_TAG, [Node.Name, TagName]), Stream.CharSize);
 
-                    Node.Content:=EncodedString(ClearContent(Node.Content+PrevContent));
+                    Node.Content:=ClearContent(Node.Content+PrevContent);
                     Node:=Node.Parent;
                   end;
         //////////////////////////////////////////////////////////////////////////
@@ -555,7 +581,18 @@ begin
   result:=copy(S, b, e-b+1);
 end;
 
-procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil);
+procedure TXmlTree.SaveToStream(const Stream: TTextStream; StreamCallback: TStreamCallback = nil);
+
+  function GetEncodingString: string;
+  begin
+    case Stream.Encoding of
+      feAnsi:       Result := GetCodePageName;
+      feUnicode_BE: Result := 'UTF-16BE';
+      feUnicode_LE: Result := 'UTF-16';
+    else
+      Result := 'UTF-8';
+    end;
+  end;
 
   function EncodeMarkups(const s: string): string;
   var
@@ -574,60 +611,61 @@ procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCa
       end;
   end;
 
-  procedure WriteString(const Value: string);
-  var
-    s: string;
-  begin
-    if fUtf8 then
-    begin
-      s := StringToUTF8Len(PChar(Value), length(Value));
-      Stream.WriteBuffer(s[1], Length(s));
-    end
-    else
-      Stream.WriteBuffer(Value[1], length(Value));
-  end;
-
-  procedure WriteNode(Node: TXmlNode; Indent: string; IsFirst: boolean=false);
+  procedure WriteNode(Node: TXmlNode; Indent: string);
   var
     i: integer;
-    encName: string;
+    Line, encName: string;
   begin
-    if not IsFirst then WriteString(CRLF);
-
     if fMarkups then
       encName := EncodeMarkups(Node.Name)
     else
       encName := Node.Name;
-      
-    if pos(' ', encName) > 0 then WriteString(Indent + '<"' + encName + '"')
-    else WriteString(Indent + '<' + encName);
 
-    for i:=0 to Node.Attributes.Count-1 do
-      WriteString(' '+Node.Attributes.Names[i]+'='''+Node.Attributes.Values[Node.Attributes.Names[i]]+'''');
+    if pos(' ', encName) > 0 then
+      encName := '"' + encName + '"';
 
-    if (Node.Count=0) and (Node.Content='') then begin
-      WriteString('/>');
+    with Stream do
+    begin
+      if Node.FComment <> '' then
+        WriteLn(Indent + '<!--' + Node.FComment + '-->');
+      Line := Indent + '<' + encName;
+      for i := 0 to Node.Attributes.Count - 1 do
+        Line := Line + ' ' + Node.Attributes.Names[i] + '="' + Node.Attributes.Values[Node.Attributes.Names[i]] + '"';
+
+      if (Node.Content='') and (Node.Count=0) then
+      begin
+        WriteLn(Line + '/>');
+        exit;
+      end;
+
+      Line := Line + '>';
+
+      if Node.Content <> '' then
+      begin
+        if fMarkups then
+          Line := Line + EncodeMarkups(Node.Content)
+        else
+          Line := Line + Node.Content;
+      end;
+
+      if Node.Count = 0 then
+      begin
+        Line := Line + '</' + encName + '>';
+        WriteLn(Line);
+      end
+      else begin
+        WriteLn(Line);
+        for i := 0 to Node.Count - 1 do
+          WriteNode(Node[i], Indent + TAB);
+        WriteLn(Indent + '</' + encName + '>');
+      end;
       if Assigned(StreamCallback) then StreamCallback(Node);
-      exit;
     end;
-
-    WriteString('>');
-
-    if fMarkups then
-      WriteString(EncodeMarkups(Node.Content))
-    else
-      WriteString(Node.Content);
-
-    for i:=0 to Node.Count-1 do WriteNode(Node[i], Indent+TAB);
-
-    if Node.Count>0 then WriteString(CRLF+Indent);
-    if pos(' ', encName) > 0 then WriteString('</"' + encName + '">')
-    else WriteString('</' + encName + '>');
-    if Assigned(StreamCallback) then StreamCallback(Node);
   end;
 
 begin
-  WriteNode(Root, '', True);
+  Stream.WriteLn('<?xml version="1.0" encoding="' + GetEncodingString + '"?>');
+  WriteNode(Root, '');
 end;
 
 procedure TXmlTree.Sort(Compare: TListSortCompare);
@@ -638,13 +676,11 @@ end;
 
 procedure TXmlTree.LoadFromFile(const FileName: string);
 var
-  FStream: TMemoryStream;
+  FStream: TTextFile;
 begin
-  FStream:=TMemoryStream.Create;
+  FStream:=TTextFile.Create(FileName, fmOpenRead);
   try
-    FStream.LoadFromFile(FileName);
-    if FStream.Size = 0 then
-      raise Exception.CreateFmt(stEmptyFile, [FileName]);
+    Encoding := FStream.Encoding;
     LoadFromStream(FStream);
   finally
     FStream.Free;
@@ -653,9 +689,10 @@ end;
 
 procedure TXmlTree.SaveToFile(const FileName: string; StreamCallback: TStreamCallback = nil);
 var
-  FStream: TFileStream;
+  FStream: TTextFile;
 begin
-  FStream:=TFileStream.Create(FileName, fmCreate);
+  FStream:=TTextFile.Create(FileName, fmCreate);
+  FStream.Encoding := Encoding;
   try
     SaveToStream(FStream, StreamCallback);
   finally
@@ -674,11 +711,11 @@ begin
     case Path[i] of
       #0,
       '/',
-      '\':  begin
-              if n>0 then Result.Add(copy(Path, i-n, n));
-              n:=0;
-            end;
-      else  inc(n);
+      '\': begin
+             if n>0 then Result.Add(copy(Path, i-n, n));
+             n:=0;
+           end;
+      else inc(n);
     end;
   end;
 end;

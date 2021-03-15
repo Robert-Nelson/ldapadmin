@@ -80,14 +80,6 @@ begin
   Handle := LoadLibrary(CRYPTUI);
   if Handle <> 0 then
   begin
-    (*{$IFDEF UNICODE}
-    @CryptUIDlgViewCertificate := GetProcAddress(Handle, 'CryptUIDlgViewCertificateW');
-    {$ELSE}
-    @CryptUIDlgViewCertificate :=  GetProcAddress(Handle, 'CryptUIDlgViewCertificateA');
-    {$ENDIF}
-
-    if @CryptUIDlgViewCertificate <> nil then*)
-
     fContextType := ContextType;
     @CryptUIDlgViewContext :=  GetProcAddress(Handle, 'CryptUIDlgViewContext');
     if @CryptUIDlgViewContext <> nil then
