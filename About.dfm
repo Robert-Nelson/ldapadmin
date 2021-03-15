@@ -252,7 +252,7 @@ object AboutDlg: TAboutDlg
       Top = 112
       Width = 145
       Height = 13
-      Caption = '(c) 2003-2016 Tihomir Karlovic'
+      Caption = '(c) 2003-2017 Tihomir Karlovic'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
@@ -266,6 +266,7 @@ object AboutDlg: TAboutDlg
     Top = 216
     Width = 85
     Height = 25
+    Cancel = True
     Caption = '&Close'
     ModalResult = 1
     TabOrder = 0

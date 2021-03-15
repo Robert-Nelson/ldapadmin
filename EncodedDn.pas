@@ -49,6 +49,7 @@ type
     property Encoded: string read FEncoded write SetEncoded;
     property Display: string read GetDisplay write SetDisplay;
     property Verbatim: Boolean read FVerbatim write FVerbatim;
+    property DisplayAttribute: string read GetDisplayAttribute write SetDisplayAttribute;
   end;
 
 

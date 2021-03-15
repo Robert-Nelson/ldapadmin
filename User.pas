@@ -1037,7 +1037,7 @@ begin
           end;
         end;
         try
-          // modify user attributes always must happend before savegroups so we don't get inconsistent here
+          // modify user attributes always must happen before savegroups so we don't get inconsistent here
           if modop > 0 then
             MemberAttr.AddValue(MemberValue)
           else

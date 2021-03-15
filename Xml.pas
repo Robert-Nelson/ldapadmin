@@ -32,6 +32,7 @@
    @Version 2014/01/03  v1.2.5.  Added Sort method, T.Karlovic
    @Version 2016/06/18  v1.2.6   Unicode port. Support for UTF-16 types, T.Karlovic
    @Version 2016/06/22  v1.2.7   LoadFromStream and WriteToStream use TTextFile now
+   @Version 2016/12/13  v1.2.8   fixed markup decoding for tag names
   }
 
 unit Xml;
@@ -321,7 +322,7 @@ type
   TState=(tsContent, tsScriptContent, tsTag, tsScriptTag, tsAttrs, tsEnd, tsSkip, tsComment, tsMarkup);
 var
   c: WideChar;
-  State: TState;
+  State, PrevState: TState;
   quota: boolean;
   CommentState: byte;
   Markup: string;
@@ -349,7 +350,7 @@ begin
     State := tsScriptContent
   else
     State:=tsContent;
-
+  PrevState := State;
   TagName:='';
   attrs:='';
   TagType:=tt_Open;
@@ -362,7 +363,9 @@ begin
       //////////////////////////////////////////////////////////////////////////
       tsContent:  case c of
                     '<':  State:=tsTag;
-                    '&':  if FMarkups then begin
+                    '&':  if FMarkups then
+                          begin
+                            PrevState := State;
                             State := tsMarkup;
                             Markup := '';
                           end
@@ -390,6 +393,14 @@ begin
                             State:=tsComment;
                           end
                           else TagName:=TagName+c;
+                    '&':  if FMarkups then
+                          begin
+                            PrevState := State;
+                            State := tsMarkup;
+                            Markup := '';
+                          end
+                          else
+                            TagName:=TagName+c;
                     else  TagName:=TagName+c;
                   end;
      //////////////////////////////////////////////////////////////////////////
@@ -403,10 +414,13 @@ begin
      //////////////////////////////////////////////////////////////////////////
      tsMarkup:    case c of
                     ';':  begin
-                            PrevContent := PrevContent + DecodeMarkup(Markup);
-                            State := tsContent;
+                            if PrevState = tsTag then
+                              TagName := TagName + DecodeMarkup(Markup)
+                            else
+                              PrevContent := PrevContent + DecodeMarkup(Markup);
+                            State := PrevState;
                           end;
-                    '<':  raise EXmlException.Create(Stream, TagName, Format('Invalid (unclosed) reference: %s', [Markup]), Stream.CharSize);
+                    '<':  raise EXmlException.Create(Stream, TagName, Format(stUnclosedReference, [Markup]), Stream.CharSize);
                     else  Markup := Markup + c;
                   end;
     ////////////////////////////////////////////////////////////////////////////

@@ -252,7 +252,6 @@ begin
       if CompareText(oc.Values[i].AsString, 'posixaccount') = 0 then with SourceSession do
       begin
         { Remove any references to uid from groups before deleting user itself; }
-        //TODO: Entry := TPosixAccount.Create(SourceSession, dn);
         uid := GetNameFromDN(Entry.dn);
         ModifySet(Format(sMY_GROUPS,[uid, Entry.dn]), Base, LDAP_SCOPE_SUBTREE,
                   ['memberUid', 'uniqueMember', 'member'],

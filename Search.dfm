@@ -1,6 +1,7 @@
 object SearchFrm: TSearchFrm
   Left = 482
   Top = 181
+  ActiveControl = edName
   Caption = 'Search'
   ClientHeight = 499
   ClientWidth = 714

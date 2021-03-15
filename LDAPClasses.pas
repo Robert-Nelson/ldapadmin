@@ -58,7 +58,16 @@ const
 
 
 type
-  ErrLDAP = class(Exception);
+  ErrLDAP = class(Exception)
+  private
+    FErrorCode: ULONG;
+    FExtErrorCode: ULONG;
+  public
+    constructor Create(ErrCode, ExtErrCode: ULONG; Msg: string);
+    property    ErrorCode: ULONG read FErrorCode write FErrorCode;
+    property    ExtErrorCode: ULONG read FExtErrorCode write FExtErrorCode;
+  end;
+
   PBytes = array of Byte;
   PCharArray = array of PChar;
   PPLDAPMod = array of PLDAPMod;
@@ -137,6 +146,7 @@ type
     procedure Delete;
     function IndexOf(const AValue: string): Integer; overload;
     function IndexOf(const AData: Pointer; const ADataSize: Cardinal): Integer; overload;
+    procedure MoveIndex(Index: Integer);
     property Values[Index: Integer]: TLdapAttributeData read GetValue; default;
   published
     property State: TLdapAttributeStates read fState;
@@ -158,6 +168,7 @@ type
     constructor Create(Entry: TLdapEntry); virtual;
     destructor Destroy; override;
     function Add(const AName: string): TLdapAttribute;
+    //function Insert(const AName: string; Index: Integer): TLdapAttribute;
     function IndexOf(const Name: string): Integer;
     function AttributeOf(const Name: string): TLdapAttribute;
     procedure Clear;
@@ -241,8 +252,10 @@ type
                         argNewVals: array of string;
                         const ModOp: Cardinal);
     procedure WriteEntry(Entry: TLdapEntry); virtual;
-    procedure ReadEntry(Entry: TLdapEntry); virtual;
+    procedure ReadEntry(Entry: TLdapEntry); overload; virtual;
+    procedure ReadEntry(Entry: TLdapEntry; Attributes: array of string); overload; virtual;
     procedure DeleteEntry(const adn: string); virtual;
+    function  RenameEntry(const OldDn, NewRdn, NewParent: string; FailOnError: Boolean = true): Cardinal;
     property  OnConnect: TNotifyEvents read FOnConnect;
     property  OnDisconnect: TNotifyEvents read FOnDisconnect;
     property  OperationalAttrs: string read GetOperationalAttrs write SetOperationalAttrs;
@@ -270,7 +283,8 @@ type
     property Session: TLDAPSession read fSession;
     constructor Create(const ASession: TLDAPSession; const adn: string); virtual;
     destructor Destroy; override;
-    procedure Read; virtual;
+    procedure Read; overload; virtual;
+    procedure Read(Attributes: array of string); overload; virtual;
     procedure Write; virtual;
     procedure Delete; virtual;
     procedure Clone(ToEntry: TLdapEntry); virtual;
@@ -562,6 +576,15 @@ begin
   result:=AT_Attribute;
 end;
 
+{ ErrLdap }
+
+constructor ErrLdap.Create(ErrCode, ExtErrCode: ULONG; Msg: string);
+begin
+  inherited Create(Msg);
+  FErrorCode := ErrCode;
+  FExtErrorCode := ExtErrCode;
+end;
+
 { TLdapSession }
 
 procedure TLdapSession.LDAPCheck(const err: ULONG; const Critical: Boolean = true);
@@ -572,27 +595,20 @@ var
 begin
   if (err = LDAP_SUCCESS) then exit;
 
-  {msg := '';
-  if (ldap_get_option(pld, LDAP_OPT_SERVER_EXT_ERROR, @c) = LDAP_SUCCESS) then
-    msg := SysErrorMessage(c);
-
-  if msg = '' then}
+  if ((ldap_get_option(pld, LDAP_OPT_SERVER_ERROR, @ErrorEx)=LDAP_SUCCESS) and Assigned(ErrorEx)) then
   begin
-    if ((ldap_get_option(pld, LDAP_OPT_SERVER_ERROR, @ErrorEx)=LDAP_SUCCESS) and Assigned(ErrorEx)) then
-    begin
-      msg := Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]);
-      ldap_memfree(ErrorEx);
-    end
-    else
-      msg := Format(stLdapError, [ldap_err2string(err)]);
-    // TODO check with OpenLdap
-    if (ldap_get_option(pld, LDAP_OPT_SERVER_EXT_ERROR, @c) = LDAP_SUCCESS) then
-      msg := msg + #10 + SysErrorMessage(c);
-    //
-  end;
+    msg := Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]);
+    ldap_memfree(ErrorEx);
+  end
+  else
+    msg := Format(stLdapError, [ldap_err2string(err)]);
+
+  c := 0;
+  if (ldap_get_option(pld, LDAP_OPT_SERVER_EXT_ERROR, @c) = LDAP_SUCCESS) then
+    msg := msg + #10 + SysErrorMessage(c);
 
   if Critical then
-    raise ErrLDAP.Create(msg);
+    raise ErrLDAP.Create(err, c, msg);
   MessageDlg(msg, mtError, [mbOk], 0);
 end;
 
@@ -920,9 +936,67 @@ begin
     DoRead(fOperationalAttrs, Entry.OperationalAttributes);
 end;
 
+procedure TLDAPSession.ReadEntry(Entry: TLdapEntry; Attributes: array of string);
+var
+  plmEntry: PLDAPMessage;
+  attrs: PCharArray;
+  len: Integer;
+begin
+  attrs := nil;
+  len := Length(Attributes);
+  if len > 0 then
+  begin
+    SetLength(attrs, len + 1);
+    attrs[len] := nil;
+    repeat
+      dec(len);
+      attrs[len] := PChar(Attributes[len]);
+    until len = 0;
+  end;
+
+  LdapCheck(ldap_search_s(pld, PChar(Entry.dn), LDAP_SCOPE_BASE, sANYCLASS, PChar(attrs), 0, plmEntry));
+  try
+    if Assigned(plmEntry) then
+       ProcessSearchEntry(plmEntry, Entry.Attributes);
+  finally
+    // free search results
+    LDAPCheck(ldap_msgfree(plmEntry), false);
+  end;
+end;
+
 procedure TLdapSession.DeleteEntry(const adn: string);
 begin
   LdapCheck(ldap_delete_s(pld, PChar(adn)));
+end;
+
+function TLdapSession.RenameEntry(const OldDn, NewRdn, NewParent: string; FailOnError: Boolean = true): Cardinal;
+var
+  nilControl: PLDAPCOntrol;
+  rdn: string;
+begin
+
+  {if Version < LDAP_VERSION3 then
+  begin
+    Result := LDAP_PROTOCOL_ERROR;
+    exit;
+  end;}
+
+  if NewRdn = '' then
+    rdn := GetRdnFromDn(OldDn)
+  else
+    rdn := NewRdn;
+
+  nilControl := nil;
+
+  Result := ldap_rename_ext_s(pld, PChar(OldDn),
+						 PChar(rdn),
+						 PChar(NewParent),
+						 Ord(TRUE),
+						 nilControl,
+						 nilControl);
+
+  if FailOnError then
+    LdapCheck(Result);
 end;
 
 function TLDAPSession.Lookup(sBase, sFilter, sResult: string; Scope: ULONG): string;
@@ -1199,7 +1273,12 @@ begin
     end;
     CertUserAbort := false;
     if ldapTLS then
-      LdapCheck(ldap_start_tls_s(ldappld, nil, nil, nil, nil));
+    begin
+      res := ldap_start_tls_s(ldappld, nil, nil, nil, nil);
+      if CertUserAbort then
+        Abort;
+      LdapCheck(res);
+    end;
     case ldapAuthMethod of
       AUTH_SIMPLE:   res := ldap_simple_bind_s(ldappld, PChar(ldapUser), PChar(ldapPassword));
       AUTH_GSS,
@@ -1226,7 +1305,7 @@ begin
                        res := ldap_bind_s(ldappld, nil, v, LDAP_AUTH_NEGOTIATE);
                      end;
     else
-      raise Exception.Create('Invalid authentication method!');
+      raise Exception.CreateFmt(stUnsupportedAuth, [IntToStr(ldapAuthMethod)]);
     end;
 
     if CertUserAbort then
@@ -1657,6 +1736,17 @@ begin
   end;
 end;
 
+procedure TLdapAttribute.MoveIndex(Index: Integer);
+var
+  i: Integer;
+begin
+  with fEntry.fAttributes.fList do begin
+    i := IndexOf(Self);
+    if i <> -1 then
+      Move(i, Index);
+  end;
+end;
+
 { TLdapAttributeList }
 
 function TLdapAttributeList.GetCount: Integer;
@@ -1690,6 +1780,12 @@ begin
   Result := TLdapAttribute.Create(AName, Self);
   fList.Add(Result);
 end;
+
+{function TLdapAttributeList.Insert(const AName: string; Index: Integer): TLdapAttribute;
+begin
+  Result := TLdapAttribute.Create(AName, Self);
+  fList.Insert(Index, Result);
+end;}
 
 function TLdapAttributeList.IndexOf(const Name: string): Integer;
 begin
@@ -1804,6 +1900,21 @@ begin
   fState := [esReading];
   try
     fSession.ReadEntry(Self);
+    fState := fState + [esBrowse];
+  finally
+    fState := fState - [esReading];
+  end;
+  if Assigned(fOnRead) then fOnRead(Self);
+end;
+
+procedure TLDAPEntry.Read(Attributes: array of string);
+begin
+  fAttributes.Clear;
+  fObjectClass := nil;
+  fOperationalAttributes.Clear;
+  fState := [esReading];
+  try
+    fSession.ReadEntry(Self, Attributes);
     fState := fState + [esBrowse];
   finally
     fState := fState - [esReading];

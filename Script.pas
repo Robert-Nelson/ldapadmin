@@ -1757,7 +1757,7 @@ begin
   inherited Create(Script, Strings);
   FStrings := Strings;
   Methods.Add('add');
-  Methods.Add('deleteAt');
+  Methods.Add('delete');
   Methods.Add('insert');
   Methods.Add('indexOf');
   Methods.Add('indexOfName');

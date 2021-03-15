@@ -3,7 +3,7 @@ object ADPassDlg: TADPassDlg
   Top = 220
   BorderStyle = bsDialog
   Caption = 'Set Password'
-  ClientHeight = 82
+  ClientHeight = 142
   ClientWidth = 420
   Color = clBtnFace
   ParentFont = True
@@ -61,5 +61,21 @@ object ADPassDlg: TADPassDlg
     Height = 21
     PasswordChar = '*'
     TabOrder = 1
+  end
+  object cbxPwdNeverExpires: TCheckBox
+    Left = 104
+    Top = 67
+    Width = 308
+    Height = 17
+    Caption = 'Password never expires'
+    TabOrder = 4
+  end
+  object cbxPwdMustChange: TCheckBox
+    Left = 104
+    Top = 90
+    Width = 297
+    Height = 17
+    Caption = 'User must change password on next login'
+    TabOrder = 5
   end
 end

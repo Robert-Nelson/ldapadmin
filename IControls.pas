@@ -72,17 +72,10 @@ type
   TComboBoxEx = class(TComboBox)
   private
     fOnCloseUp: TNotifyEvent;
-    {fAutoComplete: Boolean;
-    fCanComplete: Boolean;}
     procedure CNCommand(var Message: TWMCommand); message CN_COMMAND;
-    //procedure SetAutoComplete(Value: Boolean);
-  protected
-    {procedure Change; override;
-    procedure KeyDown(var Key: Word; Shift: TShiftState); override;}
   public
     constructor Create(AOwner: TComponent); override;
     property OnCloseUp: TNotifyEvent read fOnCloseup write fOnCloseUp;
-    //property AutoComplete: Boolean read fAutoComplete write SetAutoComplete;
   end;
 
   TInplaceComboBox = class(TInplaceAttribute)
@@ -267,40 +260,6 @@ begin
     fOnCloseUp(Self);
 end;
 
-{procedure TComboBoxEx.SetAutoComplete(Value: Boolean);
-begin
-  fAutoComplete := Value;
-  fCanComplete := Value;
-end;
-
-procedure TComboBoxEx.Change;
-var
-  i, l: Integer;
-begin
-  inherited;
-
-  if not fAutoComplete then Exit;
-  if Text = '' then
-    fCanComplete := true;
-  if not fCanComplete then Exit;
-
-  i := Perform(CB_FINDSTRING, 0, Cardinal(PChar(Text)));
-  if i > CB_Err then
-  begin
-    l := Length(Text);
-    ItemIndex := i;
-    SelStart  := l;
-    SelLength := (Length(Text) - l);
-  end;
-end;
-
-procedure TComboBoxEx.KeyDown(var Key: Word; Shift: TShiftState);
-begin
-  inherited;
-  if Key in [VK_LEFT, VK_RIGHT, VK_DELETE, VK_BACK] then
-    fCanComplete := false;
-end;}
-
 constructor TComboBoxEx.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
@@ -343,7 +302,6 @@ begin
       Canvas.Brush.Color := Control.Color;
       Canvas.Font.Color := Control.Font.Color;
       Canvas.TextRect(Rect, Rect.Left + 2, Rect.Top + 2, Cells[ACol, ARow]);
-      //DrawFrameControl(Canvas.Handle, R, DFC_SCROLL, DFCS_SCROLLCOMBOBOX);
       DrawComboBtn(Canvas, R, bs_Normal);
     end;
   end;

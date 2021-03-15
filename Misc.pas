@@ -1,5 +1,5 @@
   {      LDAPAdmin - Misc.pas
-  *      Copyright (C) 2003-2016 Tihomir Karlovic
+  *      Copyright (C) 2003-2017 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -24,7 +24,7 @@ unit Misc;
 interface
 
 uses LdapClasses, Classes, SysUtils, Windows, Forms, Dialogs, Controls,
-     ExtCtrls, ComCtrls;
+     ExtCtrls, ComCtrls, Graphics;
 
 type
   TStreamProcedure = procedure(Stream: TStream) of object;
@@ -39,8 +39,9 @@ function  GetValueAsText(Value: TLdapAttributeData): string;
 { Time conversion routines }
 function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
 function  UnixTimeToDateTime(const AValue: Int64): TDateTime;
-function  GTZToDateTime(const Value: string): TDateTime;
+function  GTZToDateTime(AValue: string): TDateTime;
 function  LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
+function  UTCToLocalDateTime(const UTCDateTime: TDateTime): TDateTime;
 { String handling routines }
 function  IsNumber(const S: string): Boolean;
 procedure Split(Source: string; Result: TStrings; Separator: Char);
@@ -54,10 +55,14 @@ procedure ParseURL(const URL: string; var proto, user, password, host, path: str
 { Some handy dialogs }
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
+function  CreateMessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent; MinTextWidth: Integer = 0): TForm;
 function  MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+function  CheckedMessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent; CbCaption: string; var CbChecked: Boolean): TModalResult;
 { Tree sort procedure }
 function TreeSortProc(Node1, Node2: TTreeNode; Data: Integer): Integer; stdcall;
 { everything else :-) }
+function  GetTextExtent(Text: string; Font: TFont): TSize;
+function  CenterWithSpaces(Font: TFont; s: string;  BorderSize: Integer): string;
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
 procedure LockControl(c: TWinControl; bLock: Boolean);
@@ -65,7 +70,8 @@ function  PeekKey: Integer;
 procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
 function  CreateComponent(const ClassName: string; Owner: TComponent): TComponent;
 procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
-function LoadBase64(const FileName: string): AnsiString;
+function  LoadBase64(const FileName: string): AnsiString;
+function  DragDropQuery(Source: TObject; Destination: string; var Move: Boolean): Boolean;
 
 const
   mrCustom   = 1000;
@@ -74,8 +80,7 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF},
-     Base64;
+uses StdCtrls, Messages, Constant, Config, Base64, DateUtils, Math;
 
 function TreeSortProc(Node1, Node2: TTreeNode; Data: Integer): Integer; stdcall;
 var
@@ -153,11 +158,12 @@ begin
 end;
 
 function CStrToString(cstr: String): String;
-var  lpesc:      Array [0..2] of Byte;
-     cbytes:     Integer;
-     cesc:       Integer;
-     l:          Integer;
-     i:          Integer;
+var
+  lpesc:      Array [0..2] of Byte;
+  cbytes:     Integer;
+  cesc:       Integer;
+  l:          Integer;
+  i:          Integer;
 begin
 
   // Set the length of result, this will keep us from having to append. Result could never be longer than input
@@ -176,7 +182,8 @@ begin
      begin
         // Get next byte
         Inc(i);
-        if (i = l) then break;
+        if (i = l) then
+          break;
         // Set next write pos
         Inc(cbytes);
         case cstr[i] of
@@ -207,7 +214,8 @@ begin
               else
                  break;
               end;
-              if (cesc = 2) then break;
+              if (cesc = 2) then
+                break;
               Inc(i);
            end;
            // Make sure we got 3 bytes
@@ -260,19 +268,106 @@ begin
   Result := AValue / 86400 + 25569.0;
 end;
 
-function GTZToDateTime(const Value: string): TDateTime;
+function GTZToDateTime(AValue: string): TDateTime;
 var
-  AValue: string;
+  Fail, UTC, NegativeDiff: Boolean;
+  Year, Month, Day, Hour, Minutes, Seconds, Miliseconds, Fraction, Err: Integer;
+  AVal: string;
+  DiffHr, DiffMin: Integer;
+  gDiff: TDateTime;
+
+  function GetValue(var Val: string; Len: Integer; out Value, Fraction: Integer): Boolean;
+  begin
+    if Length(Val) < Len then
+    begin
+      Result := false;
+      exit;
+    end;
+    Result := TryStrToInt(Copy(Val, 1, Len), Value);
+    Delete(Val, 1, Len);
+    if (Val <> '') then
+    begin
+      if(Val[1] = '.') then // get fraction
+      begin
+        Result := TryStrToInt(Copy(Val, 2), Fraction);
+        Delete(Val, 1, 2);
+      end;
+      if(Val <> '') and (Val[1] in ['+', '-']) then
+      begin
+        if UTC then
+          Result := false
+        else begin          // get g-differential
+          NegativeDiff := Val[1] = '-';
+          Delete(Val, 1, 1);
+          Err := 0;
+          Result := GetValue(Val, 2, DiffHr, Err);
+          Result := Result and (Err = 0);
+          if Result and (Val <> '') then
+          begin
+            Result := GetValue(Val, 2, DiffMin, Err);
+            Result := Result and (Err = 0) and (Val = '');
+          end;
+        end;
+      end;
+    end;
+  end;
+
 begin
-  if (Length(Value) < 15) or (Uppercase(Value[Length(Value)]) <> 'Z') then
-        raise EConvertError.Create(stInvalidTimeFmt);
-  AValue := Copy(Value, 1, 14); // not interested in ms
-  Insert(':', AValue, 13);
-  Insert(':', AValue, 11);
-  Insert(' ', AValue, 9);
-  Insert('-', AValue, 7);
-  Insert('-', AValue, 5);
-  Result := VarToDateTime(AValue);
+  AVal := AValue;
+  if Length(AValue) < 10 then
+    Fail := true
+  else
+  begin
+    UTC := false;
+    if AValue.EndsWith('Z', true) then
+    begin
+      UTC := true;
+      Delete(AValue, Length(AValue), 1);
+    end;
+    Year := 0;
+    Month := 0;
+    Day := 0;
+    Hour := 0;
+    Minutes := 0;
+    Seconds := 0;
+    Miliseconds := 0;
+    Fraction := 0;
+    DiffHr := 0;
+    DiffMin := 0;
+    { Get mandatory values }
+    Fail := not (GetValue(AValue, 4, Year, Fraction) and GetValue(AValue, 2, Month, Fraction) and
+                 GetValue(AValue, 2, Day, Fraction) and GetValue(AValue, 2, Hour, Fraction));
+    if not Fail then
+    begin
+      if Fraction <> 0 then
+        Minutes := Round(60*Fraction*0.1)
+      else
+      if AValue <> '' then
+      begin
+        Fail := not GetValue(AValue, 2, Minutes, Fraction);
+        if not Fail then
+        begin
+          if Fraction <> 0 then
+            Seconds := Round(60*Fraction*0.1)
+          else
+          if AValue <> '' then
+          begin
+            Fail := not GetValue(AValue, 2, Seconds, Fraction);
+            Fail := Fail or (AValue <> '');
+            if not Fail and (Fraction <> 0) then
+                Miliseconds := Round(1000*Fraction*0.1)
+          end;
+        end;
+      end;
+    end;
+  end;
+  if Fail then
+    raise EConvertError.Create(Format(stInvalidTimeFmt, [AVal]));
+  Result := EncodeDateTime(Year, Month, Day, Hour, Minutes, Seconds, Miliseconds);
+  gDiff := EncodeTime(DiffHr, DiffMin, 0, 0);
+  if NegativeDiff then
+    gDiff := -gDiff;
+  Result := Result - gDiff;
 end;
 
 function LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
@@ -291,6 +386,23 @@ begin
     if err = TIME_ZONE_ID_DAYLIGHT then
       inc(Bias, tzi.DayLightBias);
     Result := DateTime + Bias * 60 / 86400;
+  end;
+end;
+
+function UTCToLocalDateTime(const UTCDateTime: TDateTime): TDateTime;
+var
+  LocalSystemTime: TSystemTime;
+  UTCSystemTime: TSystemTime;
+  LocalFileTime: TFileTime;
+  UTCFileTime: TFileTime;
+begin
+  DateTimeToSystemTime(UTCDateTime, UTCSystemTime);
+  SystemTimeToFileTime(UTCSystemTime, UTCFileTime);
+  if FileTimeToLocalFileTime(UTCFileTime, LocalFileTime)
+  and FileTimeToSystemTime(LocalFileTime, LocalSystemTime) then begin
+    Result := SystemTimeToDateTime(LocalSystemTime);
+  end else begin
+    Result := UTCDateTime;  // Default to UTC if any conversion function fails.
   end;
 end;
 
@@ -669,41 +781,57 @@ begin
     Result := 0;
 end;
 
-function CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
+function GetTextExtent(Text: string; Font: TFont): TSize;
 var
-  Form: TForm;
-  i: integer;
-  CheckCbx: TCheckBox;
+  c: TBitmap;
 begin
-  Form:=CreateMessageDialog(Msg, DlgType, Buttons);
-  with Form do
+  c := TBitmap.Create;
   try
-      CheckCbx:=TCheckBox.Create(Form);
-      CheckCbx.Parent:=Form;
-      CheckCbx.Caption:=Caption;
-      CheckCbx.Width:=Width - CheckCbx.Left;
-      CheckCbx.Caption := CbCaption;
-      CheckCbx.Checked := CbChecked;
-
-      for i:=0 to ComponentCount-1 do begin
-        if Components[i] is TLabel then begin
-          TLabel(Components[i]).Top:=16;
-          CheckCbx.Top:=TLabel(Components[i]).Top+TLabel(Components[i]).Height+16;
-          CheckCbx.Left:=TLabel(Components[i]).Left;
-        end;
-      end;
-
-      for i:=0 to ComponentCount-1 do begin
-        if Components[i] is TButton then begin
-          TButton(Components[i]).Top:=CheckCbx.Top+CheckCbx.Height+24;
-          ClientHeight:=TButton(Components[i]).Top+TButton(Components[i]).Height+16;
-        end;
-      end;
-      Result := ShowModal;
-      CbChecked := CheckCbx.Checked;
+    c.Canvas.Font.Assign(Font);
+    Result := c.Canvas.TextExtent(Text);
   finally
-    Form.Free;
+    c.Free;
   end;
+end;
+
+{ Centers lines of text (denoted by #10 character) by padding space characters
+  from the left. The BorderSize can be used to pad the longist line with spaces
+  from both side to create a spaced border for better readability }
+function CenterWithSpaces(Font: TFont; s: string;  BorderSize: Integer): string;
+var
+  i, c, MaxWidth, SpaceWidth: Integer;
+  Lines: TArray<string>;
+  Widths: array of Integer;
+begin
+  Lines := s.Split([#10]);
+  SetLength(Widths, Length(Lines));
+  MaxWidth := 0;
+  for i := 0 to High(Lines) do
+  begin
+    c := GetTextExtent(Lines[i], Font).cx;
+    Widths[i] := c;
+    MaxWidth := Max(MaxWidth, c);
+  end;
+  SpaceWidth := GetTextExtent(#32, Font).cx;
+  for i := 0 to High(Lines) do
+  begin
+    c := MaxWidth - Widths[i];
+    if c = 0 then
+    begin
+      if BorderSize > 0 then
+      begin
+        c := Lines[i].Length + BorderSize;
+        Lines[i] := Lines[i].PadLeft(c);
+        Lines[i] := Lines[i].PadRight(c + BorderSize);
+      end;
+      continue;
+    end;
+    c := (c shr 1) div SpaceWidth;
+    inc(c, BorderSize); // compensate for border spaces
+    inc(c, Lines[i].Length);
+    Lines[i] := Lines[i].PadLeft(c);
+  end;
+  Result := Result.Join(#10, Lines);
 end;
 
 function ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
@@ -745,19 +873,29 @@ begin
 end;
 
 { Uses Caption array to replace captions and Events array to assign OnClick event to buttons}
-function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons;
-         Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+function CreateMessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons;
+         Captions: array of string; Events: array of TNotifyEvent; MinTextWidth: Integer = 0): TForm;
 const
   cbBtnSpacing = 4;
   cbDlgMargin  = 8;
 var
-  Form: TForm;
   i, ci, ce, w, btnWidth, btnCount, leftPos: Integer;
   TextRect: TRect;
 begin
-  Form:=CreateMessageDialog(Msg, DlgType, Buttons);
-  with Form do
-  try
+  Result := CreateMessageDialog(Msg, DlgType, Buttons);
+  with Result do
+  begin
+    leftPos := 0;
+    w := 0;
+    for i := 0 to ControlCount - 1 do
+      if Controls[i] is TLabel then with Controls[i] do
+      begin
+        leftPos := Left;
+        w := Width;
+        break;
+      end;
+    Width := Max(LeftPos + MinTextWidth, Width);
+    Width := Min(Max(LeftPos + w, Width), Screen.Width div 2);
     ci := 0;
     ce := 0;
     btnWidth := 0;
@@ -776,7 +914,6 @@ begin
             Windows.DrawText( canvas.handle, PChar(Captions[ci]), -1, TextRect,
                               DT_CALCRECT or DT_LEFT or DT_SINGLELINE or
                               DrawTextBiDiModeFlagsReadingOnly);
-            //with TextRect do Width := Right - Left + cbBtnSpacing + cbDlgMargin;
             with TextRect do w := Right - Left + cbBtnSpacing + cbDlgMargin;
             if w > Width then
               Width := w;
@@ -805,13 +942,83 @@ begin
       Left := leftPos;
       inc(leftPos, Width + cbBtnSpacing);
     end;
+  end;
+end;
 
-    Result := ShowModal;
+function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons;
+         Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+var
+  Form: TForm;
+begin
+  Form := CreateMessageDlgEx(Msg, DlgType, Buttons, Captions, Events);
+  try
+    Result := Form.ShowModal;
   finally
     Form.Free;
   end;
 end;
 
+function CheckedMessageDlgEx(const Msg: string; DlgType: TMsgDlgType;
+         Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent;
+         CbCaption: string; var CbChecked: Boolean): TModalResult;
+var
+  Form: TForm;
+  i: integer;
+  CheckCbx: TCheckBox;
+
+  function GetCheckWidth: Integer;
+  begin
+    with TBitmap.Create do
+      try
+        Handle := LoadBitmap(0, PChar(OBM_CHECKBOXES));
+        Result := Width div 4;
+      finally
+        Free;
+      end;
+  end;
+
+begin
+
+  Form := CreateMessageDlgEx(Msg, DlgType, Buttons, Captions, Events,
+            GetCheckWidth + GetTextExtent(CbCaption + 'W', Screen.MessageFont).Width + 4);
+  with Form do
+  try
+    CheckCbx := TCheckBox.Create(Form);
+    CheckCbx.Parent := Form;
+    CheckCbx.Caption := Caption;
+    CheckCbx.Width := Width - CheckCbx.Left;
+    CheckCbx.Caption := CbCaption;
+    CheckCbx.Checked := CbChecked;
+
+    for i:=0 to ComponentCount-1 do begin
+      if Components[i] is TLabel then begin
+        TLabel(Components[i]).Top:=16;
+        CheckCbx.Top:=TLabel(Components[i]).Top+TLabel(Components[i]).Height+16;
+        CheckCbx.Left:=TLabel(Components[i]).Left;
+      end;
+    end;
+
+    for i:=0 to ComponentCount-1 do begin
+      if Components[i] is TButton then begin
+        TButton(Components[i]).Top:=CheckCbx.Top+CheckCbx.Height+24;
+        ClientHeight:=TButton(Components[i]).Top+TButton(Components[i]).Height+16;
+      end;
+    end;
+    Result := ShowModal;
+    CbChecked := CheckCbx.Checked;
+  finally
+    Form.Free;
+  end;
+end;
+
+function CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons;
+                           CbCaption: string; var CbChecked: Boolean): TModalResult;
+begin
+  Result := CheckedMessageDlgEx(Msg, DlgType, Buttons, [], [], cbCaption, cbChecked);
+end;
+
+{ Checks if the form is entirely covered with the main form and, if so,
+  moves it in indicated directions so that it becomes at least partialy visible }
 procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
 var
   R1, R2: TRect;
@@ -932,7 +1139,7 @@ const
   begin
     Result := nil;
     for i := 0 to High(CONTROLS_CLASSES) do
-      if CONTROLs_CLASSES[i].ClassName = ClassName then
+      if CONTROLS_CLASSES[i].ClassName = ClassName then
         Result := CONTROLS_CLASSES[i];
     if not Assigned(Result) then
       raise EClassNotFound.CreateFmt(stClassNotFound, [ClassName]);
@@ -989,6 +1196,29 @@ begin
   finally
     ms.free;
   end;
+end;
+
+function DragDropQuery(Source: TObject; Destination: string; var Move: Boolean): Boolean;
+var
+  msg: String;
+begin
+  Move := GetKeyState(VK_CONTROL) >= 0;
+  if Move then
+    msg := stAskTreeMove
+  else
+    msg := stAskTreeCopy;
+
+  if Source is TListView then
+  begin
+    if TListView(Source).SelCount > 1 then
+      msg := Format(msg, [Format(stNumObjects, [TListView(Source).SelCount]), Destination])
+    else
+      msg := Format(msg, [TListView(Source).Selected.Caption, Destination]);
+  end
+  else
+    msg := Format(msg, [TTreeView(Source).Selected.Text, Destination]);
+
+  Result := MessageDlg(msg, mtConfirmation, [mbOk, mbCancel], 0) = mrOk;
 end;
 
 end.

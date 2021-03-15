@@ -1144,7 +1144,7 @@ begin
   with SearchList do begin
     Entry := Entries[Item.Index];
     Item.ImageIndex := (Entry.Session as TConnection).GetImageIndex(Entry);
-    Item.Caption:=Entry.dn;
+    Item.Caption := DecodeLdapString(Entry.dn);
     Item.Data := Entry;
     for i:=0 to Attributes.Count-1 do begin
       Item.SubItems.Add(Entry.AttributesByName[Attributes[i]].AsString);
@@ -1904,7 +1904,7 @@ procedure TSearchFrm.ActGotoExecute(Sender: TObject);
 begin
   with ResultPages, ActiveList do
   if Assigned(ActiveList) and Assigned(Selected) then
-    MainFrm.LocateEntry(Selected.Caption, true);
+    MainFrm.LocateEntry(TLdapEntry(Selected.Data).dn, true);
 end;
 
 procedure TSearchFrm.ActPropertiesExecute(Sender: TObject);
@@ -2085,7 +2085,10 @@ begin
   begin
     ActStartExecute(nil);
     Key := #0;
-  end;
+  end
+  else
+  if (Key = #27) then
+    Close;
 end;
 
 procedure TSearchFrm.ListViewDblClick(Sender: TObject);

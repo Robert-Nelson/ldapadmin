@@ -83,7 +83,7 @@ implementation
 
 {$R *.DFM}
 
-uses Main, Constant, Dialogs, Connection, ObjectInfo;
+uses Main, Constant, Dialogs, Connection, ObjectInfo, System.UITypes;
 
 procedure TBookmarks.MenuPopup(Sender: TObject);
 var
@@ -186,9 +186,6 @@ begin
 end;
 
 constructor TBookmarkDlg.Create(AOwner: TComponent; Bookmarks: TBookmarks);
-var
-  ls: TStringList;
-  i: Integer;
 begin
   inherited Create(AOwner);
   FBookmarks := Bookmarks;
@@ -232,9 +229,6 @@ begin
 end;
 
 procedure TBookmarkDlg.FormClose(Sender: TObject; var Action: TCloseAction);
-var
-  i: Integer;
-  s: string;
 begin
   if fModified then
   begin

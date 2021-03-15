@@ -269,7 +269,7 @@ begin
   Entry := TLdapEntry.Create(fSession, DomainDn);
   with Entry do
   try
-    Read; //TODO Read(attr,attr,...);
+    Read(['sambaNextRid', 'sambaNextUserRid', 'sambaNextGroupRid']);
 
     for i := 0 to Attributes.Count - 1 do with Attributes[i] do
       if (Values[0].DataSize > 0) then
@@ -277,10 +277,10 @@ begin
         if (CompareText('sambaNextRid', Name) = 0) then
           Result := StrToInt(AsString)
         else
-        if CompareText('sambaNextRid', Name) = 0 then
+        if CompareText('sambaNextUserRid', Name) = 0 then
           nur := StrToInt(AsString)
         else
-        if CompareText('sambaNextRid', Name) = 0 then
+        if CompareText('sambaNextGroupRid', Name) = 0 then
           ngr := StrToInt(AsString);
       except
         on E:EConvertError do

@@ -464,7 +464,11 @@ begin
   if Accept and assigned(FOnCanCloseUp) then begin
     CanClose:=true;
     FOnCanCloseUp(Index, CanClose);
-    if not CanClose then exit;
+    if not CanClose then
+    begin
+      Beep;
+      exit;
+    end;
   end;
 
   if GetCapture<>0 then SendMessage(GetCapture, WM_CANCELMODE, 0, 0);
@@ -515,9 +519,17 @@ end;
 
 procedure TLAComboBox.SetItemIndex(const Value: Integer);
 begin
-  FItemIndex:=Value;
-  FPickList.ItemIndex:=Value;
-  if FItemIndex>-1 then Text:=FPickList.Items[FItemIndex];
+  if Value = FItemIndex then
+    exit;
+  FItemIndex := Value;
+  FPickList.ItemIndex := Value;
+  if FItemIndex > -1 then
+  begin
+    if Text = FPickList.Items[FItemIndex] then
+      OnChange(Self)
+    else
+      Text := FPickList.Items[FItemIndex];
+  end;
 end;
 
 procedure TLAComboBox.SetStyle(const Value: TComboBoxStyle);

@@ -84,7 +84,15 @@ uses
   ast in 'ast.pas',
   DBLoad in 'DBLoad.pas' {DBLoadDlg},
   DlgWrap in 'DlgWrap.pas',
-  EncodedDn in 'EncodedDn.pas';
+  EncodedDn in 'EncodedDn.pas',
+  ADUser in 'ADUser.pas' {ADUserDlg},
+  AdPrefs in 'AdPrefs.pas' {AdPrefDlg},
+  AdAdv in 'AdAdv.pas' {AdAdvancedDlg},
+  AdGroup in 'AdGroup.pas' {AdGroupDlg},
+  AdComputer in 'AdComputer.pas' {AdComputerDlg},
+  AdContainer in 'AdContainer.pas' {AdContainerDlg},
+  ADObjects in 'ADObjects.pas',
+  Validator in 'Validator.pas';
 
 {$R *.RES}
 

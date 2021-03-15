@@ -38,15 +38,10 @@ type
     fUnixWrite: Boolean;
     fEncoding:  TFileEncode;
     fCharSize:  Integer;
-    //fFileName:  string;
-    //fMode:      Integer;
     function    IsEof: Boolean;
     procedure   SetEncoding(AEncoding: TFileEncode);
   public
     constructor Create;
-    //destructor  Destroy; override;
-    //function    Read(var Buffer; Count: Longint): Longint; override;
-    //function    Write(const Buffer; Count: Longint): Longint; override;
     procedure   ReadHeader;
     function    GetText: string;
     function    ReadChar: WideChar;
@@ -71,7 +66,7 @@ type
 
 implementation
 
-uses Constant, Misc;
+uses Constant, Misc, Dialogs;
 
 procedure TTextStream.SetEncoding(AEncoding: TFileEncode);
 var
@@ -122,14 +117,14 @@ begin
     if Bom = UTF_16BOM_BE then
     begin
       fEncoding := feUnicode_BE;
-      fCharSize := 2; // for now
+      fCharSize := 2;
       exit;
     end;
 
     if (Bom = UTF_16BOM_LE) then
     begin
       fEncoding := feUnicode_LE;
-      fCharSize := 2; // for now
+      fCharSize := 2;
       exit;
     end;
 
@@ -199,14 +194,13 @@ end;
 procedure TTextStream.WriteChar(AChar: WideChar);
 var
   b: Byte;
-  ch: WideChar;
 begin
-    if Encoding = feUnicode_BE then
-    begin
-      b := Hi(Word(ch));
-      Word(ch) := Word(ch) shl 8;
-      Word(ch) := Word(ch) or b;
-    end;
+  if Encoding = feUnicode_BE then
+  begin
+    b := Hi(Word(AChar));
+    Word(AChar) := Word(AChar) shl 8;
+    Word(AChar) := Word(AChar) or b;
+  end;
   WriteBuffer(AChar, FCharSize);
 end;
 
@@ -326,7 +320,12 @@ end;
 destructor TTextFile.Destroy;
 begin
   if fMode <> fmOpenRead then
+  try
     SaveToFile(fFileName);
+  except
+    on E: Exception do
+      MessageDlg(E.Message, mtError, [mbOK], 0);
+  end;
   inherited;
 end;
 
