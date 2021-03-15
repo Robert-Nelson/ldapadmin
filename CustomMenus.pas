@@ -513,7 +513,7 @@ end;
 
 function TCustomActionMenu.Load: Boolean;
 
-  function ReadItem(ActionItem: TCustomActionItem; Path: string): Boolean;
+  function ReadItem(ActionItem: TCustomActionItem; ItemPath: string): Boolean;
   var
     i: integer;
     names: TStrings;
@@ -524,11 +524,11 @@ function TCustomActionMenu.Load: Boolean;
     names := TStringList.Create;
     with fConfig do
     try
-      GetKeyNames(Path, names);
+      GetKeyNames(ItemPath, names);
       Result := names.Count > 0;
       for i := 0 to names.Count - 1 do
       begin
-        valPath := Path + names[i] + '\';
+        valPath := ItemPath + names[i] + '\';
         NewItem := TCustomActionItem.Create(ActionItem);
         with NewItem do
         begin
@@ -560,20 +560,19 @@ procedure TCustomActionMenu.Save;
 var
   i: Integer;
 
-  procedure WriteItem(ActionItem: TCustomActionItem; Path: string);
+  procedure WriteItem(ActionItem: TCustomActionItem; ItemPath: string);
   var
     i: integer;
-
   begin
     with fConfig, ActionItem do begin
-      WriteString(Path + 'Caption', Caption);
-      WriteInteger(Path + 'ShortCut', ShortCut);
-      WriteBool(Path + 'Enabled', Enabled);
-      WriteInteger(Path + 'ActionId', ActionId);
-      WriteInteger(Path + 'DefaultAction', DefaultAction);
-      WriteString(Path + 'TemplateName', TemplateName);
+      WriteString(ItemPath + 'Caption', Caption);
+      WriteInteger(ItemPath + 'ShortCut', ShortCut);
+      WriteBool(ItemPath + 'Enabled', Enabled);
+      WriteInteger(ItemPath + 'ActionId', ActionId);
+      WriteInteger(ItemPath + 'DefaultAction', DefaultAction);
+      WriteString(ItemPath + 'TemplateName', TemplateName);
       for i:= 0 to Count - 1 do
-        WriteItem(Items[i], Path + Format('%.4d', [i]) + '\');
+        WriteItem(Items[i], ItemPath + Format('%.4d', [i]) + '\');
     end;
   end;
 

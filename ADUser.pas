@@ -179,6 +179,7 @@ type
     FTimeCheckedState: Boolean;
     function  GetTimePickersValue: TDateTime;
     procedure SetTimePickers(Value: TDateTime);
+    procedure HandleTimePickersCheckboxes;
     procedure PanelWindowProc(var Msg: TMessage);
     procedure PanelImageDrop(var Msg: TWMDROPFILES);
     function  FormatString(const Src: string): string;
@@ -276,7 +277,8 @@ begin
     if TimePicker.Checked then
     begin
       TimePicker.Checked := false;
-      TimePickerChange(nil);
+      //TimePickerChange(nil);
+      HandleTimePickersCheckboxes;
     end;
     {$ELSE}
     if TimePicker.Checked then
@@ -288,12 +290,39 @@ begin
     else
     if not FTimeCheckedState and (Frac(TimePicker.Time) = 0) then
       DatePicker.Date := DatePicker.Date + 1; // Handle change from midnight to 00:00:00 next day
-    TimePickerChange(nil);
+    //TimePickerChange(nil);
+    HandleTimePickersCheckboxes;
     {$ENDIF}
     Value := Value - 1;
   end
   else
     TimePicker.DateTime := Value;
+end;
+
+procedure TADUserDlg.HandleTimePickersCheckboxes;
+begin
+  {$IFDEF MIDNIGHT_TO_ZERO_DAY_ADJUST}
+  if TimePicker.Checked then
+  begin
+    if not FTimeCheckedState then
+    begin
+      if Frac(TimePicker.Time) = 0 then
+        DatePicker.Date := DatePicker.Date + 1; // Handle change from midnight to 00:00:00 next day
+    end;
+    TimePicker.Format := '';
+  end
+  else begin
+    if FTimeCheckedState and (Frac(TimePicker.Time) = 0) then
+      DatePicker.Date := DatePicker.Date - 1; // Handle change from 00:00:00 to midnight previous day
+    TimePicker.Format := '''' + cMidnight + '''';
+  end;
+  {$ELSE}
+  if TimePicker.Checked then
+    TimePicker.Format := ''
+  else
+    TimePicker.Format := '''' + cMidnight + '''';
+  {$ENDIF}
+  FTimeCheckedState := TimePicker.Checked;
 end;
 
 procedure TADUserDlg.PanelWindowProc(var Msg: TMessage) ;
@@ -970,28 +999,7 @@ end;
 
 procedure TADUserDlg.TimePickerChange(Sender: TObject);
 begin
-  {$IFDEF MIDNIGHT_TO_ZERO_DAY_ADJUST}
-  if TimePicker.Checked then
-  begin
-    if not FTimeCheckedState then
-    begin
-      if Frac(TimePicker.Time) = 0 then
-        DatePicker.Date := DatePicker.Date + 1; // Handle change from midnight to 00:00:00 next day
-    end;
-    TimePicker.Format := '';
-  end
-  else begin
-    if FTimeCheckedState and (Frac(TimePicker.Time) = 0) then
-      DatePicker.Date := DatePicker.Date - 1; // Handle change from 00:00:00 to midnight previous day
-    TimePicker.Format := '''' + cMidnight + '''';
-  end;
-  {$ELSE}
-  if TimePicker.Checked then
-    TimePicker.Format := ''
-  else
-    TimePicker.Format := '''' + cMidnight + '''';
-  {$ENDIF}
-  FTimeCheckedState := TimePicker.Checked;
+  HandleTimePickersCheckboxes;
   Entry.AdAccountExpires := GetTimePickersValue;
 end;
 
