@@ -1,7 +1,7 @@
   {      LDAPAdmin - Pickup.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
-  *      Author: Tihomir Karlovic
+  *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
   *
   * This file is free software; you can redistribute it and/or modify
@@ -24,260 +24,237 @@ unit Pickup;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList;
-
-const
-  bmGroup          =  0;
-  bmGroupSel       =  0;
-  bmMailGroup      =  1;
-  bmMailGroupSel   =  1;
-  bmCGroup         =  2;
-  bmCGroupSel      =  3;
-  bmUser           =  3;
-  bmUserSel        =  3;
-  bmComputer       =  4;
-  bmComputerSel    =  4;
+  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Misc;
 
 type
-  TPickupDlg = class(TForm)
-    OKBtn: TButton;
-    CancelBtn: TButton;
-    ListView: TListView;
-    ImageList: TImageList;
-    Label1: TLabel;
-    FilterEdit: TEdit;
-    tmrChanged: TTimer;
-    FullList: TListView;
-    procedure ListViewDeletion(Sender: TObject; Item: TListItem);
-    procedure ListViewDblClick(Sender: TObject);
-    procedure ListViewColumnClick(Sender: TObject; Column: TListColumn);
-    procedure ListViewCompare(Sender: TObject; Item1, Item2: TListItem;
-      Data: Integer; var Compare: Integer);
-    procedure ListViewClick(Sender: TObject);
-    procedure FilterEditChange(Sender: TObject);
-    procedure tmrChangedTimer(Sender: TObject);
-  private
-    ColumnToSort: Integer;
-    Descending: Boolean;
-    procedure CopyListItem(si, di: TListItem);
-  public
-    procedure Populate(Session: TLDAPSession; Filter: string; var attrs: PCharArray;
-      ImgIdx: integer = -1);
-    procedure PopulateGroups(Session: TLDAPSession);
-    procedure PopulateMailGroups(Session: TLDAPSession);
-    procedure PopulateAccounts(Session: TLDAPSession);
-    procedure PopulateComputers(Session: TLDAPSession);
-    procedure PopulateMailAccounts(Session: TLDAPSession);
-
-    procedure FillFullList;
+  TPopulateColumn = record
+    Attribute: string;
+    DataType:  TLdapAttributeSortType;
   end;
 
-var
-  PickupDlg: TPickupDlg;
+  TPopulateColumns = array of TPopulateColumn;
+
+  TOnGetImageIndex= procedure(const Entry: TLdapEntry; var ImageIndex: integer) of object;
+
+  TPickupDlg = class(TForm)
+    OKBtn:            TButton;
+    CancelBtn:        TButton;
+    ListView:         TListView;
+    FilterLbl:        TLabel;
+    FilterEdit:       TEdit;
+    procedure         ListViewDblClick(Sender: TObject);
+    procedure         FilterEditChange(Sender: TObject);
+    procedure         ListViewData(Sender: TObject; Item: TListItem);
+    procedure         FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure         ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
+  private
+    FPopulates:       array of TPopulateColumns;
+    FOnGetImageIndex: TOnGetImageIndex;
+    FEntries:         TLdapEntryList;
+    FShowed:          TList;
+    FSorter:          TListViewSorter;
+    FSelected:        TList;
+    FImageIndex:      integer;
+    procedure         FillListView;
+    procedure         DoSort(SortColumn:  TListColumn; SortAsc: boolean);
+    function          GetColumns: TListColumns;
+    function          GetText(Index: integer; Entry: TLdapEntry): string;
+    function          GetImages: TCustomImageList;
+    procedure         SetImages(const Value: TCustomImageList);
+    function          GetSelCount: integer;
+    function          GetSelected(Index: integer): TLdapEntry;
+    function          GetMultiSelect: boolean;
+    procedure         SetMultiSelect(const Value: boolean);
+  protected
+    procedure         DoShow; override;
+  public
+    constructor       CreateNew(AOwner: TComponent; Dummy: Integer = 0); override;
+    destructor        Destroy; override;
+    procedure         Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string);
+
+    property          Entries:  TLdapEntryList read FEntries;
+    property          ImageIndex: integer read FImageIndex write FImageIndex;
+    property          Images: TCustomImageList read GetImages write SetImages;
+    property          Columns: TListColumns read GetColumns;
+    property          OnGetImageIndex: TOnGetImageIndex read FOnGetImageIndex write FOnGetImageIndex;
+    property          Selected[Index: integer]: TLdapEntry read GetSelected;
+    property          SelCount: integer read GetSelCount;
+    property          MultiSelect: boolean read GetMultiSelect write SetMultiSelect;
+  end;
 
 implementation
 
 {$R *.DFM}
 
-
 uses WinLDAP, Constant;
 
-function CustomSortProc(Item1, Item2: TListItem; ParamSort: integer): integer; stdcall;
-var
-  n1, n2: Integer;
+////////////////////////////////////////////////////////////////////////////////
+
+constructor TPickupDlg.CreateNew(AOwner: TComponent; Dummy: Integer);
 begin
-  n1 := Item1.ImageIndex;
-  n2 := Item2.ImageIndex;
-  if n1 > n2 then
-    Result := 1
-  else
-  if n1 < n2 then
-    Result := -1
-  else
-    Result := AnsiStrIComp(PChar(Item1.Caption), PChar(Item2.Caption));
+  inherited;
+  FImageIndex:=-1;
+  FEntries:=TLdapEntryList.Create;
+  FShowed:=TList.Create;
+  FSelected:=TList.Create;
+  setlength(FPopulates,0);
 end;
 
-
-{ This function takes filter parameter to use on LDAP search and attrs parameter
-  which is a NULL terminated array of PChars to attribute names we want to display
-  in a list box. The caller can prepare list view columns, if there are not enough
-  columns to display results they are automatically added with attribute name
-  used as a caption. if there are multiple values per attribute only first returned
-  will be displayed }
-
-procedure TPickupDlg.Populate(Session: TLDAPSession; Filter: string; var attrs: PCharArray;
-  ImgIdx: integer = -1);
-var
-  plmSearch, plmEntry: PLDAPMessage;
-  ppcVals: PPChar;
-  pld: PLDAP;
-  I: Integer;
-  ListItem: TListItem;
-  NewColumn: TListColumn;
-
-function IndexOf(entryName: string): Integer;
-var
-  I: Integer;
+destructor TPickupDlg.Destroy;
 begin
-  I := 0;
-  while Assigned(attrs[I]) do
-  begin
-    If (StrIComp(PChar(entryName), attrs[i]) = 0) then
-      break;
-    Inc(I);
+  FSorter.Free;
+  FShowed.Free;
+  setlength(FPopulates,0);
+  FEntries.Free;
+  FSelected.Free;
+  inherited;
+end;
+
+procedure TPickupDlg.DoShow;
+begin
+  FillListView;
+  FSorter:=TListViewSorter.Create;
+  FSorter.ListView:=self.ListView;
+  FSorter.OnSort:=DoSort;
+  inherited;
+end;
+
+procedure TPickupDlg.Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string);
+var
+  i: integer;
+  popIdx: integer;
+begin
+  popIdx:=length(FPopulates);
+  setlength(FPopulates, popIdx+1);
+  setlength(FPopulates[popIdx],length(Attributes));
+  //////////////////////////////////////////////////////////////////////////////
+  for i:=0 to length(Attributes)-1 do begin
+    FPopulates[popIdx][i].DataType:=GetAttributeSortType(Attributes[i]);
+    FPopulates[popIdx][i].Attribute:=Attributes[i];
   end;
-  Result := I;
+  //////////////////////////////////////////////////////////////////////////////
+  Session.Search(Filter, Session.Base, LDAP_SCOPE_SUBTREE, Attributes, false, FEntries);
 end;
 
+procedure TPickupDlg.FilterEditChange(Sender: TObject);
 begin
-
-  pld := Session.pld;
-
-  for i := ListView.Columns.Count to High(attrs)-1 do
-  begin
-    NewColumn := ListView.Columns.Add;
-    NewColumn.Caption := attrs[i];
-  end;
-
-  LdapCheck(ldap_search_s(pld, PChar(Session.Base), LDAP_SCOPE_SUBTREE,
-                               PChar(Filter), PChar(attrs), 0, plmSearch));
-  try
-    // loop thru entries
-    plmEntry := ldap_first_entry(pld, plmSearch);
-    while Assigned(plmEntry) do
-    begin
-      //ListItem := ListView.Items.Add;
-      i := 0;
-      while Assigned(attrs[i]) do
-      begin
-        ppcVals := ldap_get_values(pld, plmEntry, attrs[i]);
-        if Assigned(ppcVals) then
-        try
-          if I = 0 then
-          begin
-            ListItem := ListView.Items.Add;
-            ListItem.Caption := PCharArray(ppcVals)[0];
-            ListItem.Data := StrNew(ldap_get_dn(pld, plmEntry));
-            if ImgIdx <> -1 then
-              ListItem.ImageIndex := ImgIdx;
-            //ListItem.SubItems.Add(PChar(ListItem.Data));
-          end
-          else
-            ListItem.SubItems.Add(PCharArray(ppcVals)[0]);
-        finally
-          LDAPCheck(ldap_value_free(ppcVals));
-        end;
-        inc(i);
-      end;
-      plmEntry := ldap_next_entry(pld, plmEntry);
-    end;
-  finally
-    // free search results
-    LDAPCheck(ldap_msgfree(plmSearch));
-  end;
-
-  //ListView.AlphaSort;
-  ListView.CustomSort(@CustomSortProc, 0);
-
+  FillListView;
 end;
 
-procedure TPickupDlg.PopulateGroups(Session: TLDAPSession);
+function  TPickupDlg.GetText(Index: integer; Entry: TLdapEntry): string;
 var
-  attrs: PCharArray;
-begin
-  // set result fields
-  SetLength(attrs, 3);
-  attrs[0] := 'cn';
-  attrs[1] := 'description';
-  attrs[2] := nil;
-  ListView.Columns[1].Caption := cDescription;
-  Caption := cPickGroups;
-  Populate(Session, sGROUPS, attrs, bmGroup);
-
-  FillFullList;
-end;
-
-procedure TPickupDlg.PopulateMailGroups(Session: TLDAPSession);
-var
-  attrs: PCharArray;
-begin
-  // set result fields
-  SetLength(attrs, 3);
-  attrs[0] := 'cn';
-  attrs[1] := 'description';
-  attrs[2] := nil;
-  ListView.Columns[1].Caption := cDescription;
-  Caption := cPickGroups;
-  Populate(Session, sMAILGROUPS, attrs, bmMailGroup);
-
-  FillFullList;
-end;
-
-procedure TPickupDlg.PopulateAccounts(Session: TLDAPSession);
-var
-  attrs: PCharArray;
-  i: Integer;
-begin
-  // set result to Result only
-  SetLength(attrs, 2);
-  attrs[0] := 'uid';
-  attrs[1] := nil;
-  Caption := cPickAccounts;
-  Populate(Session, sPOSIXACCNT, attrs, bmUser);
-  for i := 0 to ListView.Items.Count - 1 do
-    with ListView.Items[i] do Subitems.Add(CanonicalName(GetDirFromDn(PChar(Data))));
-
-  FillFullList;
-end;
-
-procedure TPickupDlg.PopulateComputers(Session: TLDAPSession);
-var
-  attrs: PCharArray;
-  i: Integer;
+  i: integer;
   s: string;
 begin
-  SetLength(attrs, 2);
-  attrs[0] := 'uid';
-  attrs[1] := nil;
-  Caption := cPickAccounts;
-  Populate(Session, sPOSIXACCNT, attrs, bmComputer);
-  with ListView do
-  begin
-    i := Items.Count - 1;
-    while i >= 0 do
-    begin
-      s := Items[i].Caption;
-      if s[Length(s)] <> '$' then
-        Items.Delete(i);
-      dec(i);
+  result:='';
+  for i:=0 to length(FPopulates)-1 do begin
+    if Index>length(FPopulates[i])-1 then continue;
+
+    case FPopulates[i][Index].DataType of
+      AT_DN:   s:=Entry.DN;
+      AT_RDN:  s:=GetRdnFromDn(Entry.DN);
+      AT_Path: s:=CanonicalName(GetDirFromDn(Entry.dn));
+      else     s:=Entry.AttributesByName[FPopulates[i][Index].Attribute].AsString;
     end;
-    for i := 0 to Items.Count - 1 do
-      with Items[i] do Subitems.Add(CanonicalName(GetDirFromDn(PChar(Data))));
+    if s<>'' then begin
+      if result<>'' then result:=result + ', ' + s
+      else result:=result + s;
+    end;
   end;
-  FillFullList;
 end;
 
-procedure TPickupDlg.PopulateMailAccounts(Session: TLDAPSession);
+procedure TPickupDlg.ListViewData(Sender: TObject; Item: TListItem);
 var
-  attrs: PCharArray;
-  i: Integer;
+  i: integer;
+  IcoIndex: integer;
 begin
-  // set result to Result only
-  SetLength(attrs, 2);
-  attrs[0] := 'uid';
-  attrs[1] := nil;
-  Caption := cPickAccounts;
-  Populate(Session, sMAILACCNT, attrs, bmUser);
-  for i := 0 to ListView.Items.Count - 1 do
-    with ListView.Items[i] do Subitems.Add(CanonicalName(GetDirFromDn(PChar(Data))));
+  Item.Caption:=GetText(0, TLdapEntry(FShowed[Item.Index]));
+  for i:=1 to ListView.Columns.Count-1 do
+    Item.SubItems.Add(GetText(i, TLdapEntry(FShowed[Item.Index])));
 
-  FillFullList;
+  IcoIndex:=FImageIndex;
+  if assigned(FOnGetImageIndex) then FOnGetImageIndex(TLdapEntry(FShowed[Item.Index]), IcoIndex);
+  Item.ImageIndex := IcoIndex;
 end;
 
-procedure TPickupDlg.ListViewDeletion(Sender: TObject; Item: TListItem);
+procedure TPickupDlg.FillListView;
+var
+  i : integer;
+  sl: TStringList;
+
+  function Match(Entry: TLdapEntry): boolean;
+  var
+    i : integer;
+    s: string;
+  begin
+    if sl.Count=0 then begin
+      result:=true;
+      exit;
+    end;
+    s := '';
+    for i:=0 to ListView.Columns.Count-1 do s:=s+#1+GetText(i, Entry);
+    s := AnsiUpperCase(s);
+
+    result := false;
+    for i:=0 to sl.Count-1 do
+      if Pos(sl[i],s) = 0 then exit;
+
+    result := true;
+  end;
+
 begin
-  if Assigned(Item.Data) then
-    StrDispose(Item.Data);
+  // Checks ////////////////////////////////////////////////////////////////////
+  if (FEntries=nil) (*or (FAttributes.Count=0)*) then begin
+    ListView.Items.Clear;
+    Exit;
+  end;
+  if ListView.Columns.Count<1 then exit;
+
+  // Prepare Filter ////////////////////////////////////////////////////////////
+  sl := TStringList.Create;
+  sl.CommaText := AnsiUpperCase(FilterEdit.Text);
+  //////////////////////////////////////////////////////////////////////////////
+  Screen.Cursor:=crHourGlass;
+  ListView.Items.BeginUpdate;
+
+  FShowed.Clear;
+  for i:=0 to FEntries.Count-1 do
+    if Match(FEntries[i]) then FShowed.Add(FEntries[i]);
+
+  ListView.Items.Count:=FShowed.Count;
+  sl.Free;
+  ListView.Items.EndUpdate;
+  Screen.Cursor:=crDefault;
+end;
+
+procedure TPickupDlg.DoSort(SortColumn: TListColumn; SortAsc: boolean);
+var
+  Attrs: array of string;
+  i,n : integer;
+
+begin
+  setlength(Attrs, length(FPopulates));
+  n:=0;
+  for i:=0 to length(FPopulates)-1 do begin
+    if length(FPopulates[i])< SortColumn.Index-1 then continue;
+    Attrs[n]:=FPopulates[i][SortColumn.Index].Attribute;
+    inc(n);
+  end;
+  setlength(Attrs, n);
+
+  FEntries.Sort(Attrs, SortAsc);
+  FillListView;
+end;
+
+procedure TPickupDlg.FormClose(Sender: TObject; var Action: TCloseAction);
+var
+  i: integer;
+begin
+  // Populate FSelected list ///////////////////////////////////////////////////
+  FSelected.Clear;
+  if ModalResult<>MrOK then exit;
+  for i:=0 to FShowed.Count-1 do
+    if ListView.Items[i].Selected then FSelected.Add(FShowed[i]);
 end;
 
 procedure TPickupDlg.ListViewDblClick(Sender: TObject);
@@ -285,116 +262,44 @@ begin
   ModalResult := mrOk
 end;
 
-procedure TPickupDlg.ListViewColumnClick(Sender: TObject; Column: TListColumn);
+function TPickupDlg.GetColumns: TListColumns;
 begin
-  if ColumnToSort <> Column.Index then
-  begin
-    ColumnToSort := Column.Index;
-    Descending := false;
-  end
-  else
-    Descending := not Descending;
-  //(Sender as TCustomListView).AlphaSort;
-  (Sender as TCustomListView).CustomSort(@CustomSortProc, 0);
+  result:=ListView.Columns;
 end;
 
-procedure TPickupDlg.ListViewCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
-var
-  ix: Integer;
+function TPickupDlg.GetImages: TCustomImageList;
 begin
-  if ColumnToSort = 0 then
-    Compare := CompareText(Item1.Caption,Item2.Caption)
-  else
-  begin
-    Compare := -1;
-    ix := ColumnToSort - 1;
-    if Item1.SubItems.Count > ix then
-    begin
-      Compare := 1;
-      if Item2.SubItems.Count > ix then
-        Compare := AnsiCompareText(Item1.SubItems[ix],Item2.SubItems[ix]);
-    end;
-  end;
-  if Descending then
-    Compare := - Compare;
+  result:=ListView.SmallImages;
 end;
 
-procedure TPickupDlg.ListViewClick(Sender: TObject);
+procedure TPickupDlg.SetImages(const Value: TCustomImageList);
 begin
-  OkBtn.Enabled := Assigned(ListView.Selected);
+  ListView.SmallImages:=Value;
 end;
 
-procedure TPickupDlg.FilterEditChange(Sender: TObject);
+function TPickupDlg.GetSelCount: integer;
 begin
-  tmrChanged.Enabled := false;
-  tmrChanged.Enabled := true;
+  result:=FSelected.Count;
 end;
 
-procedure TPickupDlg.CopyListItem(si, di: TListItem);
+function TPickupDlg.GetSelected(Index: integer): TLdapEntry;
 begin
-  if di <> nil then
-  with di do
-  begin
-    Caption := si.Caption;
-    Data := StrNew(si.Data);
-    ImageIndex := si.ImageIndex;
-    Indent := si.Indent;
-    OverlayIndex := si.OverlayIndex;
-    StateIndex := si.StateIndex;
-    SubItems.Assign(si.SubItems);
-    Checked := si.Checked;
-  end;
+  result:=TLdapEntry(FSelected[Index]);
 end;
 
-procedure TPickupDlg.tmrChangedTimer(Sender: TObject);
-var
-  i: integer;
-  sl: TStringList;
-  oldc: TCursor;
-
-  procedure Match(li: TListItem);
-  var
-    s: string;
-    i: integer;
-  begin
-    s := li.Caption;
-    for i:=0 to li.SubItems.Count-1 do
-      s := s + '#1' + li.SubItems[i];
-    s := UpperCase(s);
-
-    for i:=0 to sl.Count-1 do
-      if Pos(sl[i],s) = 0 then exit;
-
-    CopyListItem(li, ListView.Items.Add);
-  end;
-
+function TPickupDlg.GetMultiSelect: boolean;
 begin
-  tmrChanged.Enabled := false;
-  sl := TStringList.Create;
-  oldc := Screen.Cursor;
-  Screen.Cursor := crHourGlass;
-  ListView.Items.BeginUpdate;
-  try
-    ListView.Items.Clear;
-    sl.CommaText := UpperCase(FilterEdit.Text);
-    for i:=0 to FullList.Items.Count-1 do
-      Match(FullList.Items[i]);
-  finally
-    Screen.Cursor := oldc;
-    ListView.Items.EndUpdate;
-    sl.Free;
-  end;
+  result:=ListView.MultiSelect;
 end;
 
-procedure TPickupDlg.FillFullList;
-var
-  i: integer;
+procedure TPickupDlg.setMultiSelect(const Value: boolean);
 begin
-  FullList.Items.Clear;
+  ListView.MultiSelect:=Value;
+end;
 
-  FullList.Columns.Assign(ListView.Columns);
-  for i:=0 to ListView.Items.Count-1 do
-    CopyListItem(ListView.Items[i], FullList.Items.Add);
+procedure TPickupDlg.ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
+begin
+  OkBtn.Enabled := ListView.SelCount>0;
 end;
 
 end.

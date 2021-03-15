@@ -45,6 +45,8 @@ type
 
 implementation
 
+uses Constant;
+
 function TTextFile.IsEof: Boolean;
 begin
   Result := (Position = Size) and (fPos = fNumRead);
@@ -55,7 +57,7 @@ var
   p1, s1, len: Integer;
 begin
   if Eof then
-    raise Exception.Create('EOF!');
+    raise Exception.Create(stLdifEof);
   s1 := 0;
   Result := '';
   repeat

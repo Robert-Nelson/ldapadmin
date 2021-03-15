@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, RegAccnt, Constant, Samba, LDAPClasses;
+  StdCtrls, ComCtrls, ExtCtrls, Constant, Samba, LDAPClasses;
 
 type
   TPrefDlg = class(TForm)
@@ -83,11 +83,10 @@ type
     procedure PageControl1Change(Sender: TObject);
     procedure BtnWizardClick(Sender: TObject);
   private
-    Account: TAccountEntry;
     Session: TLDAPSession;
     DomList: TDomainList;
   public
-    constructor Create(AOwner: TComponent; rAccount: TAccountEntry; lSession: TLDAPSession); reintroduce; overload;
+    constructor Create(AOwner: TComponent; lSession: TLDAPSession); reintroduce; overload;
   end;
 
 var
@@ -95,72 +94,74 @@ var
 
 implementation
 
-uses Pickup, WinLdap, PrefWiz;
+uses Pickup, WinLdap, PrefWiz, Main, Config;
 
 {$R *.DFM}
 
-constructor TPrefDlg.Create(AOwner: TComponent; rAccount: TAccountEntry; lSession: TLDAPSession);
+constructor TPrefDlg.Create(AOwner: TComponent; lSession: TLDAPSession);
 begin
   inherited Create(AOwner);
-  Account := rAccount;
   Session := lSession;
-  with Account do
+  with AccountConfig do
   begin
-    edFirstUID.Text := IntToStr(posixFirstUID);
-    edLastUID.Text := IntToStr(posixLastUID);
-    edFirstGID.Text := IntToStr(posixFirstGID);
-    edLastGID.Text := IntToStr(posixLastGID);
-    edUserName.Text := posixUserName;
-    edDisplayName.Text := inetDisplayName;
-    edHomeDir.Text := posixHomeDir;
-    edLoginShell.Text := posixLoginShell;
-    if posixGroup <> NO_GROUP then
-      edGroup.Text := Session.GetDN(Format(sGROUPBYGID, [posixGroup]));
-    edNetbios.Text := sambaNetbiosName;
-    edHomeShare.Text := sambaHomeShare;
-    cbHomeDrive.ItemIndex := cbHomeDrive.Items.IndexOf(sambaHomeDrive);
-    edScript.Text := sambaScript;
-    edProfilePath.Text := sambaProfilePath;
-    edMailAddress.Text := postfixMailAddress;
-    edMaildrop.Text := postfixMaildrop;
+    edFirstUID.Text     := IntToStr(ReadInteger(rposixFirstUID, FIRST_UID));
+    edLastUID.Text      := IntToStr(ReadInteger(rposixLastUID,  LAST_UID));
+    edFirstGID.Text     := IntToStr(ReadInteger(rposixFirstGID, FIRST_GID));
+    edLastGID.Text      := IntToStr(ReadInteger(rposixLastGID,  LAST_GID));
+    edUserName.Text     := ReadString(rposixUserName, '');
+    edDisplayName.Text  := ReadString(rinetDisplayName, '');
+    edHomeDir.Text      := ReadString(rposixHomeDir, '');
+    edLoginShell.Text   := ReadString(rposixLoginShell, '');
+    if ReadInteger(rposixGroup, NO_GROUP) <> NO_GROUP then
+      edGroup.Text      := Session.GetDN(Format(sGROUPBYGID, [ReadInteger(rposixGroup, NO_GROUP)]));
+    edNetbios.Text      := ReadString(rsambaNetbiosName, '');
+    edHomeShare.Text    := ReadString(rsambaHomeShare, '');
+    cbHomeDrive.ItemIndex := cbHomeDrive.Items.IndexOf(ReadString(rsambaHomeDrive, ''));
+    edScript.Text       := ReadString(rsambaScript, '');
+    edProfilePath.Text  := ReadString(rsambaProfilePath, '');
+    edMailAddress.Text  := ReadString(rpostfixMailAddress, '');
+    edMaildrop.Text     := ReadString(rpostfixMaildrop, '');
   end;
 end;
 
 procedure TPrefDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   if ModalResult = mrOK then
-  with Account do begin
-    posixFirstUID := StrToInt(edFirstUID.Text);
-    posixLastUID := StrToInt(edLastUID.Text);
-    posixFirstGID := StrToInt(edFirstGID.Text);
-    posixLastGID := StrToInt(edLastGID.Text);
-    posixUserName := edUserName.Text;
-    inetDisplayName := edDisplayName.Text;
-    posixHomeDir := edHomeDir.Text;
-    posixLoginShell := edLoginShell.Text;
-    if edGroup.Text <> '' then
-      posixGroup := StrToInt(Session.Lookup(edGroup.Text, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE))
-    else
-      posixGroup := NO_GROUP;
-    sambaNetbiosName := edNetbios.Text;
-    sambaDomainName := cbDomain.Text;
-    sambaHomeShare := edHomeShare.Text;
-    sambaHomeDrive := cbHomeDrive.Text;
-    sambaScript := edScript.Text;
-    sambaProfilePath := edProfilePath.Text;
-    postfixMailAddress := edMailAddress.Text;
-    postfixMaildrop := edMaildrop.Text;
-    Write;
+  with AccountConfig do begin
+    WriteInteger(rposixFirstUID,      StrToInt(edFirstUID.Text));
+    WriteInteger(rposixLastUID,       StrToInt(edLastUID.Text));
+    WriteInteger(rposixFirstGID,      StrToInt(edFirstGID.Text));
+    WriteInteger(rposixLastGID,       StrToInt(edLastGID.Text));
+    WriteString (rposixUserName,      edUserName.Text);
+    WriteString (rinetDisplayName,    edDisplayName.Text);
+    WriteString (rposixHomeDir,       edHomeDir.Text);
+    WriteString (rposixLoginShell,    edLoginShell.Text);
+    WriteInteger(rposixGroup,         StrToIntDef(Session.Lookup(edGroup.Text, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE), NO_GROUP));
+    WriteString (rsambaNetbiosName,   edNetbios.Text);
+    WriteString (rsambaDomainName,    cbDomain.Text);
+    WriteString (rsambaHomeShare,     edHomeShare.Text);
+    WriteString (rsambaHomeDrive,     cbHomeDrive.Text);
+    WriteString (rsambaScript,        edScript.Text);
+    WriteString (rsambaProfilePath,   edProfilePath.Text);
+    WriteString (rpostfixMailAddress, edMailAddress.Text);
+    WriteString (rpostfixMaildrop,    edMaildrop.Text);
   end;
 end;
 
 procedure TPrefDlg.SetBtnClick(Sender: TObject);
 begin
-  with TPickupDlg.Create(Self), ListView do
-  begin
-    PopulateGroups(Session);
-    if ShowModal = mrOk then
-      EdGroup.Text := PChar(Selected.Data);
+  with TPickupDlg.Create(self) do begin
+    Caption := cPickGroups;
+    Columns[1].Caption:='Description';
+    Populate(Session, sGROUPS, ['cn', 'description']);
+    Images:=MainFrm.ImageList;
+    ImageIndex:=bmGroup;
+
+    ShowModal;
+
+    if (SelCount>0) then edGroup.Text:=Selected[0].Dn;
+
+    Free;
   end;
 end;
 
@@ -175,7 +176,7 @@ begin
     begin
       for i := 0 to DomList.Count - 1 do
         Items.Add(DomList.Items[i].DomainName);
-      ItemIndex := Items.IndexOf(Account.SambaDomainName);
+      ItemIndex := Items.IndexOf(AccountConfig.ReadString(rSambaDomainName, ''));
       if ItemIndex = -1 then
         ItemIndex := 0;
     end;

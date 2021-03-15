@@ -26,75 +26,85 @@ object UserDlg: TUserDlg
     Height = 396
     ActivePage = AccountSheet
     Align = alClient
+    MultiLine = True
     TabOrder = 0
     OnChange = PageControlChange
+    OnChanging = PageControlChanging
+    OnResize = PageControlResize
     object AccountSheet: TTabSheet
       Caption = '&Account'
       object Label1: TLabel
         Left = 16
-        Top = 24
+        Top = 16
         Width = 51
         Height = 13
         Caption = '&First name:'
       end
       object Label2: TLabel
         Left = 224
-        Top = 24
+        Top = 16
         Width = 69
         Height = 13
         Caption = '&Second name:'
       end
       object Label3: TLabel
         Left = 16
-        Top = 72
+        Top = 64
         Width = 66
         Height = 13
         Caption = '&Display name:'
       end
       object Label4: TLabel
         Left = 16
-        Top = 120
+        Top = 112
         Width = 51
         Height = 13
         Caption = '&Username:'
       end
       object Label5: TLabel
         Left = 160
-        Top = 24
+        Top = 16
         Width = 32
         Height = 13
         Caption = '&Initials:'
       end
       object Label9: TLabel
         Left = 16
-        Top = 168
+        Top = 160
         Width = 76
         Height = 13
         Caption = '&Home Directory:'
       end
       object Label12: TLabel
         Left = 16
-        Top = 216
+        Top = 208
         Width = 34
         Height = 13
         Caption = 'Gecos:'
       end
       object Label14: TLabel
         Left = 208
-        Top = 120
+        Top = 112
         Width = 53
         Height = 13
         Caption = '&Login shell:'
       end
       object GroupBox1: TGroupBox
         Left = 16
-        Top = 264
+        Top = 256
         Width = 353
-        Height = 89
+        Height = 105
         Caption = 'Account properties'
-        TabOrder = 10
+        TabOrder = 8
+        object Bevel1: TBevel
+          Left = 176
+          Top = 28
+          Width = 9
+          Height = 57
+          Shape = bsLeftLine
+        end
         object cbShadow: TCheckBox
-          Left = 32
+          Left = 24
           Top = 24
           Width = 121
           Height = 17
@@ -102,10 +112,46 @@ object UserDlg: TUserDlg
           TabOrder = 0
           OnClick = cbShadowClick
         end
+        object cbMail: TCheckBox
+          Left = 24
+          Top = 72
+          Width = 97
+          Height = 17
+          Caption = 'Mail Account'
+          TabOrder = 2
+          OnClick = cbMailClick
+        end
+        object cbSamba: TCheckBox
+          Left = 24
+          Top = 48
+          Width = 97
+          Height = 17
+          Caption = 'Samba Account'
+          TabOrder = 1
+          OnClick = cbSambaClick
+        end
+        object CheckListBox: TCheckListBox
+          Left = 200
+          Top = 21
+          Width = 137
+          Height = 72
+          OnClickCheck = CheckListBoxClickCheck
+          BorderStyle = bsNone
+          Color = clBtnFace
+          Enabled = False
+          Flat = False
+          IntegralHeight = True
+          ItemHeight = 24
+          Sorted = True
+          Style = lbOwnerDrawFixed
+          TabOrder = 3
+          OnClick = CheckListBoxClick
+          OnDrawItem = CheckListBoxDrawItem
+        end
       end
       object givenName: TEdit
         Left = 16
-        Top = 40
+        Top = 32
         Width = 137
         Height = 21
         TabOrder = 0
@@ -113,7 +159,7 @@ object UserDlg: TUserDlg
       end
       object sn: TEdit
         Left = 224
-        Top = 40
+        Top = 32
         Width = 145
         Height = 21
         TabOrder = 2
@@ -122,7 +168,7 @@ object UserDlg: TUserDlg
       end
       object displayName: TEdit
         Left = 16
-        Top = 88
+        Top = 80
         Width = 353
         Height = 21
         TabOrder = 3
@@ -130,7 +176,7 @@ object UserDlg: TUserDlg
       end
       object uid: TEdit
         Left = 16
-        Top = 136
+        Top = 128
         Width = 185
         Height = 21
         TabOrder = 4
@@ -139,7 +185,7 @@ object UserDlg: TUserDlg
       end
       object initials: TEdit
         Left = 160
-        Top = 40
+        Top = 32
         Width = 57
         Height = 21
         TabOrder = 1
@@ -147,7 +193,7 @@ object UserDlg: TUserDlg
       end
       object homeDirectory: TEdit
         Left = 16
-        Top = 184
+        Top = 176
         Width = 353
         Height = 21
         TabOrder = 6
@@ -155,7 +201,7 @@ object UserDlg: TUserDlg
       end
       object gecos: TEdit
         Left = 16
-        Top = 232
+        Top = 224
         Width = 353
         Height = 21
         TabOrder = 7
@@ -163,29 +209,11 @@ object UserDlg: TUserDlg
       end
       object loginShell: TEdit
         Left = 208
-        Top = 136
+        Top = 128
         Width = 161
         Height = 21
         TabOrder = 5
         OnChange = EditChange
-      end
-      object cbSamba: TCheckBox
-        Left = 48
-        Top = 320
-        Width = 97
-        Height = 17
-        Caption = 'Samba Account'
-        TabOrder = 8
-        OnClick = cbSambaClick
-      end
-      object cbMail: TCheckBox
-        Left = 232
-        Top = 288
-        Width = 97
-        Height = 17
-        Caption = 'Mail account'
-        TabOrder = 9
-        OnClick = cbMailClick
       end
     end
     object ShadowSheet: TTabSheet
@@ -556,9 +584,9 @@ object UserDlg: TUserDlg
       object Label19: TLabel
         Left = 16
         Top = 216
-        Width = 78
+        Width = 75
         Height = 13
-        Caption = 'State/&Province::'
+        Caption = 'State/&Province:'
       end
       object Label20: TLabel
         Left = 208
@@ -628,7 +656,7 @@ object UserDlg: TUserDlg
         Top = 232
         Width = 161
         Height = 21
-        TabOrder = 10
+        TabOrder = 9
         OnChange = EditChange
       end
       object URL: TEdit
@@ -638,7 +666,7 @@ object UserDlg: TUserDlg
         Height = 21
         Color = clBtnFace
         Enabled = False
-        TabOrder = 12
+        TabOrder = 11
       end
       object postalAddress: TMemo
         Left = 16
@@ -663,14 +691,14 @@ object UserDlg: TUserDlg
         Height = 21
         Color = clBtnFace
         Enabled = False
-        TabOrder = 11
+        TabOrder = 10
       end
       object telephoneNumber: TEdit
         Left = 208
         Top = 136
         Width = 161
         Height = 21
-        TabOrder = 8
+        TabOrder = 7
         OnChange = EditChange
       end
       object postalCode: TEdit
@@ -686,16 +714,8 @@ object UserDlg: TUserDlg
         Top = 88
         Width = 161
         Height = 21
-        TabOrder = 7
-        OnChange = EditChange
-      end
-      object title: TComboBox
-        Left = 208
-        Top = 40
-        Width = 161
-        Height = 21
-        ItemHeight = 0
         TabOrder = 6
+        OnChange = EditChange
       end
       object o: TEdit
         Left = 16
@@ -710,7 +730,7 @@ object UserDlg: TUserDlg
         Top = 184
         Width = 161
         Height = 21
-        TabOrder = 9
+        TabOrder = 8
         OnChange = EditChange
       end
       object l: TEdit
@@ -729,6 +749,14 @@ object UserDlg: TUserDlg
         Color = clBtnFace
         Enabled = False
         TabOrder = 5
+      end
+      object title: TEdit
+        Left = 208
+        Top = 40
+        Width = 161
+        Height = 21
+        TabOrder = 12
+        OnChange = EditChange
       end
     end
     object PrivateSheet: TTabSheet
@@ -845,9 +873,9 @@ object UserDlg: TUserDlg
       object Label34: TLabel
         Left = 16
         Top = 72
-        Width = 44
+        Width = 41
         Height = 13
-        Caption = 'M&ember::'
+        Caption = 'M&ember:'
       end
       object Label33: TLabel
         Left = 16
@@ -937,6 +965,7 @@ object UserDlg: TUserDlg
       Top = 16
       Width = 75
       Height = 25
+      Cancel = True
       Caption = '&Cancel'
       ModalResult = 2
       TabOrder = 1

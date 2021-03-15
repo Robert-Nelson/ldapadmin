@@ -28,50 +28,84 @@ uses
   ExtCtrls, ImgList, Schema, StdCtrls, LDAPClasses, Messages, Menus, Clipbrd;
 
 type
-  TChangeType=(ct_Normal,ct_Undo,ct_Redo);
+
+  TTabInfo=class
+  private
+    FCurrent:       TTreeNode;
+    FUndo:          TList;
+    FRedo:          TList;
+    procedure       SetCurrent(const Value: TTreeNode);
+    function        GetIsRedo: boolean;
+    function        GetIsUndo: boolean;
+  public
+    constructor     Create; reintroduce;
+    destructor      Destroy; override;
+    procedure       Undo;
+    procedure       Redo;
+    property        Current: TTreeNode read FCurrent write SetCurrent;
+    property        IsUndo: boolean read GetIsUndo;
+    property        IsRedo: boolean read GetIsRedo;
+  end;
+
 
   TSchemaDlg = class(TForm)
     Tree:           TTreeView;
     ImageList1:     TImageList;
     Splitter1:      TSplitter;
-    Panel1:         TPanel;
     Label1:         TLabel;
     SearchEdit:     TEdit;
     View:           TTreeView;
     UndoBtn:        TSpeedButton;
     RedoBtn:        TSpeedButton;
-    PopupMenu: TPopupMenu;
-    pmCopy: TMenuItem;
-    StatusBar: TStatusBar;
+    PopupMenu:      TPopupMenu;
+    pmCopy:         TMenuItem;
+    StatusBar:      TStatusBar;
+    WholeWordsCbx:  TCheckBox;
+    Tabs:           TTabControl;
+    pmOpenNewTab:   TMenuItem;
+    N1:             TMenuItem;
+    pmOpen:         TMenuItem;
+    Bevel1:         TBevel;
+    pmUndo:         TMenuItem;
     procedure       TreeChange(Sender: TObject; Node: TTreeNode);
     procedure       SearchEditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure       ViewMouseMove(Sender: TObject; Shift: TShiftState; X,  Y: Integer);
     procedure       ViewAdvancedCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode; State: TCustomDrawState; Stage: TCustomDrawStage; var PaintImages, DefaultDraw: Boolean);
     procedure       UndoBtnClick(Sender: TObject);
-    procedure       TreeChanging(Sender: TObject; Node: TTreeNode; var AllowChange: Boolean);
     procedure       RedoBtnClick(Sender: TObject);
-    procedure       ViewClick(Sender: TObject);
-    procedure       ViewKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure       FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure pmCopyClick(Sender: TObject);
-    procedure ViewContextPopup(Sender: TObject; MousePos: TPoint;
-      var Handled: Boolean);
+    procedure       pmCopyClick(Sender: TObject);
+    procedure       ViewContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
+    procedure       TabsChange(Sender: TObject);
+    procedure       ViewMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure       TabsMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure       TabsMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure       TabsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure       pmOpenClick(Sender: TObject);
+    procedure       pmOpenNewTabClick(Sender: TObject);
+    procedure       PopupMenuPopup(Sender: TObject);
+    function        GetNodeAt(X, Y: Integer): TTreeNode;
+    procedure       pmUndoClick(Sender: TObject);
+    function        GetLinkRect(Node: TTreeNode): TRect;
   private
-    FUndo:          TList;
-    FRedo:          TList;
-    FChangeType:    TChangeType;
     FSchema:        TLDAPSchema;
     FLastSerched:   string;
-    function        AddValue(const Name: string; Value: string; IsUrl: boolean=false; const Parent: TTreeNode=nil): TTreeNode; overload;
+    function        AddValue(const Name: string; Value: string; const Parent: TTreeNode=nil): TTreeNode; overload;
     function        AddValue(const Name: string; Value: integer): TTreeNode; overload;
     function        AddValue(const Name: string; Value: boolean): TTreeNode; overload;
-    procedure       Search(const SearchStr: string);
+    function        AddValue(const Name: string; const Value: TLdapSchemaItem; const AsString: string; const Parent: TTreeNode=nil): TTreeNode; overload;
+    procedure       AddValues(const Name: string; const Values: TLdapSchemaItems; const AsString: string; const Parent: TTreeNode=nil); overload;
+    procedure       AddValues(const Name: string; const Values: TStringList; const Parent: TTreeNode=nil); overload;
+
+    function        Search(const SearchStr: string; const WholeWords: boolean; const InNewTab: boolean): TTreeNode;
     procedure       ShowObjectClass(const ObjClass: TLDAPSchemaClass);
     procedure       ShowAttribute(const Attribute: TLDAPSchemaAttribute);
-    procedure       ShowSyntax(const Syntax: TLDAPSchemaSynax);
+    procedure       ShowSyntax(const Syntax: TLDAPSchemaSyntax);
     procedure       ShowMatchingRule(const MatchingRule: TLDAPSchemaMatchingRule);
     procedure       ShowMatchingRuleUse(const MatchingRuleUse: TLDAPSchemaMatchingRuleUse);
     procedure       WmGetSysCommand(var Message :TMessage); Message WM_SYSCOMMAND;
+    function        AddTab(TreeNode: TTreeNode): integer;
+    procedure       GoToLink(Node: TTreeNode; InNewTab: boolean);
   public
     constructor     Create(const ASession: TLDAPSession); reintroduce;
     destructor      Destroy; override;
@@ -79,89 +113,84 @@ type
 
 implementation
 
+uses Math;
+
+const
+  FOLDER_IMG          = 0;
+  CLASS_IMG           = 1;
+  SYNTAX_IMG          = 2;
+  ATTRIBUTE_IMG       = 3;
+  MATCHINGRULE_IMG    = 4;
+  MATCHINGRULEUSE_IMG = 5;
+
+
 {$R *.dfm}
 
 { TSchemaDlg }
 
 constructor TSchemaDlg.Create(const ASession: TLDAPSession);
-var
-  i: integer;
-  ParentNode: TTreeNode;
+  procedure AddSchemaItems(Items: TLdapSchemaItems; Caption: string; Img: integer);
+  var
+    i: integer;
+    ParentNode: TTreeNode;
+  begin
+    ParentNode:=Tree.Items.Add(nil, Caption);
+    ParentNode.ImageIndex:=FOLDER_IMG;
+    ParentNode.SelectedIndex:=FOLDER_IMG;
+    for i:=0 to Items.Count-1 do begin
+      with Tree.Items.AddChild(ParentNode,Items[i].Name.CommaText) do begin
+        Data:=Items[i];
+        ImageIndex:=img;
+        SelectedIndex:=ImageIndex;
+      end;
+    end;
+    ParentNode.AlphaSort;
+  end;
+
 begin
   inherited Create(Application.MainForm);
-  FUndo:=TList.Create;
-  FRedo:=TList.Create;
+
   FSchema:=TLDAPSchema.Create(ASession);
-  if not FSchema.Loaded then begin
-    Application.MessageBox('Can''t load LDAP schema',pchar(application.Title),MB_ICONERROR or MB_OK);
-    Free;
-  end;
+  if not FSchema.Loaded then raise Exception.Create('Can''t load LDAP schema');
 
-  ParentNode:=Tree.Items.Add(nil,'Object Classes');
-  ParentNode.ImageIndex:=1;
-  ParentNode.SelectedIndex:=1;
-   for i:=0 to FSchema.OBjectClasses.Count-1 do begin
-     with Tree.Items.AddChild(ParentNode,FSchema.OBjectClasses.Items[i].Name.CommaText) do begin
-       Data:=FSchema.OBjectClasses.Items[i];
-     end;
-   end;
+  AddSchemaItems(FSchema.OBjectClasses,    'Object Classes',    CLASS_IMG);
+  AddSchemaItems(FSchema.Attributes,       'Attribute Types',   ATTRIBUTE_IMG);
+  AddSchemaItems(FSchema.Syntaxes,         'Syntaxes',          SYNTAX_IMG);
+  AddSchemaItems(FSchema.MatchingRules,    'Matching Rules',    MATCHINGRULE_IMG);
+  AddSchemaItems(FSchema.MatchingRuleUses, 'Matching Rule Use', MATCHINGRULEUSE_IMG);
 
-  ParentNode:=Tree.Items.Add(nil,'Attribute Types');
-  ParentNode.ImageIndex:=1;
-  ParentNode.SelectedIndex:=1;
-  for i:=0 to FSchema.Attributes.Count-1 do begin
-    with Tree.Items.AddChild(ParentNode,FSchema.Attributes.Items[i].Name.CommaText) do begin
-      Data:=FSchema.Attributes.Items[i];
-    end;
-  end;
-
-  ParentNode:=Tree.Items.Add(nil,'Syntaxes');
-  ParentNode.ImageIndex:=1;
-  ParentNode.SelectedIndex:=1;
-  for i:=0 to FSchema.Syntaxes.Count-1 do begin
-    with Tree.Items.AddChild(ParentNode,FSchema.Syntaxes.Items[i].Oid) do begin
-      Data:=FSchema.Syntaxes.Items[i];
-    end;
-  end;
-
-  ParentNode:=Tree.Items.Add(nil,'Matching Rules');
-  ParentNode.ImageIndex:=1;
-  ParentNode.SelectedIndex:=1;
-  for i:=0 to FSchema.MatchingRules.Count-1 do begin
-    with Tree.Items.AddChild(ParentNode,FSchema.MatchingRules.Items[i].Name) do begin
-      Data:=FSchema.MatchingRules.Items[i];
-    end;
-  end;
-
-  ParentNode:=Tree.Items.Add(nil,'Matching Rule Use');
-  ParentNode.ImageIndex:=1;
-  ParentNode.SelectedIndex:=1;
-  for i:=0 to FSchema.MatchingRuleUses.Count-1 do begin
-    with Tree.Items.AddChild(ParentNode,FSchema.MatchingRuleUses.Items[i].Name) do begin
-      Data:=FSchema.MatchingRuleUses.Items[i];
-    end;
-  end;
-
-  Tree.AlphaSort;
+  if Tree.Items.Count>0 then Tree.Items[0].Selected:=true;
   Show;
 end;
 
 destructor TSchemaDlg.Destroy;
+var
+  i: integer;
 begin
+  for i:=0 to Tabs.Tabs.Count-1 do
+    if Tabs.Tabs.Objects[i] is TTabInfo then TTabInfo(Tabs.Tabs.Objects[i]).Free;
+
   inherited;
-  FUndo.Free;
-  FRedo.Free;
   FSchema.Free;
 end;
 
 procedure TSchemaDlg.TreeChange(Sender: TObject; Node: TTreeNode);
 begin
   if Tree.Selected=nil then exit;
+  if not(Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo) then Tabs.Tabs.Objects[Tabs.TabIndex]:=TTabInfo.Create;
+
+  begin
+    Tabs.Tabs.Strings[Tabs.TabIndex]:=Tree.Selected.Text;
+    TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).Current:=Tree.Selected;
+    UndoBtn.Enabled:=TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).IsUndo;
+    RedoBtn.Enabled:=TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).IsRedo;
+  end;
+
   View.Items.BeginUpdate;
   View.Items.Clear;
   if (TObject(Tree.Selected.Data) is TLDAPSchemaClass) then ShowObjectClass(TLDAPSchemaClass(Tree.Selected.Data));
   if (TObject(Tree.Selected.Data) is TLDAPSchemaAttribute) then ShowAttribute(TLDAPSchemaAttribute(Tree.Selected.Data));
-  if (TObject(Tree.Selected.Data) is TLDAPSchemaSynax) then ShowSyntax(TLDAPSchemaSynax(Tree.Selected.Data));
+  if (TObject(Tree.Selected.Data) is TLDAPSchemaSyntax) then ShowSyntax(TLDAPSchemaSyntax(Tree.Selected.Data));
   if (TObject(Tree.Selected.Data) is TLDAPSchemaMatchingRule) then ShowMatchingRule(TLDAPSchemaMatchingRule(Tree.Selected.Data));
   if (TObject(Tree.Selected.Data) is TLDAPSchemaMatchingRuleUse) then ShowMatchingRuleUse(TLDAPSchemaMatchingRuleUse(Tree.Selected.Data));
 
@@ -177,121 +206,171 @@ begin
     StatusBar.Panels[0].Text:=' '+Tree.Selected.Parent.Text;
     StatusBar.Panels[1].Text:=' '+Tree.Selected.Text;
   end;
+
 end;
 
-procedure TSchemaDlg.Search(const SearchStr: string);
-  function DoSearch(Start: TTreeNode; Pattern: string): boolean;
+function TSchemaDlg.Search(const SearchStr: string; const WholeWords: boolean; const InNewTab: boolean): TTreeNode;
+  function DoSearch(Start: TTreeNode; Pattern: string): TTreeNode;
   begin
-    while Start <> nil do begin
-      if pos(Pattern,UpperCase(Start.Text))>0 then begin
-        Start.Selected:=true;
-        result:=true;
-        exit;
-      end;
-      Start:= Start.GetNext;
+    result:=Start;
+    while result <> nil do begin
+      if pos(Pattern,','+UpperCase(result.Text)+',')>0 then exit;
+      result:= result.GetNext;
     end;
-    result:=false;
   end;
+
 var
   s: string;
 begin
   s:=Trim(UpperCase(SearchStr));
+  if WholeWords then s:=','+s+',';
+
+
   if S<>FLastSerched then begin
-    DoSearch(Tree.Items.GetFirstNode, s);
+    result:=DoSearch(Tree.Items.GetFirstNode, s);
     FLastSerched:=s;
   end
   else begin
-    if not DoSearch(Tree.Selected.GetNext, s) then
-      DoSearch(Tree.Items.GetFirstNode, s);
+    result:=DoSearch(Tree.Selected.GetNext, s);
+    if result=nil then
+      result:=DoSearch(Tree.Items.GetFirstNode, s);
+  end;
+
+  if result<>nil then begin
+    if InNewTab then Tabs.TabIndex:=AddTab(result);
+    result.Selected:=true;
   end;
 end;
 
 procedure TSchemaDlg.SearchEditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  if KEY=VK_RETURN then Search(SearchEdit.Text);
+  case KEY of
+    VK_RETURN: Search(SearchEdit.Text, WholeWordsCbx.Checked, Trim(UpperCase(SearchEdit.Text))<>FLastSerched);
+  end;
+end;
+
+function TSchemaDlg.GetNodeAt(X, Y: Integer): TTreeNode;
+begin
+  result:=View.GetNodeAt(X,Y);
+  if (result<>nil) and (not PtInRect(result.DisplayRect(true), Point(X,Y))) then
+    result:=nil;
 end;
 
 procedure TSchemaDlg.ViewMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
   Node: TTreeNode;
 begin
-  Node:=View.GetNodeAt(X,Y);
-  if (Node<>nil) and (integer(Node.Data)>0) then View.Cursor:=crHandPoint
+  Node:=GetNodeAt(X,Y);
+  if (Node=nil) then begin
+    View.Cursor:=crDefault;
+    exit;
+  end;
+
+  if ssLeft in Shift then begin
+    View.Cursor:=crDefault;
+    Node.Selected:=true;
+    Node.Focused:=true;
+    exit;
+  end;
+
+  if PtInRect(GetLinkRect(Node), point(X, Y)) then View.Cursor:=crHandPoint
   else View.Cursor:=crDefault;
 end;
 
-procedure TSchemaDlg.ViewClick(Sender: TObject);
+function TSchemaDlg.GetLinkRect(Node: TTreeNode): TRect;
 var
   n: integer;
 begin
-  if (View.Selected<>nil) and (integer(View.Selected.Data)>0) then begin
-    n:=pos(': ',View.Selected.Text);
-    Search(trim(copy(View.Selected.Text,n+1,length(View.Selected.Text)-n+1)));
+  if (Node=nil) or (Node.Data=nil) then begin
+    result:=rect(0,0,0,0);
+    exit;
   end;
-end;
 
-procedure TSchemaDlg.ViewKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-begin
-  if Key=VK_RETURN then viewClick(nil);
+  result:=Node.DisplayRect(true);
+  n:=pos(':', Node.Text);
+  if n>0 then
+    result.Left:=result.Left+Node.TreeView.Canvas.TextWidth(copy(Node.Text, 1, n+1));
 end;
 
 procedure TSchemaDlg.ViewAdvancedCustomDrawItem(Sender: TCustomTreeView; Node: TTreeNode; State: TCustomDrawState;Stage: TCustomDrawStage; var PaintImages, DefaultDraw: Boolean);
+var
+  rect: TRect;
+  n: integer;
 begin
+  if (Node.Parent=nil) and (Node.Index=0) then View.Canvas.Font.Style:=[fsBold];
+  if Stage<> cdPostPaint then exit;
   if integer(Node.Data)>0 then begin
     if not (cdsFocused in State) then View.Canvas.Font.Color:=clBlue;
     View.Canvas.Font.Style:=[fsUnderline];
+    rect:=GetLinkRect(Node);
+    n:=pos(':', Node.Text);
+    if n>0 then inc(n,2);
+    //logs('|'+copy(Node.Text, n, length(Node.Text)));
+    View.Canvas.TextRect(Rect, Rect.Left+1, Rect.Top+1, copy(Node.Text, n, length(Node.Text)));
   end;
 end;
 
 procedure TSchemaDlg.UndoBtnClick(Sender: TObject);
 begin
-  if FUndo.Count<1 then Exit;
-  FChangeType:=ct_Undo;
-  TTreeNode(FUndo.Items[FUndo.Count-1]).Selected:=true;
+  if not (Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo) then exit;
+  with Tabs.Tabs.Objects[Tabs.TabIndex] as TTabInfo do begin
+    Undo;
+    Current.Selected:=true;
+  end;
 end;
 
 procedure TSchemaDlg.RedoBtnClick(Sender: TObject);
 begin
-  if FRedo.Count<1 then exit;
-  FChangeType:=ct_Redo;
-  TTreeNode(FRedo.Items[FRedo.Count-1]).Selected:=true;
-end;
-
-procedure TSchemaDlg.TreeChanging(Sender: TObject; Node: TTreeNode; var AllowChange: Boolean);
-begin
-  if Tree.Selected<>nil then begin
-    case FChangeType of
-      ct_Normal:  begin
-                    FUndo.Add(Tree.Selected);
-                    FRedo.Clear;
-                  end;
-      ct_Undo:    begin
-                    FRedo.Add(Tree.Selected);
-                    if FUndo.Count>0 then FUndo.Delete(FUndo.Count-1);
-                  end;
-      ct_Redo:    begin
-                    FUndo.Add(Tree.Selected);
-                    if FRedo.Count>0 then FRedo.Delete(FRedo.Count-1);
-                  end;
-    end;
+  if not (Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo) then exit;
+  with Tabs.Tabs.Objects[Tabs.TabIndex] as TTabInfo do begin
+    Redo;
+    Current.Selected:=true;
   end;
-  FChangeType:=ct_Normal;
-  UndoBtn.Enabled:=FUndo.Count>0;
-  RedoBtn.Enabled:=FRedo.Count>0;
 end;
 
-function TSchemaDlg.AddValue(const Name: string; Value: string; IsUrl: boolean=false; const Parent: TTreeNode=nil): TTreeNode;
+function TSchemaDlg.AddValue(const Name: string; Value: string; const Parent: TTreeNode=nil): TTreeNode;
 var
-  S: string;
+  s: string;
 begin
-  if Name<>'' then S:=': '
-  else S:='';
-
-  if IsUrl then result:=View.Items.AddChildObject(Parent, Name+S+Value,pointer(length(Value)))
-  else result:=View.Items.AddChild(Parent,Name+S+Value);
+  if Name<>'' then
+    s := ': '
+  else
+    s := '';
+  result:=View.Items.AddChild(Parent, Name + s + Value);
   result.ImageIndex:=-1;
   result.SelectedIndex:=-1;
   result.StateIndex:=-1;
+end;
+
+function TSchemaDlg.AddValue(const Name: string; const Value: TLdapSchemaItem; const AsString: string; const Parent: TTreeNode=nil): TTreeNode;
+var
+  s: string;
+begin
+  if Name<>'' then
+    s := ': '
+  else
+    s := '';
+  if Value<>nil then result:=View.Items.AddChildObject(Parent, Name + s + Value.Name.CommaText, Value)
+  else result:=AddValue(Name, AsString, Parent);
+  result.ImageIndex:=-1;
+  result.SelectedIndex:=-1;
+  result.StateIndex:=-1;
+end;
+
+procedure TSchemaDlg.AddValues(const Name: string; const Values: TLdapSchemaItems; const AsString: string; const Parent: TTreeNode=nil);
+var
+  i: integer;
+begin
+  for i:=0 to Values.Count-1 do AddValue(Name, Values[i], AsString, Parent);
+  Parent.AlphaSort;
+end;
+
+procedure TSchemaDlg.AddValues(const Name: string; const Values: TStringList; const Parent: TTreeNode=nil);
+var
+  i: integer;
+begin
+  for i:=0 to Values.Count-1 do AddValue(Name, Values[i], Parent);
+  Parent.AlphaSort;
 end;
 
 function TSchemaDlg.AddValue(const Name: string; Value: integer): TTreeNode;
@@ -307,16 +386,16 @@ end;
 
 procedure TSchemaDlg.ShowObjectClass(const ObjClass: TLDAPSchemaClass);
 var
-  i: integer;
-  Node: TTreeNode;
+  Node, Node2: TTreeNode;
+  Sup:  TLDAPSchemaClass;
 begin
-  with ObjClass do begin
+   with ObjClass do begin
     case Name.Count of
       0: AddValue('Name','');
       1: AddValue('Name',Name[0]);
       else begin
         Node:=AddValue('Names','');
-        for i:=0 to Name.Count-1 do AddValue('',Name[i],false,Node);
+        AddValues('', Name, Node);
       end;
     end;
     AddValue('Description',Description);
@@ -328,28 +407,42 @@ begin
       lck_Structural: AddValue('Kind','Structural');
     end;
 
-    AddValue('Superior',Sup,true);
+    AddValue('Superior', Superior, SuperiorAsStr);
 
     Node:=AddValue('Must','');
     Node.ImageIndex:=1;
     Node.SelectedIndex:=1;
-    for i:=0 to Must.Count-1 do begin
-      AddValue('',Must[i],true,Node);
+    AddValues('', Must, '', Node);
+
+    Sup:=Superior;
+    while Sup<>nil do begin
+      if Sup.Must.Count>0 then begin
+        Node2:=AddValue('Inherited from', Sup, '',  Node);
+        AddValues('', Sup.Must, '', Node2);
+      end;
+      Sup:=Sup.Superior;
     end;
 
     Node:=AddValue('May','');
     Node.ImageIndex:=1;
     Node.SelectedIndex:=1;
-    for i:=0 to May.Count-1 do begin
-      AddValue('',May[i],true,Node);
+    AddValues('', May, '', Node);
+
+    Sup:=Superior;
+    while Sup<>nil do begin
+      if Sup.May.Count>0 then begin
+        Node2:=AddValue('Inherited from', Sup, '', Node);
+        AddValues('', Sup.May, '', Node2);
+      end;
+      Sup:=Sup.Superior;
     end;
+
   end;
 end;
 
 procedure TSchemaDlg.ShowAttribute(const Attribute: TLDAPSchemaAttribute);
 var
   Node: TTreeNode;
-  i: integer;
 begin
   with Attribute do begin
    case Name.Count of
@@ -359,21 +452,21 @@ begin
         Node:=AddValue('Names','');
         Node.ImageIndex:=1;
         Node.SelectedIndex:=1;
-        for i:=0 to Name.Count-1 do AddValue('',Name[i],false,Node);
+        AddValues('', Name, Node);
       end;
    end;
     AddValue('Description',Description);
     AddValue('Oid',Oid);
     AddValue('Single Value',SingleValue);
-    AddValue('Syntax',Syntax,true);
+    AddValue('Syntax', Syntax, SyntaxAsStr);
 
     if Attribute.Length>0 then AddValue('Length',Length)
     else AddValue('Length','undefined');
 
-    AddValue('Superior',Superior,true);
-    AddValue('Collective',Collective);
-    AddValue('Obsolete',Obsolete);
-    AddValue('No user modification',NoUserModification);
+    AddValue('Superior', Superior, SubstrAsStr);
+    AddValue('Collective', Collective);
+    AddValue('Obsolete', Obsolete);
+    AddValue('No user modification' ,NoUserModification);
 
     case Attribute.Usage of
       au_directoryOperation:   AddValue('Usage','Directory operation');
@@ -382,13 +475,19 @@ begin
       au_userApplications:     AddValue('Usage','User applications');
     end;
 
-    AddValue('Ordering', Ordering,true);
-    AddValue('Equality', Equality,true);
-    AddValue('Substring',Substr,  true);
+   AddValue('Ordering',  Ordering, OrderingAsStr);
+   AddValue('Equality',  Equality, EqualityAsStr);
+   AddValue('Substring', Substr,   SubstrAsStr);
+
+    Node:=AddValue('Classes which use','');
+    Node.ImageIndex:=1;
+    Node.SelectedIndex:=1;
+    AddValues('', WhichUse, '', Node);
+
   end;
 end;
 
-procedure TSchemaDlg.ShowSyntax(const Syntax: TLDAPSchemaSynax);
+procedure TSchemaDlg.ShowSyntax(const Syntax: TLDAPSchemaSyntax);
 begin
   with Syntax do begin
     AddValue('Oid',Oid);
@@ -399,26 +498,25 @@ end;
 procedure TSchemaDlg.ShowMatchingRule(const MatchingRule: TLDAPSchemaMatchingRule);
 begin
   with MatchingRule do begin
-    AddValue('Name',Name);
-    AddValue('Description',Description);
-    AddValue('Oid',Oid);
-    AddValue('Obsolete',Obsolete);
-    Addvalue('Syntax',Syntax,true);
+    AddValue('Name', Name.CommaText);
+    AddValue('Description', Description);
+    AddValue('Oid', Oid);
+    AddValue('Obsolete', Obsolete);
+    AddValue('Syntax', Syntax, SyntaxAsStr);
   end;
 end;
 
 procedure TSchemaDlg.ShowMatchingRuleUse(const MatchingRuleUse: TLDAPSchemaMatchingRuleUse);
 var
   Node: TTreeNode;
-  i: integer;
 begin
   with MatchingRuleUse do begin
-    AddValue('Name',Name);
+    AddValue('Name',Name.CommaText);
     AddValue('Description',Description);
     AddValue('Oid',Oid);
     AddValue('Obsolete',Obsolete);
     Node:=AddValue('Applies OIDs','');
-    for i:=0 to Applies.Count-1 do AddValue('',Applies[i],true,Node);
+    AddValues('', Applies, '', Node);
   end;
 end;
 
@@ -430,12 +528,22 @@ end;
 procedure TSchemaDlg.WmGetSysCommand(var Message: TMessage);
 begin
   if (Message.WParam = SC_MINIMIZE) then Hide
-  else inherited; 
+  else inherited;
 end;
 
 procedure TSchemaDlg.pmCopyClick(Sender: TObject);
 begin
   if View.Selected<>nil then Clipboard.SetTextBuf(pchar(View.Selected.Text));
+end;
+
+procedure TSchemaDlg.pmOpenClick(Sender: TObject);
+begin
+  GoToLink(View.Selected,false);
+end;
+
+procedure TSchemaDlg.pmOpenNewTabClick(Sender: TObject);
+begin
+  GoToLink(View.Selected,true);
 end;
 
 procedure TSchemaDlg.ViewContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
@@ -449,4 +557,153 @@ begin
   end;
 end;
 
+function TSchemaDlg.AddTab(TreeNode: TTreeNode): integer;
+var
+  i: integer;
+  TabInfo: TTabInfo;
+begin
+  if TreeNode=nil then begin
+    result:=Tabs.TabIndex;
+    exit;
+  end;
+
+  for i:=0 to Tabs.Tabs.Count-1 do begin
+    if (Tabs.Tabs.Objects[i] is TTabInfo) and (TTabInfo(Tabs.Tabs.Objects[i]).Current=TreeNode) then begin
+      result:=i;
+      exit;
+    end;
+  end;
+
+  if Tree.Items.GetFirstNode=Tree.Selected then begin
+    result:=Tabs.TabIndex;
+    exit;
+  end;
+
+  TabInfo:=TTabInfo.Create;
+  TabInfo.Current:=TreeNode;
+  result:=Tabs.Tabs.AddObject(TreeNode.Text, TabInfo);
+end;
+
+procedure TSchemaDlg.TabsChange(Sender: TObject);
+begin
+  if Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo then begin
+    if TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).Current<>nil then TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).Current.Selected:=true;
+  end;
+end;
+
+procedure TSchemaDlg.ViewMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if not PtInRect(GetLinkRect(GetNodeAt(X, Y)), point(X,Y)) then exit;
+  if ssMiddle in Shift then GoToLink(GetNodeAt(X,Y), true);
+  if ssLeft   in Shift then GoToLink(GetNodeAt(X,Y), false);
+end;
+
+procedure TSchemaDlg.GoToLink(Node: TTreeNode; InNewTab: boolean);
+var
+  N: TTreeNode;
+begin
+  if (Node=nil) or (Node.Data=nil) then exit;
+
+  N:=Tree.Items.GetFirstNode;
+  while N<>nil do begin
+    if N.Data=Node.Data then begin
+      N.Selected:=true;
+      exit;
+    end;
+    N:=N.getNext;
+  end;
+end;
+
+procedure TSchemaDlg.TabsMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  Tabs.Tabs.Move(Tabs.TabIndex,Tabs.IndexOfTabAt(X,Y));
+  Tabs.Cursor:=crDefault;
+end;
+
+procedure TSchemaDlg.TabsMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+begin
+  if (ssLeft in Shift) and (Tabs.Tabs.Count>1) then Tabs.Cursor:=crDrag
+  else Tabs.Cursor:=crDefault;
+end;
+
+procedure TSchemaDlg.TabsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Idx: integer;
+begin
+  if (ssDouble in Shift) and (Tabs.Tabs.Count>1) then begin
+    Idx:=Tabs.TabIndex;
+    if Tabs.Tabs.Objects[Idx] is TTabInfo then TTabInfo(Tabs.Tabs.Objects[Idx]).Free;
+    Tabs.Tabs.Delete(Idx);
+    if Idx<Tabs.Tabs.Count then
+      Tabs.TabIndex := Idx
+     else
+      Tabs.TabIndex := Tabs.Tabs.Count-1;
+    Tabs.OnChange(self);
+  end;
+end;
+
+procedure TSchemaDlg.PopupMenuPopup(Sender: TObject);
+begin
+  pmCopy.Enabled:=View.Selected<>nil;
+  pmOpen.Enabled:=(View.Selected<>nil) and (View.Selected.Data<>nil);
+  pmOpenNewTab.Enabled:=pmOpen.Enabled;
+end;
+
+procedure TSchemaDlg.pmUndoClick(Sender: TObject);
+begin
+  UndoBtnClick(self);
+end;
+
+
+{ TTabInfo }
+
+constructor TTabInfo.Create;
+begin
+  inherited;
+  FUndo:=TList.Create;
+  FRedo:=TList.Create;
+end;
+
+destructor TTabInfo.Destroy;
+begin
+  FUndo.Free;
+  FRedo.Free;
+  inherited;
+end;
+
+procedure TTabInfo.SetCurrent(const Value: TTreeNode);
+begin
+  if FCurrent=Value then exit;
+  if FCurrent<>nil then FUndo.Insert(0,FCurrent);
+  FCurrent := Value;
+  FRedo.Clear;
+end;
+
+procedure TTabInfo.Undo;
+begin
+  if not IsUndo then exit;
+  if FCurrent<>nil then FRedo.Insert(0,FCurrent);
+  FCurrent:=TTreeNode(FUndo[0]);
+  FUndo.Delete(0);
+end;
+
+procedure TTabInfo.Redo;
+begin
+  if not ISRedo then exit;
+  if FCurrent<>nil then FUndo.Insert(0,FCurrent);
+  FCurrent:=TTreeNode(FRedo[0]);
+  FRedo.Delete(0);
+end;
+
+function TTabInfo.GetIsUndo: boolean;
+begin
+  result:=FUndo.Count>0;
+end;
+
+function TTabInfo.GetIsRedo: boolean;
+begin
+  result:=FRedo.Count>0;
+end;
+
 end.
+

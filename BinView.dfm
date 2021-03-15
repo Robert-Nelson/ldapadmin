@@ -68,7 +68,7 @@ object HexView: THexView
     object ValueLabel: TLabel
       Left = 316
       Top = 16
-      Width = 10
+      Width = 3
       Height = 13
     end
     object Label3: TLabel
@@ -108,7 +108,7 @@ object HexView: THexView
     object SizeLabel: TLabel
       Left = 44
       Top = 16
-      Width = 11
+      Width = 3
       Height = 13
     end
     object Button2: TButton

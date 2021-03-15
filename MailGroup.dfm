@@ -64,6 +64,7 @@ object MailGroupDlg: TMailGroupDlg
     Top = 440
     Width = 75
     Height = 25
+    Cancel = True
     Caption = '&Cancel'
     ModalResult = 2
     TabOrder = 4

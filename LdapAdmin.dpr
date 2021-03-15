@@ -21,7 +21,6 @@ uses
   Search in 'Search.pas' {SearchFrm},
   Ou in 'Ou.pas' {OuDlg},
   Export in 'Export.pas' {ExportDlg},
-  RegAccnt in 'RegAccnt.pas',
   Prefs in 'Prefs.pas' {PrefDlg},
   Samba in 'Samba.pas',
   Posix in 'Posix.pas',
@@ -45,7 +44,16 @@ uses
   BinView in 'BinView.pas' {HexView},
   AdvSamba in 'AdvSamba.pas' {SambaAdvancedDlg},
   TextFile in 'TextFile.pas',
-  md5crypt in 'md5crypt.pas';
+  md5crypt in 'md5crypt.pas',
+  Config in 'Config.pas',
+  IControls in 'IControls.pas',
+  Xml in 'Xml.pas',
+  Templates in 'Templates.pas',
+  TemplateCtrl in 'TemplateCtrl.pas',
+  ConfigDlg in 'ConfigDlg.pas' {ConfigDlg},
+  PickAttr in 'PickAttr.pas' {PickAttributesDlg},
+  uAccountCopyDlg in 'uAccountCopyDlg.pas' {AccountCopyDlg},
+  LAControls in 'LAControls.pas';
 
 {$R *.RES}
 

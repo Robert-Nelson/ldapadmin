@@ -1,5 +1,5 @@
   {      LDAPAdmin - User.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2006 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -29,7 +29,8 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Posix, Shadow,
-  InetOrg, Postfix, Samba, PropertyObject, RegAccnt, Constant, ExtDlgs;
+  InetOrg, Postfix, Samba, PropertyObject, Constant, ExtDlgs, TemplateCtrl, 
+  CheckLst;
 
 const
 
@@ -70,8 +71,6 @@ type
     sambaHomePath: TEdit;
     Label21: TLabel;
     description: TMemo;
-    cbSamba: TCheckBox;
-    cbMail: TCheckBox;
     GroupBox1: TGroupBox;
     MailSheet: TTabSheet;
     Label10: TLabel;
@@ -103,7 +102,6 @@ type
     telephoneNumber: TEdit;
     postalCode: TEdit;
     physicalDeliveryOfficeName: TEdit;
-    title: TComboBox;
     o: TEdit;
     facsimileTelephoneNumber: TEdit;
     l: TEdit;
@@ -152,6 +150,11 @@ type
     Image1: TImage;
     OpenPictureDialog: TOpenPictureDialog;
     DeleteJpegBtn: TButton;
+    cbMail: TCheckBox;
+    cbSamba: TCheckBox;
+    CheckListBox: TCheckListBox;
+    Bevel1: TBevel;
+    title: TEdit;
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure AddMailBtnClick(Sender: TObject);
     procedure EditMailBtnClick(Sender: TObject);
@@ -183,28 +186,37 @@ type
     procedure OpenPictureBtnClick(Sender: TObject);
     procedure DeleteJpegBtnClick(Sender: TObject);
     procedure BtnAdvancedClick(Sender: TObject);
+    procedure CheckListBoxDrawItem(Control: TWinControl; Index: Integer;
+      Rect: TRect; State: TOwnerDrawState);
+    procedure CheckListBoxClickCheck(Sender: TObject);
+    procedure CheckListBoxClick(Sender: TObject);
+    procedure PageControlResize(Sender: TObject);
+    procedure PageControlChanging(Sender: TObject;
+      var AllowChange: Boolean);
   private
     ParentDn: string;
     Entry: TLdapEntry;
+    EventHandler: TEventHandler;
     PosixAccount: TPosixAccount;
     ShadowAccount: TShadowAccount;
     SambaAccount: TSamba3Account;
     MailAccount: TMailUser;
     InetOrgPerson: TInetOrgPerson;
     Session: TLDAPSession;
-    RegAccount: TAccountEntry;
     origGroups: TStringList;
     ColumnToSort: Integer;
     Descending: Boolean;
     PageSetup: Boolean;
     DomList: TDomainList;
+    AsTop: Integer;
     function FormatString(const Src : string) : string;
+    procedure SetCheckbox(Cbx: TCheckBox; Check: Boolean);
     procedure LoadControls(Parent: TWinControl);
     procedure PosixPreset;
     procedure ShadowPreset;
     procedure SambaPreset;
     procedure MailPreset;
-    procedure SetSambaTime;    
+    procedure SetSambaTime;
     procedure SetShadowTime;
     procedure GetShadowTime;
     procedure CheckSchema;
@@ -216,7 +228,7 @@ type
     procedure SaveGroups;
     procedure SetText(Edit: TCustomEdit; Value: string);
   public
-    constructor Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
 
 var
@@ -224,7 +236,7 @@ var
 
 implementation
 
-uses AdvSamba, Pickup, Input, Misc, Jpeg;
+uses AdvSamba, Pickup, Input, Misc, Jpeg, Main, Templates, Config;
 
 {$R *.DFM}
 
@@ -246,7 +258,7 @@ begin
         'F': Result := Result + GivenName.Text[1];
         'l': Result := Result + Sn.Text;
         'L': Result := Result + Sn.Text[1];
-        'n': Result := Result + RegAccount.sambaNetbiosName;
+        'n': Result := Result + AccountConfig.ReadString(rsambaNetbiosName, '');
       else
         Result := Result + p^ + p1^;
       end;
@@ -255,6 +267,19 @@ begin
     else
       Result := Result + p^;
     p := p1;
+  end;
+end;
+
+procedure TUserDlg.SetCheckbox(Cbx: TCheckBox; Check: Boolean);
+var
+  ev: TNotifyEvent;
+begin
+  ev := Cbx.OnClick;
+  try
+    Cbx.OnClick := nil;
+    Cbx.Checked := Check;
+  finally
+    Cbx.OnClick := ev;
   end;
 end;
 
@@ -315,8 +340,8 @@ begin
   begin
     if givenName.Text <> '' then
     begin
-      s := AnsiLowercase(FormatString(RegAccount.posixUserName));
-      SetText(displayName, FormatString(RegAccount.inetDisplayName));
+      s := AnsiLowercase(FormatString(AccountConfig.ReadString(rposixUserName, '')));
+      SetText(displayName, FormatString(AccountConfig.ReadString(rinetDisplayName, '')));
     end
     else begin
       s := AnsiLowercase(sn.Text);
@@ -325,7 +350,7 @@ begin
     if uid.Text = '' then
     begin
       SetText(uid, ConvertUmlauts(s));
-      SetText(homeDirectory, FormatString(RegAccount.posixHomeDir));
+      SetText(homeDirectory, FormatString(AccountConfig.ReadString(rposixHomeDir)));
       SambaPreset;
     end;
   end;
@@ -360,26 +385,26 @@ begin
   begin
     LoadControls(SambaSheet);
     SetSambaTime;
-    cbDomain.ItemIndex := cbDomain.Items.IndexOf(RegAccount.SambaDomainName);
+    cbDomain.ItemIndex := cbDomain.Items.IndexOf(AccountConfig.ReadString(rSambaDomainName));
     cbDomain.Enabled := true;
     if (uid.Text <> '') then
     begin
-      if (RegAccount.sambaNetbiosName <> '') or (Pos('%n', RegAccount.sambaHomeShare) = 0) then
-        SetText(sambaHomePath, FormatString(RegAccount.sambaHomeShare));
-      if (RegAccount.sambaNetbiosName <> '') or (Pos('%n', RegAccount.sambaProfilePath) = 0) then
-        SetText(sambaProfilePath, FormatString(RegAccount.sambaProfilePath));
-      SetText(sambaLogonScript, FormatString(RegAccount.sambaScript));
+       if (AccountConfig.ReadString(rsambaNetbiosName) <> '') or (Pos('%n', AccountConfig.ReadString(rsambaHomeShare)) = 0) then
+        SetText(sambaHomePath, FormatString(AccountConfig.ReadString(rsambaHomeShare)));
+      if (AccountConfig.ReadString(rsambaNetbiosName) <> '') or (Pos('%n', AccountConfig.ReadString(rsambaProfilePath)) = 0) then
+        SetText(sambaProfilePath, FormatString(AccountConfig.ReadString(rsambaProfilePath)));
+      SetText(sambaLogonScript, FormatString(AccountConfig.ReadString(rsambaScript)));
       if sambaHomeDrive.ItemIndex = -1 then
       begin
-        sambaHomeDrive.ItemIndex := sambaHomeDrive.Items.IndexOf(RegAccount.sambaHomeDrive);
-        SambaAccount.HomeDrive := RegAccount.sambaHomeDrive;
+        sambaHomeDrive.ItemIndex := sambaHomeDrive.Items.IndexOf(AccountConfig.ReadString(rsambaHomeDrive));
+        SambaAccount.HomeDrive := AccountConfig.ReadString(rsambaHomeDrive);
       end;
     end;
    end
    else begin
      LoadControls(SambaSheet);
      cbDomain.ItemIndex := cbDomain.Items.IndexOf(SambaAccount.DomainName);
-     cbDomain.Enabled := false;
+     cbDomain.Enabled := not (esBrowse in Entry.State) and (cbDomain.ItemIndex = -1);
    end;
 
    with SambaAccount do
@@ -395,7 +420,8 @@ begin
      try
        cbPwdMustChange.Checked := PwdMustChange = 0;
      except end; // not critical
-     cbAccntDisabled.Checked := Disabled;
+     //cbAccntDisabled.Checked := Disabled;
+     SetCheckbox(cbAccntDisabled, Disabled or Autolocked);
      if not Active then
      begin
        New;
@@ -416,11 +442,11 @@ begin
     MailAccount.New;
     if uid.Text <> '' then
     begin
-      if (maildrop.Text = '') and (RegAccount.postfixMaildrop <> '') then
-        SetText(maildrop, FormatString(RegAccount.postfixMaildrop));
-      if RegAccount.postfixMailAddress <> '' then
+      if (maildrop.Text = '') and (AccountConfig.ReadString(rpostfixMaildrop) <> '') then
+        SetText(maildrop, FormatString(AccountConfig.ReadString(rpostfixMaildrop)));
+      if AccountConfig.ReadString(rpostfixMailAddress) <> '' then
       begin
-        s := FormatString(RegAccount.postfixMailAddress);
+        s := FormatString(AccountConfig.ReadString(rpostfixMailAddress));
         if mail.Items.IndexOf(s) = -1 then
         begin
           mail.Items.Add(s);
@@ -521,9 +547,12 @@ begin
     CheckSchema;
     if esNew in Entry.State then
     begin
-      Entry.Dn := 'uid=' + uid.Text + ',' + ParentDn;
-      PosixAccount.Cn := PosixAccount.Uid;
-      uidnr := Session.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
+      Entry.Dn := 'uid=' + PosixAccount.Uid + ',' + ParentDn;
+      if InetOrgPerson.DisplayName <> '' then
+        PosixAccount.Cn := InetOrgPerson.DisplayName
+      else
+        PosixAccount.Cn := PosixAccount.Uid;
+      uidnr := Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID), AccountConfig.ReadInteger(rposixLastUID, LAST_UID));
       if cbSamba.Checked then
         SambaAccount.UidNumber := uidnr
       else
@@ -553,11 +582,17 @@ begin
   EditMailBtn.Enabled := Enable;
 end;
 
-constructor TUserDlg.Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; Mode: TEditMode);
+constructor TUserDlg.Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; Mode: TEditMode);
+var
+  i: Integer;
+  Oc: TLdapAttribute;
+  TemplateList: TTemplateList;
 begin
   inherited Create(AOwner);
+
+  AsTop := AccountSheet.Top;
+
   Session := ASession;
-  RegAccount := ARegAccount;
   ParentDn := adn;
 
   Entry := TLdapEntry.Create(ASession, adn);
@@ -572,12 +607,26 @@ begin
   SambaSheet.TabVisible := false;
   MailSheet.TabVisible := false;
 
+  // Show template extensions
+  TemplateList := nil;
+  if GlobalConfig.ReadBool(rTemplateExtensions, true) then
+    TemplateList := TemplateParser.Extensions['user'];
+  if Assigned(TemplateList) then
+  begin
+    EventHandler := TEventHandler.Create;
+    with TemplateList do
+      for i := 0 to Count - 1 do
+        CheckListBox.Items.AddObject(Templates[i].Name, Templates[i]);
+    CheckListBox.ItemIndex := 0;
+    CheckListBox.Enabled := true;
+  end;
+
   if Mode = EM_ADD then
   begin
     PosixAccount.New;
     InetOrgPerson.New;
-    PosixAccount.GidNumber := RegAccount.posixGroup;
-    SetText(loginShell, RegAccount.posixLoginShell);
+    PosixAccount.GidNumber := AccountConfig.ReadInteger(rposixGroup);
+    SetText(loginShell, AccountConfig.ReadString(rposixLoginShell));
     DateTimePicker.Date := Date;
   end
   else begin
@@ -591,6 +640,18 @@ begin
     if MailAccount.Activated then
       cbMail.Checked := true;
     Caption := Format(cPropertiesOf, [uid.Text]);
+    // Initialize the template extensions
+    if Assigned(TemplateList) and GlobalConfig.ReadBool(rTemplateAutoload, true) then with CheckListBox do
+    begin
+      Oc := Entry.AttributesByName['objectclass'];
+      for i := 0 to Items.Count - 1 do with TTemplate(Items.Objects[i]) do
+        if Matches(Oc) then
+        begin
+          State[i] := cbChecked;
+          ItemIndex := i;
+          CheckListBoxClickCheck(nil);
+        end;
+    end;
   end;
 end;
 
@@ -682,7 +743,11 @@ begin
   if (PageControl.ActivePage = PrivateSheet) and not Assigned(Image1.Picture.Graphic) then
   begin
     Image1.Picture.Graphic := InetOrgPerson.JPegPhoto;
-    DeleteJpegBtn.Enabled := true;
+    if Assigned(Image1.Picture.Graphic) then
+    begin
+      DeleteJpegBtn.Enabled := true;
+      Panel2.Caption := '';
+    end;
   end;
 end;
 
@@ -738,36 +803,32 @@ end;
 
 procedure TUserDlg.AddGroupBtnClick(Sender: TObject);
 var
-  SelItem, GroupItem: TListItem;
+  GroupItem: TListItem;
+  i: integer;
 begin
-  with TPickupDlg.Create(Self), ListView do
-  try
-    MultiSelect := true;
-    PopulateGroups(Session);
-    if ShowModal = mrOk then
-    begin
+  with TPickupDlg.Create(self) do begin
+    Caption := cPickGroups;
+    Columns[1].Caption:='Description';
+    Populate(Session, sGROUPS, ['cn', 'description']);
+    Images:=MainFrm.ImageList;
+    ImageIndex:=bmGroup;
+
+    if ShowModal=MrOK then begin
       CopyGroups;
-      SelItem := Selected;
-      while Assigned(SelItem) do
-      begin
-        if not FindDataString(PChar(SelItem.Data)) then
-        begin
-          GroupItem := GroupList.Items.Add;
-          GroupItem.Caption := SelItem.Caption;
-          if SelItem.SubItems.Count > 0 then
-            GroupItem.SubItems.Add(SelItem.SubItems[0]);
-          GroupItem.Data := StrNew(SelItem.Data);
-          HandleGroupModify(PChar(SelItem.Data), GRP_ADD);
-        end;
-        SelItem := GetNextItem(SelItem, sdAll, [isSelected]);
+      for i:=0 to SelCount-1 do  begin
+        if FindDataString(PChar(Selected[i].dn)) then continue;
+
+        GroupItem:=GroupList.Items.Add;
+        GroupItem.Data := StrNew(pchar(Selected[i].DN));
+        GroupItem.Caption := selected[i].AttributesByName['cn'].AsString;
+        GroupItem.SubItems.Add(selected[i].AttributesByName['description'].AsString);
+        HandleGroupModify(PChar(selected[i].dn), GRP_ADD);
       end;
       GroupList.Tag := 1;
     end;
-  finally
-    Destroy;
-    if GroupList.Items.Count > 0 then
-      RemoveGroupBtn.Enabled := true;
+    Free;
   end;
+  RemoveGroupBtn.Enabled := GroupList.Items.Count > 0;
 end;
 
 procedure TUserDlg.RemoveGroupBtnClick(Sender: TObject);
@@ -839,29 +900,31 @@ var
   gidnr: Integer;
   gsid: string;
 begin
-  with TPickupDlg.Create(Self), ListView do
-  try
-    PopulateGroups(Session);
-    if ShowModal = mrOk then
-    begin
-      if Assigned(Selected) and (AnsiStrComp(PChar(edGidNumber.Text), PChar(Selected.Data)) <> 0) then
+  with TPickupDlg.Create(self) do begin
+    Caption := cPickGroups;
+    Columns[1].Caption:='Description';
+    Populate(Session, sGROUPS, ['cn', 'description']);
+    Images:=MainFrm.ImageList;
+    ImageIndex:=bmGroup;
+
+    ShowModal;
+
+    if (SelCount>0) and (AnsiCompareStr(edGidNumber.Text, Selected[0].Dn) <> 0) then begin
+      gidnr := StrToInt(Session.Lookup(Selected[0].Dn, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE));
+      if SambaAccount.Activated then
       begin
-        gidnr := StrToInt(Session.Lookup(PChar(Selected.Data), sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE));
-        if SambaAccount.Activated then
-        begin
-          gsid := Session.Lookup(PChar(Selected.Data), sANYCLASS, 'sambasid', LDAP_SCOPE_BASE);
-          if (Copy(gsid, 1, LastDelimiter('-', gsid) - 1) <> SambaAccount.DomainSID) and
-             (MessageDlg('Selected primary group is not a Samba group or it does not map to user domain. Do you still want to continue?', mtWarning, [mbYes, mbNo], 0) = mrNo) then Abort;
-          SambaAccount.GidNumber := gidnr;
-        end
-        else
-          PosixAccount.GidNumber := gidnr;
-        edGidNumber.Text := PChar(Selected.Data);
+        gsid := Session.Lookup(Selected[0].Dn, sANYCLASS, 'sambasid', LDAP_SCOPE_BASE);
+        if (Copy(gsid, 1, LastDelimiter('-', gsid) - 1) <> SambaAccount.DomainSID) and
+           (MessageDlg(stGidNotSamba, mtWarning, [mbYes, mbNo], 0) = mrNo) then Abort;
+        SambaAccount.GidNumber := gidnr;
+      end
+      else
+        PosixAccount.GidNumber := gidnr;
+        edGidNumber.Text := Selected[0].Dn;
         edGidNumber.Modified := true;
       end;
-    end;
-  finally
-    Destroy;
+
+    Free;
   end;
 end;
 
@@ -951,6 +1014,8 @@ begin
 end;
 
 procedure TUserDlg.FormDestroy(Sender: TObject);
+var
+  i: Integer;
 begin
   Entry.Free;
   PosixAccount.Free;
@@ -958,6 +1023,10 @@ begin
   ShadowAccount.Free;
   SambaAccount.Free;
   MailAccount.Free;
+  with CheckListBox.Items do
+    for i := 0 to Count - 1 do
+      if Objects[i] is TTabSheet then Objects[i].Free;
+  EventHandler.Free;
 end;
 
 procedure TUserDlg.cbPwdMustChangeClick(Sender: TObject);
@@ -1035,7 +1104,28 @@ end;
 
 procedure TUserDlg.cbAccntDisabledClick(Sender: TObject);
 begin
-  SambaAccount.Disabled := cbAccntDisabled.Checked;
+  with SambaAccount do
+  if cbAccntDisabled.Checked then
+    Disabled := true
+  else begin
+    if Autolocked then
+    begin
+      if MessageDlg(stResetAutolock, mtWarning, [mbYes, mbNo], 0) = mrYes then
+        Autolocked := false
+      else
+      begin
+        try
+          cbAccntDisabled.OnClick := nil;
+          cbAccntDisabled.Checked := true;
+        finally
+          cbAccntDisabled.OnClick := cbAccntDisabledClick;
+        end;
+        Exit;
+      end;
+    end;
+    Disabled := false;
+  end;
+  //SambaAccount.Disabled := cbAccntDisabled.Checked;
 end;
 
 procedure TUserDlg.DateTimePickerChange(Sender: TObject);
@@ -1050,6 +1140,7 @@ begin
     Image1.Picture.LoadFromFile(OpenPictureDialog.fileName);
     InetOrgPerson.JPegPhoto := Image1.Picture.Graphic as TJpegImage;
     DeleteJpegBtn.Enabled := true;
+    Panel2.Caption := '';
   end;
 end;
 
@@ -1063,6 +1154,147 @@ end;
 procedure TUserDlg.BtnAdvancedClick(Sender: TObject);
 begin
   TSambaAdvancedDlg.Create(Self, Session, SambaAccount).ShowModal;
+end;
+
+procedure TUserDlg.CheckListBoxDrawItem(Control: TWinControl;
+  Index: Integer; Rect: TRect; State: TOwnerDrawState);
+var
+  Flags: Longint;
+begin
+  with CheckListBox do begin
+    Canvas.Brush.Color := clBtnFace;
+    Canvas.Font.Color := clBlack;
+    Canvas.FillRect(Rect);
+    Flags := DrawTextBiDiModeFlags(DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
+    Inc(Rect.Left, 2);
+    DrawText(Canvas.Handle, PChar(Items[Index]), Length(Items[Index]), Rect, Flags);
+  end;
+end;
+
+procedure TUserDlg.CheckListBoxClickCheck(Sender: TObject);
+var
+  Template: TTemplate;
+  TabSheet: TTabSheet;
+  TemplatePanel: TTemplatePanel;
+  i, j: Integer;
+  s: string;
+
+  function SafeDelete(const name: string): boolean;
+  var
+    i: Integer;
+    s: string;
+  begin
+    Result := false;
+    s := lowercase(name);
+    for i := Low(InetOrg.PropAttrNames) to High(InetOrg.PropAttrNames) do
+      if s = lowercase(InetOrg.PropAttrNames[i]) then Exit;
+    for i := Low(Posix.PropAttrNames) to High(Posix.PropAttrNames) do
+      if s = lowercase(Posix.PropAttrNames[i]) then Exit;
+    Result := true;
+  end;
+
+begin
+  { CheckListBox holds pointers to Templates or TabSheets in its Object array:
+    Checked[i] = FALSE:  Objects[i] = Pointer(Template)
+    Checked[i] = TRUE:   Objects[i] = Pointer(TTabSheet)
+    TabSheet holds in its Tag filed pointer to Template.
+  }
+  with CheckListBox do begin
+    Tag := Integer(Sender);
+    if State[ItemIndex] <> cbChecked then
+    begin
+      TabSheet := TTabSheet(Items.Objects[ItemIndex]);
+      Items.Objects[ItemIndex] := Pointer(TabSheet.Tag);
+      TabSheet.Free;
+      { Handle removing of the template - remove only attributes and
+        objectclasses which are not used by builtin registers }
+      Template := TTemplate(Items.Objects[ItemIndex]);
+      for i := 0 to Template.AttributeCount - 1 do with Template[i] do
+      begin
+        if (lowercase(Name) = 'objectclass') then
+        begin
+          with Entry.AttributesByName['objectclass'] do
+          for j := 0 to Template.ObjectclassCount - 1 do
+          begin
+            s := lowercase(Template.Objectclasses[j]);
+            if (s <> 'top') and
+               (s <> 'inetorgperson') and
+               (s <> 'posixaccount') then
+            begin
+              DeleteValue(s);
+              if AnsiCompareText(s, MailAccount.Objectclass) = 0 then
+                cbMail.Checked := false
+              else
+              if AnsiCompareText(s, ShadowAccount.Objectclass) = 0 then
+                cbShadow.Checked := false
+              else
+              if AnsiCompareText(s, SambaAccount.Objectclass) = 0 then
+                cbSamba.Checked := false;
+            end;
+          end;
+        end
+        else
+        if SafeDelete(Name) then
+          Entry.AttributesByName[Name].Delete;
+      end;
+      //xxx
+      Exit;
+    end;
+    Template := TTemplate(Items.Objects[ItemIndex]);
+    TabSheet := TTabSheet.Create(Self);
+    TabSheet.Caption := Template.Name;
+    TabSheet.Tag := Integer(Template);
+    Items.Objects[ItemIndex] := TabSheet;
+  end;
+  TabSheet.PageControl := PageControl;
+  TemplatePanel := TTemplatePanel.Create(Self);
+  TemplatePanel.Parent := TabSheet;
+  TemplatePanel.Align := alClient;
+  TemplatePanel.LdapEntry := Entry;
+  TemplatePanel.Template := Template;
+  TemplatePanel.EventHandler := EventHandler;
+  with Entry.AttributesByName['objectclass'] do
+    for i := 0 to Template.ObjectclassCount - 1 do
+      AddValue(Template.Objectclasses[i]);
+end;
+
+procedure TUserDlg.CheckListBoxClick(Sender: TObject);
+begin
+  with CheckListBox do begin
+    if Tag = 0 then
+    begin
+      if State[ItemIndex] = cbChecked then
+        State[ItemIndex] := cbUnchecked
+      else
+        State[ItemIndex] := cbChecked;
+      CheckListBoxClickCheck(nil);
+    end;
+    Tag := 0;
+  end;
+end;
+
+procedure TUserDlg.PageControlResize(Sender: TObject);
+begin
+  PageControl.OnResize := nil;
+  try
+    Height := Height + AccountSheet.Top - AsTop;
+    AsTop := AccountSheet.Top;
+  finally
+    PageControl.OnResize := PageControlResize;
+  end;
+end;
+
+procedure TUserDlg.PageControlChanging(Sender: TObject;
+  var AllowChange: Boolean);
+begin
+  // (Try to:) Ensure that possible template changes reflect in standard tabs
+  if PageControl.ActivePageIndex > 6 then
+  begin
+    PosixPreset;
+    ShadowPreset;
+    SambaPreset;
+    MailPreset;
+  end;
 end;
 
 end.

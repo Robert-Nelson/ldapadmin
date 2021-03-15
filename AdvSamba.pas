@@ -71,7 +71,7 @@ var
 
 implementation
 
-uses Pickup;
+uses Pickup, Main, Constant;
 
 {$R *.DFM}
 
@@ -170,27 +170,37 @@ begin
 end;
 
 procedure TSambaAdvancedDlg.AddBtnClick(Sender: TObject);
-var
-  SelItem: TListItem;
-begin
-  with TPickupDlg.Create(Self), ListView do
-  try
-    MultiSelect := true;
-    PopulateComputers(fSession);
-    if ShowModal = mrOk then
-    begin
-      SelItem := Selected;
-      while Assigned(SelItem) do
-      begin
-        wsList.Items.Add.Caption := SelItem.Caption;
-        SelItem := GetNextItem(SelItem, sdAll, [isSelected]);
-      end;
-    end;
-  finally
-    Destroy;
-    if wsList.Items.Count > 0 then
-      RemoveBtn.Enabled := true;
+  function IsPresent(S: string): boolean;
+  var
+    i: integer;
+  begin
+    s:=AnsiUpperCase(S);
+    result:=true;
+    for i:=0 to wsList.Items.Count-1 do
+      if AnsiUpperCase(wsList.Items[i].Caption)=S then exit;
+    result:=false;
   end;
+var
+  i: integer;
+  wsname: string;
+begin
+  with TPickupDlg.Create(self) do begin
+    Caption := cPickAccounts;
+    Populate(fSession, sCOMPUTERS, ['uid', PSEUDOATTR_DN]);
+    Images:=MainFrm.ImageList;
+    ImageIndex:=bmComputer;
+    ShowModal;
+
+    for i:=0 to SelCount-1 do
+    begin
+      wsname := Selected[i].AttributesByName['uid'].AsString;
+      wsname := Copy(wsname, 1, Length(wsname) - 1);
+      if not IsPresent(wsname) then
+        wsList.Items.Add.Caption := wsname;
+    end;
+    Free;
+  end;
+  RemoveBtn.Enabled:=wsList.Items.Count > 0;
 end;
 
 procedure TSambaAdvancedDlg.RemoveBtnClick(Sender: TObject);

@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, RegAccnt, Constant;
+  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Constant;
 
 type
   TGroupDlg = class(TForm)
@@ -71,7 +71,6 @@ type
   private
     ParentDn: string;
     Session: TLDAPSession;
-    RegAccount: TAccountEntry;
     Entry: TLdapEntry;
     PosixGroup: TPosixGroup;
     SambaGroup: TSamba3Group;
@@ -85,7 +84,7 @@ type
     procedure Save;
     function GetGroupType: Integer;
   public
-    constructor Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
 
 var
@@ -93,7 +92,7 @@ var
 
 implementation
 
-uses Pickup, WinLDAP, Input;
+uses Pickup, WinLDAP, Input, Main, Config;
 
 {$R *.DFM}
 
@@ -132,7 +131,6 @@ begin
   begin
     ListItem := UserList.Items.Add;
     ListItem.Caption := PosixGroup.Members[i];
-    //ListItem.Data := StrNew(PChar(GetDirectory(Format(sACCNTBYUID, [PCharArray(ppcVals)[I]]))));
     ListItem.Data := StrNew(PChar(Session.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
     ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
   end;
@@ -141,14 +139,13 @@ begin
   IsSambaGroup := Entry.AttributesByName['objectclass'].IndexOf('sambagroupmapping') <> -1;
 end;
 
-constructor TGroupDlg.Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode);
+constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
 var
   n: Integer;
 begin
   inherited Create(AOwner);
   ParentDn := dn;
   Self.Session := Session;
-  Self.RegAccount := RegAccount;
   Entry := TLdapEntry.Create(Session, dn);
   PosixGroup := TPosixGroup.Create(Entry);
   if Mode = EM_MODIFY then
@@ -198,7 +195,7 @@ begin
     raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
   if esNew in Entry.State then
   begin
-    PosixGroup.GidNumber := Session.GetFreeGidNumber(RegAccount.posixFirstGid, RegAccount.posixLastGID);
+    PosixGroup.GidNumber := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, START_GID), AccountConfig.ReadInteger(rposixLastGID, LAST_GID));
     edRidChange(nil);  // Update sambaSid
   end;
   Entry.Write;
@@ -219,48 +216,39 @@ end;
 
 procedure TGroupDlg.AddUserBtnClick(Sender: TObject);
 var
-  UserItem, SelItem: TListItem;
+  UserItem: TListItem;
+  i: integer;
 begin
-  with TPickupDlg.Create(Self), ListView do
-  try
-    MultiSelect := true;
-    PopulateAccounts(Session);
-    if ShowModal = mrOk then
-    begin
-      SelItem := Selected;
-      while Assigned(SelItem) do
-      begin
-        if not FindDataString(PChar(SelItem.Data)) then
-        begin
-          UserItem := UserList.Items.Add;
-          UserItem.Caption := SelItem.Caption;
-          UserItem.Data := StrNew(SelItem.Data);
-          UserItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(SelItem.Data))));
-          PosixGroup.AddMember(GetNameFromDN(PChar(SelItem.Data)));
-        end;
-        SelItem := GetNextItem(SelItem, sdAll, [isSelected]);
-      end;
-      OkBtn.Enabled := true;
-    end;
-  finally
-    Destroy;
-    if UserList.Items.Count > 0 then
-      RemoveUserBtn.Enabled := true;
-  end;
+  with TPickupDlg.Create(self) do begin
+    Caption := cPickAccounts;
+    Populate(Session, sPOSIXACCNT, ['uid', PSEUDOATTR_PATH]);
+    Images:=MainFrm.ImageList;
+    ImageIndex:=bmPosixUser;
+    ShowModal;
 
+    for i:=0 to SelCount-1 do  begin
+      if FindDataString(PChar(Selected[i].dn)) then continue;
+
+      UserItem := UserList.Items.Add;
+      UserItem.Data := StrNew(pchar(Selected[i].DN));
+      UserItem.Caption := selected[i].AttributesByName['uid'].AsString;
+      UserItem.SubItems.Add(CanonicalName(GetDirFromDN(Selected[i].DN)));
+      PosixGroup.AddMember(GetNameFromDN(Selected[i].DN));
+    end;
+    Free;
   end;
+end;
+
 procedure TGroupDlg.RemoveUserBtnClick(Sender: TObject);
 var
   idx: Integer;
-  dn: string;
 begin
   with UserList do
   If Assigned(Selected) then
   begin
     idx := Selected.Index;
-    dn := PChar(Selected.Data);
+    PosixGroup.RemoveMember(Selected.Caption);
     Selected.Delete;
-    PosixGroup.RemoveMember(GetNameFromDN(dn));
     OkBtn.Enabled := true;
     if idx = Items.Count then
       Dec(idx);
@@ -341,7 +329,7 @@ begin
         cbSambaGroup.Enabled := DomList.Count > 0;
         for i := 0 to DomList.Count - 1 do
           Items.Add(DomList.Items[i].DomainName);
-        ItemIndex := Items.IndexOf(RegAccount.SambaDomainName);
+        ItemIndex := Items.IndexOf(AccountConfig.ReadString(rSambaDomainName));
       end;
     end;
   except

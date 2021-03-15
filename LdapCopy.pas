@@ -24,19 +24,20 @@ unit LdapCopy;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, ComCtrls, CommCtrl, LDAPClasses, WinLDAP;
+  Buttons, ExtCtrls, ComCtrls, CommCtrl, LDAPClasses, WinLDAP, LAControls,
+  ImgList;
 
 type
+
   TExpandNodeProc = procedure (Node: TTreeNode; Session: TLDAPSession) of object;
+
   TCopyDlg = class(TForm)
     OKBtn: TButton;
     CancelBtn: TButton;
-    cbConnections: TComboBox;
     Label1: TLabel;
     TreeView: TTreeView;
     Label2: TLabel;
     edName: TEdit;
-    procedure FormCreate(Sender: TObject);
     procedure cbConnectionsChange(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure TreeViewExpanding(Sender: TObject; Node: TTreeNode;
@@ -45,17 +46,19 @@ type
     procedure cbConnectionsDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
   private
+    cbConnections: TLAComboBox;
     RdnAttribute: string;
     MainSessionIdx: Integer;
     fExpandNode: TExpandNodeProc;
     fSortProc: TTVCompare;
     ddRoot: TTreeNode;
-    function GetTgtDn: string;
-    function GetTgtRdn: string;
-    function GetTgtSession: TLDAPSession;
+    procedure cbConnectionsCloseUp(var Index: integer; var CanCloseUp: boolean);
+    function  GetTgtDn: string;
+    function  GetTgtRdn: string;
+    function  GetTgtSession: TLDAPSession;
   public
     constructor Create(AOwner: TComponent;
-                       dn, AccountName: string;
+                       dn: string;
                        Session: TLDAPSession;
                        ImageList: TImageList;
                        ExpandNode: TExpandNodeProc;
@@ -72,7 +75,18 @@ implementation
 
 {$R *.DFM}
 
-uses Registry, RegAccnt, Constant;
+uses Registry, Config, Constant;
+
+{ TCopyDlg }
+
+procedure TCopyDlg.cbConnectionsCloseUp(var Index: integer; var CanCloseUp: boolean);
+begin
+  if cbConnections.Items.Objects[Index] is TConfigStorage then
+  begin
+    Beep;
+    CanCloseUp := false;
+  end;
+end;
 
 function TCopyDlg.GetTgtDn: string;
 begin
@@ -86,24 +100,52 @@ end;
 
 function TCopyDlg.GetTgtSession: TLDAPSession;
 begin
-  Result := TLDAPSession(cbConnections.Items.Objects[cbConnections.ItemIndex]);
+  with cbConnections, Items do
+  if (Objects[ItemIndex] is TLdapSession) then
+    Result := TLdapSession(Objects[ItemIndex])
+  else
+    Result := nil;
 end;
 
 constructor TCopyDlg.Create(AOwner: TComponent;
-                            dn, AccountName: string;
+                            dn: string;
                             Session: TLDAPSession;
                             ImageList: TImageList;
                             ExpandNode: TExpandNodeProc;
                             SortProc: TTVCompare);
 var
   v: string;
+  i,j: integer;
 begin
   inherited Create(AOwner);
+  OkBtn.Enabled := false;
+  cbConnections := TLAComboBox.Create(Self);
+  with cbConnections do begin
+    Parent := Self;
+    Left := 80;
+    Top := 8;
+    Width := 305;
+    Height := 22;
+    Style := csOwnerDrawFixed;
+    Anchors := [akLeft, akTop, akRight];
+    ItemHeight := 16;
+    TabOrder := 0;
+    OnChange := cbConnectionsChange;
+    OnDrawItem := cbConnectionsDrawItem;
+    OnCanCloseUp := cbConnectionsCloseUp;
+  end;
+  for i:=0 to GlobalConfig.StoragesCount-1 do
+  begin
+    cbConnections.Items.AddObject(GlobalConfig.Storages[i].Name, GlobalConfig.Storages[i]);
+    for j:=0 to GlobalConfig.Storages[i].AccountsCount-1 do
+      cbConnections.Items.AddObject(GlobalConfig.Storages[i].Accounts[j].Name, GlobalConfig.Storages[i].Accounts[j]);
+  end;
+
   SplitRdn(GetRdnFromDn(dn), RdnAttribute, v);
   edName.Text := v;
-  MainSessionIdx := cbConnections.Items.IndexOf(AccountName);
+  MainSessionIdx := cbConnections.Items.IndexOf(AccountConfig.Name);
   if MainSessionIdx = -1 then
-    raise Exception.Create('Error!');
+    raise Exception.Create('Session error: could not locate active session!');
   cbConnections.Items.Objects[MainSessionIdx] := Session;
   fExpandNode := ExpandNode;
   fSortProc := SortProc;
@@ -112,64 +154,33 @@ begin
   cbConnectionsChange(nil);
 end;
 
-
-procedure TCopyDlg.FormCreate(Sender: TObject);
-var
-  Reg: TRegistry;
-  I: Integer;
-  KeyList: TStringList;
-begin
-  OkBtn.Enabled := false;
-  cbConnections.Items.Clear;
-  Reg := TRegistry.Create;
-  Reg.RootKey := HKEY_CURRENT_USER;
-  try
-    if Reg.OpenKey(REG_KEY + REG_ACCOUNT, false) then
-    begin
-      KeyList := TStringList.Create;
-      try
-        Reg.GetValueNames(KeyList);
-        Reg.CloseKey;
-        for I := 0 to KeyList.Count - 1 do
-          cbConnections.Items.Add(KeyList[I]);
-      finally
-        KeyList.Free;
-      end;
-      Reg.CloseKey;
-    end;
-  finally
-    Reg.Free;
-  end;
-end;
-
 procedure TCopyDlg.cbConnectionsChange(Sender: TObject);
 var
   Session: TLDAPSession;
-  regAccount: TAccountEntry;
+  Account: TAccount;
 begin
   TreeView.Items.Clear;
   TreeView.Repaint;
   OkBtn.Enabled := false;
-  Session := TLDAPSession(cbConnections.Items.Objects[cbConnections.ItemIndex]);
+  Session := TargetSession;
   if not Assigned(Session) then
   begin
+    Account := TAccount(cbConnections.Items.Objects[cbConnections.ItemIndex]);
     Session := TLDAPSession.Create;
-    regAccount := TAccountEntry.Create(cbConnections.Items[cbConnections.ItemIndex]);
     with Session do
     try
       Screen.Cursor := crHourGlass;
-      Server := regAccount.ldapServer;
-      Base := regAccount.ldapBase;
-      User := regAccount.ldapUser;
-      Password := regAccount.ldapPassword;
-      SSL := regAccount.ldapUseSSL;
-      Port := regAccount.ldapPort;
-      Version := regAccount.ldapVersion;
+      Server   := Account.Server;
+      Base     := Account.Base;
+      User     := Account.User;
+      Password := Account.Password;
+      SSL      := Account.SSL;
+      Port     := Account.Port;
+      Version  := Account.ldapVersion;
       Connect;
       cbConnections.Items.Objects[cbConnections.ItemIndex] := Session;
     finally
       Screen.Cursor := crDefault;
-      regAccount.Free;
     end;
   end;
   ddRoot := TreeView.Items.Add(nil, Format('%s [%s]', [Session.Base, Session.Server]));
@@ -185,9 +196,10 @@ procedure TCopyDlg.FormDestroy(Sender: TObject);
 var
   i: Integer;
 begin
-  for i := 0 to cbConnections.Items.Count - 1 do
-    if i <> MainSessionIdx then
-      (cbConnections.Items.Objects[i] as TLDAPSession).Free;
+  with cbConnections.Items do
+  for i := 0 to Count - 1 do
+    if (i <> MainSessionIdx) and (Objects[i] is TLdapSession)then
+      Objects[i].Free;
 end;
 
 procedure TCopyDlg.TreeViewExpanding(Sender: TObject; Node: TTreeNode;
@@ -198,7 +210,7 @@ begin
   try
     Items.BeginUpdate;
     Node.Item[0].Delete;
-    fExpandNode(Node, TLDAPSession(cbConnections.Items.Objects[cbConnections.ItemIndex]));
+    fExpandNode(Node, TargetSession);
     CustomSort(@fSortProc, 0);
   finally
     Items.EndUpdate;
@@ -214,14 +226,26 @@ procedure TCopyDlg.cbConnectionsDrawItem(Control: TWinControl;
   Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   s: string;
+  ImageIndex: Integer;
 begin
   with cbConnections do
   begin
     Canvas.FillRect(rect);
+    if Items.Objects[Index] is TConfigStorage then
+    begin
+      if Index = 0 then
+        ImageIndex := 32
+      else
+        ImageIndex := 33;
+    end
+    else begin
+      ImageIndex := bmHost;
+      Rect.Left:=Rect.Left+20;
+    end;
     Rect.Top:=Rect.Top+1;
     Rect.Bottom:=Rect.Bottom-1;
     Rect.Left:=rect.Left+2;
-    TreeView.Images.Draw(Canvas, Rect.Left, Rect.Top, bmHost);
+    TreeView.Images.Draw(Canvas, Rect.Left, Rect.Top, ImageIndex);
     Rect.Left := Rect.Left + 20;
     s := Items[Index];
     DrawText(Canvas.Handle, PChar(s), Length(s), Rect, DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);

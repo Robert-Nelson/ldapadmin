@@ -24,7 +24,7 @@ unit Computer;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, LDAPClasses, Samba, Posix, RegAccnt, PropertyObject,
+  Buttons, ExtCtrls, LDAPClasses, Samba, Posix, PropertyObject, Config,
   Constant;
 
 type
@@ -42,12 +42,11 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
   private
-    RegAccount: TAccountEntry;
     DomList: TDomainList;
     Entry: TLdapEntry;
     Account: TSamba3Computer;
   public
-    constructor Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; AMode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; AMode: TEditMode); reintroduce;
   end;
 
 var
@@ -59,12 +58,11 @@ uses WinLDAP;
 
 {$R *.DFM}
 
-constructor TComputerDlg.Create(AOwner: TComponent; adn: string; ARegAccount: TAccountEntry; ASession: TLDAPSession; AMode: TEditMode);
+constructor TComputerDlg.Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; AMode: TEditMode);
 var
   i: Integer;
 begin
   inherited Create(AOwner);
-  RegAccount := ARegAccount;
   Entry := TLdapEntry.Create(ASession, adn);
   if AMode = EM_MODIFY then
   begin
@@ -88,7 +86,7 @@ begin
     begin
       for i := 0 to DomList.Count - 1 do
         Items.Add(DomList.Items[i].DomainName);
-      ItemIndex := Items.IndexOf(RegAccount.SambaDomainName);
+      ItemIndex := Items.IndexOf(AccountConfig.ReadString(rSambaDomainName));
       if ItemIndex = -1 then
         ItemIndex := 0;
     end;
@@ -109,7 +107,7 @@ begin
     if esNew in Entry.State then
     begin
       // Acquire next available uidNumber
-      uidnr := Entry.Session.GetFreeUidNumber(RegAccount.posixFirstUID, RegAccount.posixLastUID);
+      uidnr := Entry.Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID), AccountConfig.ReadInteger(rposixLastUID, LAST_UID));
       Account := TSamba3Computer.Create(Entry);
       with Account do
       begin

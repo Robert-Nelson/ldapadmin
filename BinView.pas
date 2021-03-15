@@ -280,6 +280,8 @@ begin
   LastRow := (fMemory.Size div 16);
   if fMemory.Size mod 16 > 0 then
     inc(LastRow);
+  if LastRow = 0 then
+    Exit;
   with ScrollBar1 do
   begin
     Max := LastRow - 1;

@@ -39,13 +39,21 @@ type
   PPLDAPMod = array of PLDAPMod;
   PPLdapBerValA = array of PLdapBerVal;
 
-  TLdapAttributeStates = set of (asNew, asBrowse, asModified, asDeleted);
-  TLdapEntryStates = set of (esNew, esBrowse, esReading, esWriting, esModified);
-
+  TLdapAttributeData = class;
   TLdapAttribute     = class;
   TLdapAttributeList = class;
   TLdapEntry         = class;
   TLdapEntryList     = class;
+
+  TDataType = (dtUnknown, dtText, dtBinary);
+  TLdapAttributeStates = set of (asNew, asBrowse, asModified, asDeleted);
+  TLdapEntryStates = set of (esNew, esBrowse, esReading, esWriting, esModified);
+  TLdapAttributeSortType = (AT_Attribute, AT_DN, AT_RDN, AT_Path);
+
+  TSearchCallback = procedure (Sender: TLdapEntryList; var AbortSearch: Boolean) of object;
+
+  TCompareLdapEntry = procedure(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer) of object;
+  TDataNotifyEvent = procedure(Sender: TLdapAttributeData) of object;
 
   TLdapAttributeData = class
   private
@@ -56,6 +64,8 @@ type
     fAttribute: TLdapAttribute;
     fEntry: TLdapEntry;
     fModOp: Cardinal;
+    fType: TDataType;
+    function GetType: TDataType;
     function GetString: string;
     procedure SetString(AValue: string);
     function BervalAddr: PLdapBerval;
@@ -66,11 +76,13 @@ type
     procedure Delete;
     procedure LoadFromStream(Stream: TStream);
     procedure SaveToStream(Stream: TStream);
+    property DataType: TDataType read GetType;
     property AsString: string read GetString write SetString;
     property DataSize: Cardinal read fBerval.Bv_Len;
     property Data: PBytes read fBerval.Bv_Val;
     property Berval: PLdapBerval read BervalAddr;
     property ModOp: Cardinal read fModOp;
+    property Attribute: TLdapAttribute read fAttribute;
   end;
 
   TLdapAttribute = class
@@ -99,6 +111,7 @@ type
     property Values[Index: Integer]: TLdapAttributeData read GetValue; default;
     property ValueCount: Integer read GetCount;
     property AsString: string read GetString write SetString;
+    property Entry: TLdapEntry read fEntry;
   end;
 
   TLdapAttributeList = class
@@ -128,6 +141,8 @@ type
     ldapVersion: Integer;
     ldapBase: string;
     ldapSSL: Boolean;
+    fNoPagedQueries: Boolean;
+    procedure LDAPCheck(err: ULONG);
     procedure SetServer(Server: string);
     procedure SetUser(User: string);
     procedure SetPassword(Password: string);
@@ -155,8 +170,8 @@ type
     function GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
     function GetFreeUidNumber(const MinUid, MaxUID: Integer): Integer;
     function GetFreeGidNumber(const MinGid, MaxGID: Integer): Integer;
-    procedure Search(const Filter, Base: string; const Scope: Cardinal; QueryAttrs: array of PChar; const NoValues: LongBool; Result: TLdapEntryList); overload;
-    procedure Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList); overload;
+    procedure Search(const Filter, Base: string; const Scope: Cardinal; QueryAttrs: array of string; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload;
+    procedure Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil); overload;
     procedure ModifySet(const Filter, Base: string;
                         const Scope: Cardinal;
                         const AttrName, AttrValue, NewValue: string;
@@ -173,10 +188,12 @@ type
     fdn: string;
     fAttributes: TLdapAttributeList;
     fState: TLdapEntryStates;
+    fOnChangeProc: TDataNotifyEvent;
     function GetNamedAttribute(const AName: string): TLdapAttribute;
   protected
     procedure SetDn(const adn: string);
   public
+    Tag: Integer;
     property Session: TLDAPSession read fSession;
     property dn: string read fdn write SetDn;
     constructor Create(const ASession: TLDAPSession; const adn: string); virtual;
@@ -187,28 +204,29 @@ type
     property State: TLdapEntryStates read fState;
     property Attributes: TLdapAttributeList read fAttributes;
     property AttributesByName[const Name: string]: TLdapAttribute read GetNamedAttribute;
+    property OnChange: TDataNotifyEvent read fOnChangeProc write fOnChangeProc;
   end;
 
   TLdapEntryList = class
   private
-    fList: TList;
-    function GetCount: Integer;
-    function GetNode(Index: Integer): TLdapEntry;
+    fList:        TList;
+    function      GetCount: Integer;
+    function      GetNode(Index: Integer): TLdapEntry;
   public
-    constructor Create;
-    destructor Destroy; override;
-    procedure Add(Entry: TLdapEntry);
-    procedure Clear;
-    property Items[Index: Integer]: TLdapEntry read GetNode; default;
-    property Count: Integer read GetCount;
+    constructor   Create;
+    destructor    Destroy; override;
+    procedure     Add(Entry: TLdapEntry);
+    procedure     Clear;
+    property      Items[Index: Integer]: TLdapEntry read GetNode; default;
+    property      Count: Integer read GetCount;
+    procedure     Sort(const Attributes: array of string; const Asc: boolean); overload;
+    procedure     Sort(const Compare: TCompareLdapEntry; const Asc: boolean; const Data: pointer=nil); overload;
   end;
-
-{ Error handling routines}
-procedure LDAPCheck(err: ULONG);
 
 { Name handling routines }
 function  CanonicalName(dn: string): string;
 procedure SplitRdn(const dn: string; var attrib, value: string);
+function  GetAttributeFromDn(const dn: string): string;
 function  GetNameFromDn(const dn: string): string;
 function  GetRdnFromDn(const dn: string): string;
 function  GetDirFromDn(const dn: string): string;
@@ -217,9 +235,16 @@ function  GetDirFromDn(const dn: string): string;
 function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
 function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
 
+function GetAttributeSortType(Attribute: string): TLdapAttributeSortType;
+
+const
+  PSEUDOATTR_DN         = '*DN*';
+  PSEUDOATTR_RDN        = '*RDN*';
+  PSEUDOATTR_PATH       = '*PATH*';
+
 implementation
 
-uses dialogs, wcrypt2;
+uses Input, dialogs, wcrypt2;
 
 { VERIFYSERVERCERT callback function }
 
@@ -296,14 +321,6 @@ begin
   CertFreeCertificateContext(pSub);
 end;
 
-{ Error handling routines}
-
-procedure LDAPCheck(err: ULONG);
-begin
-  if (err <> LDAP_SUCCESS) then
-    raise ErrLDAP.Create('LDAP Fehler: ' + ldap_err2string(err));
-end;
-
 { Name handling routines }
 
 function CanonicalName(dn: string): string;
@@ -337,6 +354,17 @@ begin
   while (p1^ <> #0) and (p1^ <> ',') do
     p1 := CharNext(p1);
   SetString(value, P, P1 - P);
+end;
+
+function GetAttributeFromDn(const dn: string): string;
+var
+  p, p1: PChar;
+begin
+  p := PChar(dn);
+  p1 := p;
+  while (p1^ <> #0) and (p1^ <> '=') do
+    p1 := CharNext(p1);
+  SetString(Result, P, P1 - P);
 end;
 
 function GetNameFromDn(const dn: string): string;
@@ -409,7 +437,29 @@ begin
   end;
 end;
 
+function GetAttributeSortType(Attribute: string): TLdapAttributeSortType;
+begin
+  if Attribute=PSEUDOATTR_DN   then result:=AT_DN   else
+  if Attribute=PSEUDOATTR_RDN  then result:=AT_RDN  else
+  if Attribute=PSEUDOATTR_PATH then result:=AT_Path else
+  result:=AT_Attribute;
+end;
+
 { TLdapSession }
+
+procedure TLdapSession.LDAPCheck(err: ULONG);
+var
+  ErrorEx: PChar;
+begin
+  if (err = LDAP_SUCCESS) then exit;
+  if ((ldap_get_option(pld, LDAP_OPT_SERVER_ERROR, @ErrorEx)=LDAP_SUCCESS) and Assigned(ErrorEx)) then
+  begin
+    raise ErrLDAP.Create(Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]));
+    ldap_memfree(ErrorEx);
+  end
+  else
+    raise ErrLDAP.Create(Format(stLdapError, [ldap_err2string(err)]));
+end;
 
 procedure TLdapSession.ProcessSearchEntry(const plmEntry: PLDAPMessage; Attributes: TLdapAttributeList);
 var
@@ -477,7 +527,7 @@ begin
   end;
 end;
 
-procedure TLDAPSession.Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList);
+procedure TLDAPSession.Search(const Filter, Base: string; const Scope: Cardinal; attrs: PCharArray; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil);
 var
   plmSearch: PLDAPMessage;
   Err: Integer;
@@ -487,53 +537,83 @@ var
   HSrch: PLDAPSearch;
   TotalCount: Cardinal;
   Timeout: LDAP_TIMEVAL;
+  AbortSearch: Boolean;
 begin
 
-  Err := ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch);
-  if Err = LDAP_SUCCESS then
-    ProcessSearchMessage(plmSearch, NoValues, Result)
-  else begin
-    if Assigned(plmSearch) then
-      ldap_msgfree(plmSearch);
-    if Err <> LDAP_SIZELIMIT_EXCEEDED then
-      LdapCheck(Err)
+  if fNoPagedQueries then
+  begin
+    Err := ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch);
+    if Err = LDAP_SIZELIMIT_EXCEEDED then
+      MessageDlg(ldap_err2string(err), mtWarning, [mbOk], 0)
     else
-    begin
-      ServerControls:=nil;
-      ClientControls:=nil;
-      SortKeys:=nil;
-      hsrch:=ldap_search_init_page(pld, PChar(Base), Scope, PChar(Filter), PPCharA(attrs), Ord(NoValues),
-                                   ServerControls, ClientControls, 60, 0, SortKeys);
-      if not Assigned(hsrch) then
-      begin
-        Err := LdapGetLastError;
-        if Err = LDAP_NOT_SUPPORTED then // report original error
-          Err := LDAP_SIZELIMIT_EXCEEDED;
-        LdapCheck(Err); // raises exception
-      end;
+      LdapCheck(Err);
+    ProcessSearchMessage(plmSearch, NoValues, Result);
+    Exit;
+  end;
 
-      Timeout.tv_sec := 60;
-      while true do
-      begin
-        Err := ldap_get_next_page_s(pld, hsrch, Timeout, 500, TotalCount, plmSearch);
-        if Err = LDAP_NO_RESULTS_RETURNED then
+  ServerControls:=nil;
+  ClientControls:=nil;
+  SortKeys:=nil;
+  hsrch:=ldap_search_init_page(pld, PChar(Base), Scope, PChar(Filter), PPCharA(attrs), Ord(NoValues),
+                                   ServerControls, ClientControls, 60, 0, SortKeys);
+  if not Assigned(hsrch) then
+  begin
+    Err := LdapGetLastError;
+    if Err <> LDAP_NOT_SUPPORTED then
+      LdapCheck(Err); // raises exception
+    fNoPagedQueries := true;
+    LdapCheck(ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch)); // try ordinary search
+    ProcessSearchMessage(plmSearch, NoValues, Result);
+    Exit;
+  end;
+
+  Timeout.tv_sec := 60;
+  while true do
+  begin
+    Err := ldap_get_next_page_s(pld, hsrch, Timeout, 100, TotalCount, plmSearch);
+    case Err of
+      LDAP_UNAVAILABLE_CRIT_EXTENSION:
+          begin
+            fNoPagedQueries := true;
+            ldap_search_abandon_page(pld, hsrch);
+            LdapCheck(ldap_search_s(pld, PChar(Base), Scope, PChar(Filter), PChar(attrs), Ord(NoValues), plmSearch)); // try ordinary search
+            ProcessSearchMessage(plmSearch, NoValues, Result);
+            Break;
+          end;
+    LDAP_NO_RESULTS_RETURNED, LDAP_SIZELIMIT_EXCEEDED:
         begin
+          if Err = LDAP_SIZELIMIT_EXCEEDED then
+          begin
+            ProcessSearchMessage(plmSearch, NoValues, Result);
+            MessageDlg(ldap_err2string(err), mtWarning, [mbOk], 0)
+          end;
           LdapCheck(ldap_search_abandon_page(pld, hsrch));
           break;
         end;
-        if Err = LDAP_SUCCESS then
+    LDAP_SUCCESS:
         begin
           if not Assigned(plmSearch) then
             Continue;
-          ProcessSearchMessage(plmSearch, NoValues, Result)
-        end;
-      end;
+          ProcessSearchMessage(plmSearch, NoValues, Result);
+          if Assigned(SearchProc) then
+          begin
+            AbortSearch := false;
+            SearchProc(Result, AbortSearch);
+            if AbortSearch then
+            begin
+              LdapCheck(ldap_search_abandon_page(pld, hsrch));
+              break;
+            end;
+          end;
+        end
+    else
+      LdapCheck(Err);
     end;
   end;
 end;
 
 
-procedure TLdapSession.Search(const Filter, Base: string; const Scope: Cardinal; QueryAttrs: array of PChar; const NoValues: LongBool; Result: TLdapEntryList);
+procedure TLdapSession.Search(const Filter, Base: string; const Scope: Cardinal; QueryAttrs: array of string; const NoValues: LongBool; Result: TLdapEntryList; SearchProc: TSearchCallback = nil);
 var
   attrs: PCharArray;
   len: Integer;
@@ -548,7 +628,7 @@ begin
       attrs[len] := PChar(QueryAttrs[len]);
     until len = 0;
   end;
-  Search(Filter, Base, Scope, attrs, NoValues, Result);
+  Search(Filter, Base, Scope, attrs, NoValues, Result, SearchProc);
 end;
 
 { Modify one attribute in every entry in set returned by search filter }
@@ -789,21 +869,25 @@ begin
   Disconnect;
   ldapServer := Server;
 end;
+
 procedure TLDAPSession.SetUser(User: string);
 begin
   Disconnect;
   ldapUser := User;
 end;
+
 procedure TLDAPSession.SetPassword(Password: string);
 begin
   Disconnect;
   ldapPassword := Password;
 end;
+
 procedure TLDAPSession.SetPort(Port: Integer);
 begin
   Disconnect;
   ldapPort := Port;
 end;
+
 procedure TLDAPSession.SetVersion(Version: Integer);
 begin
   Disconnect;
@@ -831,6 +915,8 @@ procedure TLDAPSession.Connect;
 var
   res: Cardinal;
 begin
+  if (ldapUser<>'') and (ldapPassword='') then
+    if not InputDlg(cEnterPasswd, Format(stPassFor, [ldapUser]), ldapPassword, '*', true) then Abort;
   if ldapSSL then
     ldappld := ldap_sslinit(PChar(ldapServer), ldapPort,1)
   else
@@ -847,6 +933,8 @@ begin
     if CertUserAbort then
       Abort;
     LdapCheck(res);
+    if ldapVersion < 3 then
+      fNoPagedQueries := false;
   except
     // close connection
     LdapCheck(ldap_unbind_s(pld));
@@ -861,14 +949,30 @@ begin
   begin
     LdapCheck(ldap_unbind_s(pld));
     ldappld := nil;
+    fNoPagedQueries := false;
   end;
 end;
 
 { TLDapAttributeData }
 
+function TLDapAttributeData.GetType: TDataType;
+var
+  l: Integer;
+begin
+  if (fType = dtUnknown) and (DataSize > 0) then
+  begin
+    l := MultiByteToWideChar( CP_UTF8, 8{MB_ERR_INVALID_CHARS}, PChar(Data), DataSize, nil, 0);
+    if l <> 0 then
+      fType := dtText
+    else
+      fType := dtBinary;
+  end;
+  Result := fType;
+end;
+
 function TLDapAttributeData.GetString: string;
 begin
- if Assigned(Self) then
+ if Assigned(Self) and (ModOp <> LdapOpNoop) and (ModOp <> LdapOpDelete) then
     Result := UTF8ToStringLen(PChar(Data), DataSize)
   else
     Result := '';
@@ -900,7 +1004,8 @@ end;
 
 procedure TLDapAttributeData.SaveToStream(Stream: TStream);
 begin
-  Stream.WriteBuffer(Berval.bv_Val^, fBerval.Bv_Len);
+  if Assigned(Self) and (ModOp <> LdapOpNoop) and (ModOp <> LdapOpDelete) then
+    Stream.WriteBuffer(Berval.bv_Val^, fBerval.Bv_Len);
 end;
 
 function TLDapAttributeData.BervalAddr: PLdapBerval;
@@ -912,6 +1017,7 @@ constructor TLDapAttributeData.Create(Attribute: TLdapAttribute);
 begin
   fAttribute := Attribute;
   fEntry := Attribute.fEntry;
+  fType := dtUnknown;
   inherited Create;
 end;
 
@@ -946,6 +1052,7 @@ begin
     fAttribute.fState := fAttribute.fState - [asDeleted];
     if not CompareData(AData, ADataSize) then
     begin
+      fType := dtUnknown;
       fBerval.Bv_Len := ADataSize;
       SetLength(fBerval.Bv_Val, ADataSize);
       Move(AData^, Pointer(fBerval.Bv_Val)^, ADataSize);
@@ -973,12 +1080,14 @@ begin
         fModOp := LdapOpRead;
     end;
   end;
+  if Assigned(fEntry.OnChange) then fEntry.OnChange(Self);
 end;
 
 procedure TLDapAttributeData.Delete;
 var
   i: Integer;
 begin
+  if (fModOp = LdapOpNoop) then Exit;
   //if (fModOp = LDAP_MOD_ADD) or (fModOp = LDAP_MOD_REPLACE) then
   if fModOp = LDAP_MOD_ADD then
     fModOp := LdapOpNoop
@@ -1018,6 +1127,7 @@ begin
     end;
     { end change }
   end;
+  if Assigned(fEntry.OnChange) then fEntry.OnChange(Self);
 end;
 
 { TLdapAttribute }
@@ -1350,6 +1460,110 @@ begin
   for i := 0 to fList.Count - 1 do
     TLdapEntry(fList[i]).Free;
   fList.Clear;
+end;
+
+procedure TLdapEntryList.Sort(const Attributes: array of string; const Asc: boolean);
+var
+  AttrTypes: array of TLdapAttributeSortType;
+  i: integer;
+
+  function  DoCompare(Entry1, Entry2: TLdapEntry): Integer;
+  var
+    i: integer;
+  begin
+    result := 0;
+    for i:=0 to length(AttrTypes)-1 do begin
+      case AttrTypes[i] of
+        AT_DN:   result:=AnsiCompareStr(Entry1.DN, Entry2.DN);
+        AT_RDN:  result:=AnsiCompareStr(GetRdnFromDn(Entry1.DN), GetRdnFromDn(Entry2.DN));
+        AT_PATH: result:=AnsiCompareStr(CanonicalName(GetDirFromDn(Entry1.DN)),
+                                        CanonicalName(GetDirFromDn(Entry2.DN)));
+        else     result:=AnsiCompareStr(Entry1.AttributesByName[Attributes[i]].AsString,
+                                         Entry2.AttributesByName[Attributes[i]].AsString)
+      end;
+      if result<>0 then break;
+    end;
+
+    if result=0 then result:=integer(Entry1)-integer(Entry2); // Delete QuickSort instability.
+    if not Asc then result:=-result;
+  end;
+
+  procedure DoSort(L, R: Integer);
+  var
+    I, J: Integer;
+    E: TLdapEntry;
+    T: Pointer;
+  begin
+    repeat
+      I := L;
+      J := R;
+      E := TLdapEntry(fList[(L + R) shr 1]);
+      repeat
+        while DoCompare(TLdapEntry(fList[I]), E) < 0 do Inc(I);
+        while DoCompare(TLdapEntry(fList[J]), E) > 0 do Dec(J);
+        if I <= J then
+        begin
+          T := fList[I];
+          fList[I] := fList[J];
+          fList[J] := T;
+          Inc(I);
+          Dec(J);
+        end;
+      until I > J;
+      if L < J then
+        DoSort(L, J);
+      L := I;
+    until I >= R;
+  end;
+
+begin
+  if (length(Attributes)=0) or (fList.Count = 0) then exit;
+  setlength(AttrTypes, length(Attributes));
+  for i:=0 to length(Attributes)-1 do AttrTypes[i]:=GetAttributeSortType(Attributes[i]);
+
+  DoSort(0, fList.Count-1);
+end;
+
+procedure TLdapEntryList.Sort(const Compare: TCompareLdapEntry; const Asc: boolean; const Data: pointer=nil);
+
+  function  DoCompare(Entry1, Entry2: TLdapEntry): Integer;
+  begin
+    Compare(Entry1, Entry2, Data, result);
+    if result=0 then result:=integer(Entry1)-integer(Entry2); // Delete QuickSort instability.
+    if not Asc then result:=-result;
+  end;
+
+  procedure DoSort(L, R: Integer);
+  var
+    I, J: Integer;
+    E: TLdapEntry;
+    T: Pointer;
+  begin
+    repeat
+      I := L;
+      J := R;
+      E := TLdapEntry(fList[(L + R) shr 1]);
+      repeat
+        while DoCompare(TLdapEntry(fList[I]), E) < 0 do Inc(I);
+        while DoCompare(TLdapEntry(fList[J]), E) > 0 do Dec(J);
+        if I <= J then
+        begin
+          T := fList[I];
+          fList[I] := fList[J];
+          fList[J] := T;
+          Inc(I);
+          Dec(J);
+        end;
+      until I > J;
+      if L < J then
+        DoSort(L, J);
+      L := I;
+    until I >= R;
+  end;
+
+begin
+  if fList.Count = 0 then exit;
+  DoSort(0, fList.Count-1);
 end;
 
 end.

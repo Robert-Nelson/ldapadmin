@@ -63,6 +63,26 @@ const
       255, 255, 255, 255, 255, 255, 255, 255,
       255, 255, 255, 255, 255, 255, 255, 255
       );
+
+  Base64InvSet2: array [0..255] of Byte =
+  (   255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255,  62, 255, 255, 255,  63,
+       52,  53,  54,  55,  56,  57,  58,  59,   60,  61, 255, 255, 254, 255, 255, 255,
+      255,   0,   1,   2,   3,   4,   5,   6,    7,   8,   9,  10,  11,  12,  13,  14,
+       15,  16,  17,  18,  19,  20,  21,  22,   23,  24,  25, 255, 255, 255, 255, 255,
+      255,  26,  27,  28,  29,  30,  31,  32,   33,  34,  35,  36,  37,  38,  39,  40,
+       41,  42,  43,  44,  45,  46,  47,  48,   49,  50,  51, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,  255, 255, 255, 255, 255, 255, 255, 255
+      );
+
 type
   Tb24 = packed record
     case Value: Boolean of
@@ -70,10 +90,14 @@ type
     False: (Bytes: array[0..3] of Byte);
   end;
 
-function Base64encSize(InSize: Cardinal): Cardinal;
-function Base64decSize(InSize: Cardinal): Cardinal;
-procedure Base64Encode(const InBuf; const Length: Cardinal; var OutBuf);
-function Base64Decode(const InBuf; const Length: Cardinal; var OutBuf): Cardinal;
+function  Base64EncSize(InSize: Cardinal): Cardinal;
+function  Base64DecSize(InSize: Cardinal): Cardinal; overload;
+procedure Base64Encode(const InBuf; const Length: Cardinal; var OutBuf); overload;
+function  Base64Decode(const InBuf; const Length: Cardinal; var OutBuf): Cardinal; overload;
+
+function  Base64Encode(const InBuf; const Length: Cardinal): string; overload;
+function  Base64DecSize(InBuf: string): Cardinal; overload;
+function Base64Decode(const InBuf: string; var OutBuf): integer; overload;
 
 implementation
 
@@ -185,6 +209,86 @@ begin
   end;
 
   Result := Cardinal(pOut) - Cardinal(@OutBuf) + Chars;
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+function Base64Encode(const InBuf; const Length: Cardinal): string;
+begin
+  setlength(result, Base64encSize(Length));
+  if Length=0 then exit;
+  Base64Encode(InBuf, Length, result[1]);
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+function Base64decSize(InBuf: string): Cardinal; overload;
+var
+  i: integer;
+begin
+  Result := 3 * (length(InBuf) div 4);
+  if result=0 then exit;
+
+  i:=length(InBuf);
+  while InBuf[i]='=' do begin
+    dec(result);
+    dec(i);
+  end;
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+function Base64Decode(const InBuf: string; var OutBuf): integer; overload;
+var
+  i, n: integer;
+  p: PbyteArray;
+  b: byte;
+begin
+  result:=Base64decSize(InBuf);
+  p:=@OutBuf;
+  i:=1;
+  n:=-1;
+  while i<=length(InBuf) do begin
+    b:=Base64InvSet2[byte(InBuf[i])];
+    case b of
+      255:  ;
+      254:  break;
+      else  begin
+              inc(n);
+              p[n]:=b shl 2;
+            end;
+    end;
+
+    b:=Base64InvSet2[byte(InBuf[i+1])];
+    case b of
+      255:  ;
+      254:  break;
+      else  begin
+              p[n]:=p[n] or b shr 4;
+              inc(n);
+              p[n]:=b shl 4;
+            end;
+    end;
+
+    b:=Base64InvSet2[byte(InBuf[i+2])];
+    case b of
+      255:  ;
+      254:  break;
+      else  begin
+              p[n]:=p[n] or b shr 2;
+              inc(n);
+              p[n]:=b shl 6;
+            end;
+    end;
+
+    b:=Base64InvSet2[byte(InBuf[i+3])];
+    case b of
+      255:  ;
+      254:  break;
+      else  begin
+              p[n]:=p[n] + b;
+            end;
+    end;
+
+    inc(i, 4);
+  end;
 end;
 
 end.

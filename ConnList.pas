@@ -1,7 +1,7 @@
   {      LDAPAdmin - Connlist.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
-  *      Author: Tihomir Karlovic
+  *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
   *
   * This file is free software; you can redistribute it and/or modify
@@ -25,216 +25,438 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  ComCtrls, StdCtrls, Menus, ImgList, RegAccnt;
+  ComCtrls, StdCtrls, Menus, ImgList, ExtCtrls, Buttons, Config, ToolWin,
+  ActnList;
 
 type
   TConnListFrm = class(TForm)
-    OkBtn: TButton;
-    CancelBtn: TButton;
-    ListView: TListView;
-    PopupMenu: TPopupMenu;
+    PopupMenu1: TPopupMenu;
     pbNew: TMenuItem;
     pbProperties: TMenuItem;
     pbDelete: TMenuItem;
     N1: TMenuItem;
-    ImageList1: TImageList;
+    SmallImgs: TImageList;
     pbRename: TMenuItem;
     pbCopy: TMenuItem;
-    procedure FormCreate(Sender: TObject);
-    procedure pbNewClick(Sender: TObject);
-    procedure PopupMenuPopup(Sender: TObject);
-    procedure pbPropertiesClick(Sender: TObject);
-    procedure pbDeleteClick(Sender: TObject);
+    Panel1: TPanel;
+    OkBtn: TButton;
+    CancelBtn: TButton;
+    AccountsView: TListView;
+    OpenDialog: TOpenDialog;
+    ToolBar2: TToolBar;
+    ToolButton1: TToolButton;
+    ToolButton2: TToolButton;
+    ToolButton3: TToolButton;
+    ViewStyleMenu: TPopupMenu;
+    Icons1: TMenuItem;
+    List1: TMenuItem;
+    able1: TMenuItem;
+    LargeImgs: TImageList;
+    Largeicons1: TMenuItem;
+    ToolButton4: TToolButton;
+    Panel2: TPanel;
+    StoragesImgs: TImageList;
+    StoragesList: TListBox;
+    Splitter1: TSplitter;
+    ActionList: TActionList;
+    ActNewAccount: TAction;
+    ActDeleteAccount: TAction;
+    ToolButton5: TToolButton;
+    ToolButton6: TToolButton;
+    ToolButton7: TToolButton;
+    ActRenameAccount: TAction;
+    ActNewStorage: TAction;
+    ActOpenStorage: TAction;
+    ActCopyAccount: TAction;
+    ActPropertiesAccount: TAction;
+    SaveDialog: TSaveDialog;
+    ToolButton8: TToolButton;
+    ActDeleteStrorage: TAction;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure ListViewDblClick(Sender: TObject);
-    procedure ListViewClick(Sender: TObject);
     procedure ListViewEditing(Sender: TObject; Item: TListItem;
       var AllowEdit: Boolean);
-    procedure ListViewEdited(Sender: TObject; Item: TListItem;
+    procedure ViewStyleChange(Sender: TObject);
+    procedure ToolButton3Click(Sender: TObject);
+    procedure StoragesListDrawItem(Control: TWinControl; Index: Integer;
+      Rect: TRect; State: TOwnerDrawState);
+    procedure Splitter1Moved(Sender: TObject);
+    procedure StoragesListClick(Sender: TObject);
+    procedure ActNewAccountExecute(Sender: TObject);
+    procedure AccountsViewDblClick(Sender: TObject);
+    procedure AccountsViewKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure ActDeleteAccountExecute(Sender: TObject);
+    procedure ActionListUpdate(Action: TBasicAction;
+      var Handled: Boolean);
+    procedure ActRenameAccountExecute(Sender: TObject);
+    procedure AccountsViewEdited(Sender: TObject; Item: TListItem;
       var S: String);
-    procedure pbRenameClick(Sender: TObject);
-    procedure pbCopyClick(Sender: TObject);
+    procedure ActCopyAccountExecute(Sender: TObject);
+    procedure ActPropertiesAccountExecute(Sender: TObject);
+    procedure ActNewStorageExecute(Sender: TObject);
+    procedure ActOpenStorageExecute(Sender: TObject);
+    procedure ViewStyleMenuPopup(Sender: TObject);
+    procedure ActDeleteStrorageExecute(Sender: TObject);
   private
-    Account: ^TAccountEntry;
-    procedure GetAccounts;
+    FStorage: TConfigStorage;
+    procedure SetViewStyle(Style: integer);
+    procedure RefreshAccountsView;
+    procedure RefreshStoragesList(ItemIndex: integer=-1);
   public
-    constructor Create(AOwner: TComponent; var rAccount: TAccountEntry); reintroduce;
+    constructor Create(AOwner: TComponent); reintroduce;
   end;
-
-var
-  ConnListFrm: TConnListFrm;
 
 implementation
 
-uses Registry, ConnProp, Constant;
+uses ConnProp, Constant, Math, uAccountCopyDlg;
 
+const
+  CONF_ACCLV_STYLE='ConList\AccountsView\Style';
+  CONF_STORLIST_WIDTH='ConList\StorragesList\Width';
+  CONF_STORLIST_INDEX='ConList\StorragesList\Index';
 {$R *.DFM}
 
-constructor TConnListFrm.Create(AOwner: TComponent; var rAccount: TAccountEntry);
+constructor TConnListFrm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  Account := @rAccount;
-end;
-
-procedure TConnListFrm.GetAccounts;
-var
-  Reg: TRegistry;
-  I: Integer;
-  KeyList: TStringList;
-  ListItem: TListItem;
-begin
-  OkBtn.Enabled := false;
-  ListView.Items.Clear;
-  ListItem := ListView.Items.Add;
-  ListItem.Caption := cAddConn;
-  ListItem.ImageIndex := 0;
-  Reg := TRegistry.Create;
-  Reg.RootKey := HKEY_CURRENT_USER;
-  try
-    if Reg.OpenKey(REG_KEY + REG_ACCOUNT, false) then
-    try
-      KeyList := TStringList.Create;
-      Reg.GetValueNames(KeyList);
-      Reg.CloseKey;
-      {ListView.Items.Clear;
-      ListItem := ListView.Items.Add;
-      ListItem.Caption := cAddConn;
-      ListItem.ImageIndex := 0;}
-      for I := 0 to KeyList.Count - 1 do
-      begin
-        ListItem := ListView.Items.Add;
-        ListItem.Caption := KeyList[I];
-        ListItem.ImageIndex := 1;
-        //if Reg.OpenKey(KeyList[I], false) then
-      end;
-    finally
-      KeyList.Free;
-      Reg.CloseKey;
-    end;
-  finally
-    Reg.Free;
-  end;
-end;
-
-procedure TConnListFrm.FormCreate(Sender: TObject);
-begin
-  GetAccounts;
-end;
-
-procedure TConnListFrm.pbNewClick(Sender: TObject);
-begin
-  TConnPropDlg.Create(Self, '').ShowModal;
-  GetAccounts;
-end;
-
-procedure TConnListFrm.PopupMenuPopup(Sender: TObject);
-var
-  Enable: Boolean;
-begin
-  Enable := (ListView.Selected <> nil) and (ListView.Selected.Index <> 0);
-  pbDelete.enabled := Enable;
-  pbProperties.Enabled := Enable;
-  pbRename.Enabled := Enable;
-  pbCopy.Enabled := Enable;
-end;
-
-procedure TConnListFrm.pbPropertiesClick(Sender: TObject);
-begin
-  TConnPropDlg.Create(Self, ListView.Selected.Caption).ShowModal;
-end;
-
-procedure TConnListFrm.pbDeleteClick(Sender: TObject);
-var
-  Reg: TRegistry;
-begin
-  Reg := TRegistry.Create;
-  Reg.RootKey := HKEY_CURRENT_USER;
-  try
-    if Reg.OpenKey(REG_KEY + REG_ACCOUNT, false) then
-    try
-      Reg.DeleteValue(ListView.Selected.Caption);
-    finally
-      Reg.CloseKey;
-    end;
-  finally
-    Reg.Free;
-  end;
-  GetAccounts;
+  StoragesList.Width:=GlobalConfig.ReadInteger(CONF_STORLIST_WIDTH, StoragesList.Width);
+  RefreshStoragesList(GlobalConfig.ReadInteger(CONF_STORLIST_INDEX, 0));
+  SetViewStyle(GlobalConfig.ReadInteger(CONF_ACCLV_STYLE, 0));
 end;
 
 procedure TConnListFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  if ModalResult = mrOk then
-  begin
-    if ListView.Selected.Index = 0 then
-    begin
-      pbNewClick(nil);
-      Abort;
-    end
-    else
-      Account^ := TAccountEntry.Create(ListView.Selected.Caption);
+ GlobalConfig.WriteInteger(CONF_STORLIST_WIDTH, StoragesList.Width);
+ GlobalConfig.WriteInteger(CONF_STORLIST_INDEX, StoragesList.ItemIndex);
+ if ModalResult <> mrOk then exit;
+ if (AccountsView.Selected=nil) or (AccountsView.Selected.Data=nil) then begin
+  ActNewAccountExecute(self);
+  Abort;
+ end;
+ SetAccount(TAccount(AccountsView.Selected.Data));
+end;
+
+
+procedure TConnListFrm.RefreshAccountsView;
+var
+  i: integer;
+  SelData: pointer;
+begin
+  AccountsView.Items.BeginUpdate;
+
+  if (AccountsView.Selected<>nil) then SelData:=AccountsView.Selected.Data
+  else SelData:=nil;
+
+  AccountsView.Items.Clear;
+
+  with AccountsView.Items.Add do begin
+    Caption := cAddConn;
+    Data:=nil;
+    ImageIndex := 0;
   end;
+
+  if FStorage<>nil then begin
+    for i:=0 to FStorage.AccountsCount-1 do begin
+      with AccountsView.Items.Add do begin
+        Caption:=FStorage.Accounts[i].Name;
+        Data:=FStorage.Accounts[i];
+        SubItems.Add(FStorage.Accounts[i].Server);
+        SubItems.Add(FStorage.Accounts[i].Base);
+        if FStorage.Accounts[i].User='' then SubItems.Add('anonymous')
+        else SubItems.Add(FStorage.Accounts[i].User);
+        ImageIndex := 1;
+        Selected:=(Data=SelData);
+      end;
+    end;
+  end;
+  AccountsView.Items.EndUpdate;
 end;
 
-procedure TConnListFrm.ListViewDblClick(Sender: TObject);
+procedure TConnListFrm.RefreshStoragesList(ItemIndex: integer=-1);
+var
+  i: integer;
 begin
-  if Assigned(ListView.Selected) then
-    ModalResult := mrOk;
+  StoragesList.Items.BeginUpdate;
+  StoragesList.Items.Clear;
+  StoragesList.ItemIndex:=-1;
+
+  for i:=0 to GlobalConfig.StoragesCount-1 do begin
+    StoragesList.Items.AddObject(GlobalConfig.Storages[i].Name, GlobalConfig.Storages[i]);
+    if FStorage=GlobalConfig.Storages[i] then StoragesList.ItemIndex:=i;
+  end;
+
+  if (StoragesList.Items.Count>0) then begin
+    if (ItemIndex>-1) and (ItemIndex<StoragesList.Items.Count) then StoragesList.ItemIndex:=ItemIndex;
+    if StoragesList.ItemIndex<0 then StoragesList.ItemIndex:=0;
+    FStorage:=TConfigStorage(StoragesList.Items.Objects[StoragesList.ItemIndex]);
+  end;
+
+  StoragesList.Items.EndUpdate;
+  RefreshAccountsView;
 end;
 
-procedure TConnListFrm.ListViewClick(Sender: TObject);
+procedure TConnListFrm.StoragesListClick(Sender: TObject);
 begin
-  OkBtn.Enabled := Assigned(ListView.Selected);
+  if FStorage=TConfigStorage(StoragesList.Items.Objects[StoragesList.ItemIndex]) then exit;
+  FStorage:=TConfigStorage(StoragesList.Items.Objects[StoragesList.ItemIndex]);
+  RefreshAccountsView;
+end;
+
+procedure TConnListFrm.AccountsViewDblClick(Sender: TObject);
+begin
+  if AccountsView.Selected=nil then exit;
+  if AccountsView.Selected.Data=nil then ActNewAccountExecute(Self)
+  else ModalResult := mrOk;
+end;
+
+procedure TConnListFrm.AccountsViewKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if Key=VK_RETURN then AccountsViewDblClick(AccountsView);
+end;
+
+procedure TConnListFrm.ActNewAccountExecute(Sender: TObject);
+const
+  NAME_PATTERN='%s [%d]';
+var
+  Account: TAccount;
+  AName: string;
+  i: integer;
+begin
+  with TConnPropDlg.Create(self) do begin
+    PasswordEnable:=FStorage.PasswordCanSave;
+    if ShowModal=mrOK then begin
+      if Name='' then Name:=Server+'/'+Base;
+      AName:=Name;
+
+      i:=2;
+      while FStorage.AccountByName(AName)<>nil do begin
+        AName:=format(NAME_PATTERN, [Name, i]);
+        inc(i);
+      end;
+
+      Account:=FStorage.AddAccount(AName);
+      Account.Base          := Base;
+      Account.SSL           := SSl;
+      Account.Port          := Port;
+      Account.LdapVersion   := LdapVersion;
+      Account.User          := User;
+      Account.Server        := Server;
+      Account.Password      := Password;
+    end;
+    Free;
+  end;
+  RefreshAccountsView;
+end;
+
+procedure TConnListFrm.ActDeleteAccountExecute(Sender: TObject);
+begin
+  if (AccountsView.Selected=nil) or (AccountsView.Selected.Data=nil) then exit;
+  if FStorage=nil then exit;
+  if MessageBox(Application.Handle,
+                pchar(format(stConfirmDelAccnt, [TAccount(AccountsView.Selected.Data).Name])),
+                pchar(application.Name), MB_ICONQUESTION or MB_YESNO)<>mrYes then exit;
+  FStorage.DeleteAccount(TAccount(AccountsView.Selected.Data));
+  RefreshAccountsView;
+end;
+
+procedure TConnListFrm.ActionListUpdate(Action: TBasicAction; var Handled: Boolean);
+begin
+  OkBtn.Enabled := (AccountsView.Selected<>nil) and (AccountsView.Selected.Data<>nil) and (not AccountsView.IsEditing);
+  ActDeleteAccount.Enabled:=OkBtn.Enabled;
+  ActRenameAccount.Enabled:=OkBtn.Enabled;
+  ActCopyAccount.Enabled:=OkBtn.Enabled;
+  ActPropertiesAccount.Enabled:=OkBtn.Enabled;
+
+  ActDeleteStrorage.Enabled:=(FStorage<>nil) and (FStorage is TXmlConfigStorage);
+end;
+
+procedure TConnListFrm.ActRenameAccountExecute(Sender: TObject);
+begin
+  if (AccountsView.Selected=nil) or (AccountsView.Selected.Data=nil) then exit;
+  AccountsView.Selected.EditCaption;
 end;
 
 procedure TConnListFrm.ListViewEditing(Sender: TObject; Item: TListItem; var AllowEdit: Boolean);
 begin
-  OkBtn.Default := false;
+  AllowEdit:=(Item<>nil) and (Item.Data<>nil);
 end;
 
-procedure TConnListFrm.ListViewEdited(Sender: TObject; Item: TListItem; var S: String);
-var
-  Reg: TRegistry;
+procedure TConnListFrm.AccountsViewEdited(Sender: TObject; Item: TListItem; var S: String);
 begin
-  OkBtn.Default := true;
-  Reg := TRegistry.Create;
-  Reg.RootKey := HKEY_CURRENT_USER;
-  try
-    if Reg.OpenKey(REG_KEY + REG_ACCOUNT, false) then
-    try
-      Reg.RenameValue(ListView.Selected.Caption, S);
-    finally
-      Reg.CloseKey;
+  if Item.Data=nil then exit;
+  TAccount(Item.Data).Name:=S;
+end;
+
+procedure TConnListFrm.ActCopyAccountExecute(Sender: TObject);
+var
+  Account: TAccount;
+  Dlg: TAccountCopyDlg;
+begin
+  if (AccountsView.Selected=nil) or (AccountsView.Selected.Data=nil) then exit;
+
+  Dlg:=TAccountCopyDlg.Create(self);
+  Dlg.Caption:=Format(cCopyTo, [ FStorage.Name+'.'+ AccountsView.Selected.Caption]);
+  Dlg.Storage:=FStorage;
+  Dlg.AccountName := AccountsView.Selected.Caption;
+  Dlg.NameEd.SelectAll;
+  if Dlg.ShowModal=mrOK then begin
+    Account:=Dlg.Storage.AccountByName(Dlg.AccountName);
+    if Account=nil then Account:=Dlg.Storage.AddAccount(Dlg.AccountName);
+    Account.Assign(TAccount(AccountsView.Selected.Data));
+    RefreshAccountsView;
+  end;
+  Dlg.Free;
+end;
+
+procedure TConnListFrm.ActPropertiesAccountExecute(Sender: TObject);
+var
+  Account: TAccount;
+begin
+  if (AccountsView.Selected=nil) or (AccountsView.Selected.Data=nil) then exit;
+  Account:=TAccount(AccountsView.Selected.Data);
+  with TConnPropDlg.Create(Self) do begin
+    Name          := Account.Name;
+    Base          := Account.Base;
+    SSL           := Account.SSl;
+    Port          := Account.Port;
+    LdapVersion   := Account.LdapVersion;
+    User          := Account.User;
+    Server        := Account.Server;
+    Password      := Account.Password;
+    PasswordEnable:= FStorage.PasswordCanSave;
+    
+    if ShowModal=mrOK then begin
+      Account.Name          := Name;
+      Account.Base          := Base;
+      Account.SSL           := SSl;
+      Account.Port          := Port;
+      Account.LdapVersion   := LdapVersion;
+      Account.User          := User;
+      Account.Server        := Server;
+      Account.Password      := Password;
     end;
-  finally
-    Reg.Free;
   end;
+  RefreshAccountsView;
 end;
 
-procedure TConnListFrm.pbRenameClick(Sender: TObject);
-begin
-  ListView.Selected.EditCaption;
-end;
-
-procedure TConnListFrm.pbCopyClick(Sender: TObject);
+procedure TConnListFrm.ActNewStorageExecute(Sender: TObject);
 var
-  s: string;
-  ListItem: TListItem;
+  i: integer;
 begin
-  s := InputBox(Format(cCopyTo, [ListView.Selected.Caption]), cNewName, '');
-  if (s <> '') and (AnsiCompareText(s, ListView.Selected.Caption) <> 0)  then
-  with
-    TAccountEntry.Create(ListView.Selected.Caption) do
-  try
-    Name := s;
-    Write;
-    ListItem := ListView.Items.Add;
-    ListItem.Caption := s;
-    ListItem.ImageIndex := 1;
-    ListView.Selected := ListItem;
-  finally
-    Free;
+  if SaveDialog.Execute then begin
+    for i:=1 to GlobalConfig.StoragesCount-1 do begin
+      if (GlobalConfig.Storages[i] is TXmlConfigStorage) and
+         (TXmlConfigStorage(GlobalConfig.Storages[i]).FileName=SaveDialog.FileName) then begin
+        FStorage:=GlobalConfig.Storages[i];
+        StoragesList.ItemIndex:=i;
+        RefreshAccountsView;
+        exit;
+      end;
+    end;
+    FStorage:=TXmlConfigStorage.Create('');
+    TXmlConfigStorage(FStorage).FileName:=SaveDialog.FileName;
+    GlobalConfig.AddStorage(FStorage);
+    RefreshStoragesList;
   end;
+end;
+
+procedure TConnListFrm.ActOpenStorageExecute(Sender: TObject);
+var
+  i: integer;
+begin
+  if OpenDialog.Execute then begin
+    for i:=1 to GlobalConfig.StoragesCount-1 do begin
+      if (GlobalConfig.Storages[i] is TXmlConfigStorage) and
+         (TXmlConfigStorage(GlobalConfig.Storages[i]).FileName=OpenDialog.FileName) then begin
+        FStorage:=GlobalConfig.Storages[i];
+        StoragesList.ItemIndex:=i;
+        RefreshAccountsView;
+        exit;
+      end;
+    end;
+    FStorage:=TXmlConfigStorage.Create(OpenDialog.FileName);
+    GlobalConfig.AddStorage(FStorage);
+    RefreshStoragesList;
+  end;
+end;
+
+procedure TConnListFrm.ActDeleteStrorageExecute(Sender: TObject);
+var
+  i: integer;
+begin
+  if (FStorage=nil) or (FStorage is TRegistryConfigStorage) then exit;
+  for i:=0 to GlobalConfig.StoragesCount-1 do
+    if GlobalConfig.Storages[i]=FStorage then begin
+      GlobalConfig.DeleteStorage(i);
+      RefreshStoragesList;
+      exit;
+    end;
+end;
+
+procedure TConnListFrm.ViewStyleMenuPopup(Sender: TObject);
+begin
+  case AccountsView.ViewStyle of
+    vsIcon:   if AccountsView.LargeImages=SmallImgs then ViewStyleMenu.Items[0].Checked:=true
+              else ViewStyleMenu.Items[1].Checked:=true;
+    vsList:   ViewStyleMenu.Items[2].Checked:=true;
+    vsReport: ViewStyleMenu.Items[3].Checked:=true;
+  end;
+end;
+
+procedure TConnListFrm.SetViewStyle(Style: integer);
+begin
+  case Style of
+    0:  begin AccountsView.ViewStyle:=vsIcon; AccountsView.LargeImages:=SmallImgs; end;
+    1:  begin AccountsView.ViewStyle:=vsIcon; AccountsView.LargeImages:=LargeImgs; end;
+    2:  AccountsView.ViewStyle:=vsList;
+    3:  AccountsView.ViewStyle:=vsReport;
+  end;
+  GlobalConfig.WriteInteger(CONF_ACCLV_STYLE, Style);
+end;
+
+procedure TConnListFrm.ViewStyleChange(Sender: TObject);
+begin
+  SetViewStyle(TMenuItem(Sender).Tag);
+end;
+
+procedure TConnListFrm.ToolButton3Click(Sender: TObject);
+var
+  p: TPoint;
+begin
+  p:=ToolButton3.ClientToScreen(point(0,ToolButton3.Height));
+  ViewStyleMenu.Popup(p.X, p.Y);
+end;
+
+procedure TConnListFrm.StoragesListDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+var
+  X, Y: integer;
+begin
+  with StoragesList do begin
+    Canvas.Brush.Color:=Color;
+    Canvas.FillRect(Rect);
+    InflateRect(Rect, -2, -4);
+    if odSelected in State then begin
+      Canvas.Brush.Color:=clBtnFace;
+      Canvas.Font.Color:=clBtnText;
+      DrawEdge(Canvas.Handle, Rect, BDR_SUNKENOUTER, BF_MIDDLE + BF_RECT);
+    end
+    else begin
+      Canvas.Brush.Color:=Color;
+      Canvas.Font.Color:=Font.Color;
+    end;
+
+    InflateRect(Rect, -2, -4);
+    Y:=Rect.Top;
+    X:=(Rect.Right-StoragesImgs.Width) div 2;
+    StoragesImgs.Draw(Canvas, X, Y, min(Index, 1));
+    DrawText(Canvas.Handle, pchar(Items[Index]), -1, Rect, DT_SINGLELINE or DT_CENTER or DT_BOTTOM );
+  end;
+
+end;
+
+procedure TConnListFrm.Splitter1Moved(Sender: TObject);
+begin
+  StoragesList.Invalidate;
 end;
 
 end.

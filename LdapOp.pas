@@ -35,7 +35,6 @@ type
   private
     fSrcSession: TLDAPSession;
     fDstSession: TLDAPSession;
-    Running: Boolean;
     function GetDstSession: TLDAPSession;
     procedure DeleteLeaf(const Entry: TLdapEntry);
     procedure DeleteChildren(const dn: string; Children: Boolean);
@@ -129,15 +128,12 @@ begin
 
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
-      if not Running then
-        Abort;
+      if ModalResult <> mrNone then
+        Break;
       Exporting.Caption := dn;
       Application.ProcessMessages;
       if ModalResult <> mrNone then
-      begin
-        Running := false;
-        Abort;
-      end;
+        Break;
       Copy(dn, srdn +',' + pdn, '', Move);
       if Move then
         Delete;
@@ -183,22 +179,22 @@ begin
     SourceSession.Search(sANYCLASS, dn, LDAP_SCOPE_ONELEVEL, ['objectclass'], false, EntryList);
     if not Children and (EntryList.Count > 0) then
     begin
-      if MessageBox(Handle, PChar(stDeleteAll), PChar(cConfirm), MB_YESNO + MB_ICONQUESTION) <> IDYES then
-        Abort;
+      if MessageBox(Handle, PChar(Format(stDeleteAll, [dn])), PChar(cConfirm), MB_YESNO + MB_ICONQUESTION) <> IDYES then
+      begin
+        ModalResult := mrCancel;
+        Exit;
+      end;
       Show;
     end;
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
       DeleteChildren(dn, true);
-      if not Running then
-        Abort;
+      if ModalResult <> mrNone then
+        Break;
       Exporting.Caption := dn;
       Application.ProcessMessages;
       if ModalResult <> mrNone then
-      begin
-        Running := false;
-        Abort;
-      end;
+        Break;
       Delete;
     end;
   finally
@@ -215,7 +211,7 @@ end;
 procedure TLdapOpDlg.CopyTree(const dn, pdn, rdn: string);
 begin
   Message.Caption := cCopying;
-  Running := true;
+  ModalResult := mrNone;
   Copy(dn, pdn, rdn, false);
 end;
 
@@ -224,9 +220,9 @@ begin
   if System.Copy(pdn, Pos(dn, pdn), Length(pdn)) = dn then
     raise Exception.Create(stMoveOverlap);
   Message.Caption := cMoving;
-  Running := true;
+  ModalResult := mrNone;
   Copy(dn, pdn, rdn, true);
-  if Running then // if not interrupted by user
+  if ModalResult = mrNone then // if not interrupted by user
     SourceSession.DeleteEntry(dn);
 end;
 
@@ -235,9 +231,9 @@ var
   Entry: TLdapEntry;
 begin
   Message.Caption := cDeleting;
-  Running := true;
+  ModalResult := mrNone;
   DeleteChildren(adn, false);
-  if Running then
+  if ModalResult = mrNone then
   begin
     Entry := TLdapEntry.Create(SourceSession, adn);
     try

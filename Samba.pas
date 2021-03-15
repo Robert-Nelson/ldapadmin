@@ -163,6 +163,7 @@ type
     property Disabled: Boolean Index Ord('D') read GetFlag write SetFlag;
     property RequestHomeDir: Boolean Index Ord('H') read GetFlag write SetFlag;
     property NoPasswordExpiration: Boolean Index Ord('X') read GetFlag write SetFlag;
+    property Autolocked: Boolean Index Ord('L') read GetFlag write SetFlag;
   end;
 
   TSamba3Computer = class(TSamba3Account)
@@ -255,7 +256,13 @@ begin
       with pDom^ do
       begin
         DomainName := AttributesByName[attrs[0]].AsString;
-        AlgorithmicRidBase := StrToInt(AttributesByName[attrs[1]].AsString);
+        try
+          AlgorithmicRidBase := StrToInt(AttributesByName[attrs[1]].AsString);
+        except
+          on E:EConvertError do
+            AlgorithmicRidBase := 1000;
+          else raise;
+        end;
         SID := AttributesByName[attrs[2]].AsString;
       end;
     end;

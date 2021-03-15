@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, RegAccnt, Postfix,
+  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Config, Postfix,
   Constant;
 
 type
@@ -68,7 +68,6 @@ type
     EditMode: TEditMode;
     ParentDn: string;
     Session: TLDAPSession;
-    RegAccount: TAccountEntry;
     Group: TMailGroup;
     ColumnToSort: Integer;
     Descending: Boolean;
@@ -76,8 +75,10 @@ type
     function FindDataString(dstr: PChar): Boolean;
     procedure Save;
     procedure MailButtons(Enable: Boolean);
+    procedure PickupGetImgIndex(const Entry: TLdapEntry;
+      var ImageIndex: integer);
   public
-    constructor Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
 
 var
@@ -85,7 +86,7 @@ var
 
 implementation
 
-uses Pickup, WinLDAP, Input;
+uses Pickup, WinLDAP, Input, Main;
 
 {$R *.DFM}
 
@@ -113,12 +114,11 @@ begin
   OkBtn.Enabled := (edName.Text <> '') and (mail.Items.Count > 0);
 end;
 
-constructor TMailGroupDlg.Create(AOwner: TComponent; dn: string; RegAccount: TAccountEntry; Session: TLDAPSession; Mode: TEditMode);
+constructor TMailGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode);
 begin
   inherited Create(AOwner);
   ParentDn := dn;
   Self.Session := Session;
-  Self.RegAccount := RegAccount;
   EditMode := Mode;
   Entry := TLdapEntry.Create(Session, dn);
   Group := TMailGroup.Create(Entry);
@@ -162,39 +162,44 @@ begin
     end;
 end;
 
+procedure TMailGroupDlg.PickupGetImgIndex(const Entry: TLdapEntry; var ImageIndex: integer);
+begin
+  if Entry.AttributesByName['objectclass'].IndexOf('mailGroup')>-1 then ImageIndex:=bmMailGroup
+  else ImageIndex:=bmPosixUser;
+end;
+
 procedure TMailGroupDlg.AddUserBtnClick(Sender: TObject);
 var
-  UserItem, SelItem: TListItem;
+  UserItem: TListItem;
+  i: integer;
 begin
-  with TPickupDlg.Create(Self), ListView do
-  try
-    MultiSelect := true;
-    PopulateMailAccounts(Session);
-    PopulateMailGroups(Session);
-    if ShowModal = mrOk then
-    begin
-      SelItem := Selected;
-      while Assigned(SelItem) do
-      begin
-        if not FindDataString(PChar(SelItem.Data)) then
-        begin
-          UserItem := UserList.Items.Add;
-          UserItem.Caption := SelItem.Caption;
-          UserItem.Data := StrNew(SelItem.Data);
-          UserItem.SubItems.Add(CanonicalName(GetDirFromDn(PChar(SelItem.Data))));
-          Group.AddMember({Session.GetNameFromDN(}PChar(SelItem.Data){)});
-        end;
-        SelItem := GetNextItem(SelItem, sdAll, [isSelected]);
-      end;
-      OkBtn.Enabled := true;
-    end;
-  finally
-    Destroy;
-    if UserList.Items.Count > 0 then
-      RemoveUserBtn.Enabled := true;
-  end;
+  with TPickupDlg.Create(self) do begin
+    Caption:=cPickAccounts;
+    Columns[1].Caption:='Description';
+    Populate(Session, sMAILACCNT,  ['uid', '', 'objectClass']);
+    Populate(Session, sMAILGROUPS, ['cn',  'Description', 'objectClass']);
 
+    Images:=MainFrm.ImageList;
+    OnGetImageIndex:=PickupGetImgIndex;
+    ShowModal;
+
+    for i:=0 to SelCount-1 do  begin
+      if FindDataString(PChar(Selected[i].dn)) then continue;
+
+      UserItem := UserList.Items.Add;
+      if selected[i].AttributesByName['objectclass'].IndexOf('mailGroup')>-1 then
+        UserItem.Caption := selected[i].AttributesByName['cn'].AsString
+      else
+        UserItem.Caption := selected[i].AttributesByName['uid'].AsString;
+
+      UserItem.Data := StrNew(pchar(Selected[i].DN));
+      UserItem.SubItems.Add(CanonicalName(GetDirFromDn(Selected[i].DN)));
+      Group.AddMember(PChar(Selected[i].DN));
+    end;
+    Free;
   end;
+end;
+
 procedure TMailGroupDlg.RemoveUserBtnClick(Sender: TObject);
 var
   idx: Integer;

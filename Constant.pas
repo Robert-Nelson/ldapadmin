@@ -48,6 +48,7 @@ const
 
   REG_KEY = 'Software\LdapAdmin\';
   REG_ACCOUNT = 'Accounts';
+  REG_CONFIG = 'Config';
 
 // System
 
@@ -61,12 +62,56 @@ const
   START_UID         = 1000;
   START_GID         = 1000;
   NO_GROUP          = 65534;
-  COMPUTER_GROUP    = NO_GROUP; // nogroup
+  COMPUTER_GROUP    = NO_GROUP;
+
+  COMBO_HISTORY     = 10;
 
 type
   TEditMode = (EM_ADD, EM_MODIFY);
 
 const
+
+// Registry names
+
+  rAccountFiles       = 'ConfigFiles';
+  rDontCheckProto     = 'DontCheckProto';
+  rMwShowValues       = 'MwShowValues';
+  rMwShowEntries      = 'MwShowEntries';
+  rMwViewSplit        = 'MwVSplit';
+  rMwTreeSplit        = 'MwHSplit';
+  rEvViewStyle        = 'EvViewStyle';
+  rMwLTWidth          = 'MwLTWidth';
+  rMwLTIdentObject    = 'MwLTIdObject';
+  rMwLTEnfContainer   = 'MwLTEnfContainer';
+  rTemplateDir        = 'TemplateDir';
+  rTemplateExtensions = 'TemplateExtensions';
+  rTemplateAutoload   = 'TemplateAutoload';
+  rTemplateProperties = 'TemplateProperites';
+  rStartupSession     = 'StartupSession';
+  rQuickSearchFilter  = 'QuickSearchFilter';
+
+  rEditorSchemaHelp   = 'General\EdSchemaHelp';
+  rPosixFirstUID      = 'Posix\FirstUID';
+  rPosixLastUID       = 'Posix\LastUID';
+  rPosixFirstGID      = 'Posix\FirstGID';
+  rPosixLastGID       = 'Posix\LastGID';
+  rPosixUserName      = 'Posix\UserName';
+  rInetDisplayName    = 'Inet\DisplayName';
+  rPosixHomeDir       = 'Posix\HomeDir';
+  rPosixLoginShell    = 'Posix\LoginShell';
+  rPosixGroup         = 'Posix\Group';
+  rSambaNetbiosName   = 'Samba\NetbiosName';
+  rSambaDomainName    = 'Samba\DomainName';
+  rSambaHomeShare     = 'Samba\HomeShare';
+  rSambaHomeDrive     = 'Samba\HomeDrive';
+  rSambaScript        = 'Samba\Script';
+  rSambaProfilePath   = 'Samba\ProfilePath';
+  rPostfixMailAddress = 'Postfix\MailAddress';
+  rPostfixMaildrop    = 'Postfix\Maildrop';
+  rSearchBase         = 'Search\Base';
+  rSearchAttributes   = 'Search\Attributes';
+  rSearchScope        = 'Search\Scope';
+  rSearchDerefAliases = 'Search\DereferenceAliases';
 
 // Search filters
 
@@ -75,11 +120,13 @@ const
   sPOSIXACCNT       = '(objectclass=posixAccount)';
   sMAILACCNT        = '(objectclass=mailUser)';
   sGROUPS           = '(objectclass=posixGroup)';
+  sCOMPUTERS        = '(&'+sPOSIXACCNT+'(uid=*$))';
   sMAILGROUPS       = '(objectclass=mailGroup)';
   sMY_GROUP         = '(&(objectclass=posixGroup)(memberUid=%s))';
   sMY_MAILGROUP     = '(&(objectclass=mailGroup)(member=%s))';
   sGROUPBYGID       = '(&(objectclass=posixGroup)(gidNumber=%d))';
   sACCNTBYUID       = '(&(objectclass=posixAccount)(uid=%s))';
+  sDEFQUICKSRCH     = '(|(cn=*%s*)(uid=*%s*)(displayName=*%s*))';
 
 // Captions
 
@@ -95,7 +142,7 @@ const
   cEditAddress      = 'Edit Address';
   cSmtpAddress      = 'SMTP Address:';
   cConfirm          = 'Confirmation';
-  cEditEntry        = 'Edit entry:';
+  cEditEntry        = 'Edit entry: %s';
   cNewEntry         = 'New entry';
   cSurname          = 'Second name';
   cName             = 'Name';
@@ -107,35 +154,49 @@ const
   cRename           = 'Rename';
   cNewName          = 'New name:';
   cDeleting         = 'Deleting:';
-  cCopyTo           = 'Copy ''%s'' to...';
-  cMoveTo           = 'Move ''%s'' to...';
+  cCopyTo           = 'Copy %s to...';
+  cMoveTo           = 'Move %s to...';
   cMoving           = 'Moving...';
   cCopying          = 'Copying...';
   cAddHost          = 'Add Host';
   cEditHost         = 'Edit Host';
   cHostName         = 'Host Name:';
   cSambaDomain      = 'Samba Domain';
+  cEnterPasswd      = 'Enter password';
+  cSearchResults    = 'Search results:';
+  cAttribute        = 'Attribute';
+  cValue            = 'Value';
+  cObjectclass      = 'Objectclass';
+  cNewValue         = '<<new>>';
 
+  cRegistryCfgName  = 'Private'; 
+  
 // Messages
-
+  stOverwrite       = 'Do you want to overwrite?';
+  stLdapError       = 'LDAP error: %s!';
+  stLdapErrorEx     = stLdapError + #10#13 + '%s.';
   stReqAttr         = 'Attribute %s may not be empty!';
   stReqNoEmpty      = '%s must have a value!';
   stReqMail         = 'At least one E-Mail address must be defined!';
   stPassDiff        = 'Passwords do not match!';
+  stPassFor         = 'Password for : %s';
   stAccntNameReq    = 'You have to enter a name for this connection!';
   stGroupNameReq    = 'You have to enter a name for this group!';
   stGroupMailReq    = 'You have to enter at least one mail address for this group!';
+  stGidNotSamba     = 'Selected primary group is not a Samba group or it does not map to user domain. Do you still want to continue?';
   stConfirmDel      = 'Delete entry "%s"?';
-  stCntObjects      = '%d object(s) found.';
+  stConfirmDelAccnt = 'Delete account "%s"?';
+  stConfirmMultiDel = 'Delete %d entries?';
   stRegAccntErr     = 'Could not read account data!';
   stNoMoreNums      = 'No more available numbers for %s!';
   stUnclosedStr     = 'Unclosed string!';
   stObjnRetrvd      = 'Object not yet retrieved!';
   stSmbDomainReq    = 'You have to select samba domain to which this group should be mapped!';
-  stDeleteAll       = 'This directory entry is not empty (it contains further leaves). Delete all recursively?';
+  stDeleteAll       = '"%s"'#10#13'This directory entry is not empty (it contains further leaves). Delete all recursively?';
   stMoveOverlap     = 'Cannot move: Source and destination paths overlap!';
   stAskTreeCopy     = 'Copy %s to %s?';
   stAskTreeMove     = 'Move %s to %s?';
+  stNumObjects      = '%d objects';
   stFileReadOnly    = 'File opened in read only mode!';
   stLdifEVer        = 'Invalid version value: %s!';
   stLdifEFold       = 'Line %d: Empty line may not be folded!';
@@ -155,6 +216,21 @@ const
   stCertInvalidTime = 'The security certificate has expired or is not yet valid!';
   stCertInvalidName = 'The name of the security certificate is invalid or does not match the server name!';
   stCertConfirmConn = 'The server you are trying to connect to is using a certificate which could not be verified!'#10#13#10#13'%s'#10#13'Do you want to proceed?';
+  stExtConfirmAssoc = 'LDAPAdmin is currently not your default LDAP browser.'+#10+'Would you like to make it your default LDAP browser?';
+  stResetAutolock   = 'This account has been locked down by SAMBA server! Do you want to reset the autolock flag and enable it now?';
+  stDoNotCheckAgain = 'Do not perform this check in the future.';
+  stDoNotShowAgain  = 'Do not show this message in the future.';
+  stNoRdn           = 'You have to enter the unique name (rdn) for this entry!';
+  stRetrieving      = 'Reading: %d objects retrieved. Press ESC to abort...';
+  stInserting       = 'Inserting, %d of %d. Press ESC to abort...';
+  stDisplaying      = 'Displaying first %d results.';
+  stSorting         = 'Sorting...';
+  stCntObjects      = '%d object(s) retrieved.';
+
+  stDuplicateEntry  = 'EntryList does not allow duplicates';
+  stCantStorPass    = 'This storage does not allow to keep the password';
+  stAccntExist      = 'Account with this name already exists.' + #10#13 + stOverwrite;
+
 implementation
 
 end.
