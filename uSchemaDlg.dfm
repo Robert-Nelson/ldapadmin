@@ -13,6 +13,7 @@ object SchemaDlg: TSchemaDlg
   OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
+  OnDeactivate = FormDeactivate
   PixelsPerInch = 96
   TextHeight = 13
   object Bevel1: TBevel
@@ -217,6 +218,9 @@ object SchemaDlg: TSchemaDlg
     Width = 749
     Height = 19
     Panels = <
+      item
+        Width = 50
+      end
       item
         Width = 130
       end

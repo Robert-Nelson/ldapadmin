@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, Menus, ImgList, ToolWin, WinLdap, StdCtrls, ExtCtrls, Posix, Samba,
-  LDAPClasses, Clipbrd, ActnList, uSchemaDlg, Config;
+  LDAPClasses, Clipbrd, ActnList, uSchemaDlg, Config, Tabs, contnrs, uBetaImgLists;
 
 const
   ScrollAccMargin  = 40;
@@ -149,8 +149,7 @@ type
     mbViewStyle: TMenuItem;
     mbSmallView: TMenuItem;
     ActOptions: TAction;
-    N14: TMenuItem;
-    Options1: TMenuItem;
+    mbOptions: TMenuItem;
     TreeViewPanel: TPanel;
     LDAPTree: TTreeView;
     SearchPanel: TPanel;
@@ -184,6 +183,14 @@ type
     ActFindInSchema: TAction;
     N23: TMenuItem;
     pbFindInSchema: TMenuItem;
+    TabSet1: TTabSet;
+    N24: TMenuItem;
+    mbGetTemplates: TMenuItem;
+    UndoBtn: TToolButton;
+    RedoBtn: TToolButton;
+    ActModifySet: TAction;
+    ModifyBtn: TToolButton;
+    Modifyset1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LDAPTreeExpanding(Sender: TObject; Node: TTreeNode;
@@ -243,8 +250,15 @@ type
     procedure ActCopyNameExecute(Sender: TObject);
     procedure ActRenameEntryExecute(Sender: TObject);
     procedure ActFindInSchemaExecute(Sender: TObject);
+    procedure TabSet1Change(Sender: TObject; NewTab: Integer;
+      var AllowChange: Boolean);
+    procedure mbGetTemplatesClick(Sender: TObject);
+    procedure UndoBtnClick(Sender: TObject);
+    procedure RedoBtnClick(Sender: TObject);
+    procedure ActModifySetExecute(Sender: TObject);
   private
     Root: TTreeNode;
+    fLdapSessions: TObjectList;
     ldapSession: TLDAPSession;
     fViewSplitterPos: Integer;
     fLdapTreeWidth: Integer;
@@ -258,6 +272,8 @@ type
     fLocatedEntry: Integer;
     fQuickSearchFilter: string;
     fTemplateProperties: Boolean;
+    fTreeHistory: TTreeHistory;
+    fDisableImages :TBetaDisabledImageList;
     procedure EntrySortProc(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer);
     procedure SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
     procedure DoTemplateMenu;
@@ -285,6 +301,16 @@ type
     procedure ReadConfig;
   end;
 
+type
+  TSessionNode = class
+    Account: TAccount;
+    Session: TLdapSession;
+    Selected: string;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+
 var
   MainFrm: TMainFrm;
 
@@ -292,18 +318,11 @@ implementation
 
 uses EditEntry, Group, User, Computer, PassDlg, ConnList, Transport, Search, Ou,
      Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs,
-     LdapCopy, Schema, BinView, Misc, Input, ConfigDlg,
-     Templates, TemplateCtrl, About;
+     LdapCopy, Schema, BinView, Misc, Input, ConfigDlg, Templates, TemplateCtrl,
+     Shellapi, About;
 
 {$R *.DFM}
-
-{$DEFINE XPSTYLE}
-
-{$IFDEF VER100} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 3
-{$IFDEF VER120} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 4
-{$IFDEF VER130} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 5
-{$IFDEF VER140} {$UNDEF XPSTYLE} {$ENDIF} //Delphi 6
-
+{$I LdapAdmin.inc}
 {$IFDEF XPSTYLE} {$R Manifest.res} {$ENDIF}
 
 function CustomSortProc(Node1, Node2: TTreeNode; Data: Integer): Integer; stdcall;
@@ -319,6 +338,17 @@ begin
     Result := 1
   else
     Result := CompareText(Node1.Text, Node2.Text);
+end;
+
+constructor TSessionNode.Create;
+begin
+  Session := TLdapSession.Create;
+end;
+
+destructor TSessionNode.Destroy;
+begin
+  Session.Free;
+  inherited;
 end;
 
 procedure TMainFrm.EntrySortProc(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer);
@@ -485,10 +515,14 @@ begin
 end;
 
 procedure TMainFrm.ServerConnect(Account: TAccount);
+var
+  NewSessionNode: TSessionNode;
 begin
   Application.ProcessMessages;
   Screen.Cursor := crHourGlass;
-  with ldapSession do
+  NewSessionNode := TSessionNode.Create;
+  NewSessionNode.Account := AccountConfig;
+  with NewSessionNode.Session do
   try
     Server             := Account.Server;
     Base               := Account.Base;
@@ -507,9 +541,18 @@ begin
     OperationalAttrs   := Account.OperationalAttrs;
     AuthMethod         := Account.AuthMethod;
     Connect;
-  finally
+    ldapSession := NewSessionNode.Session;
+    fLdapSessions.Add(NewSessionNode);
+    TabSet1.Tabs.Add(Account.Name);
+    TabSet1.TabIndex := TabSet1.Tabs.Count - 1;
+  except
+    NewSessionNode.Free;
     Screen.Cursor := crDefault;
+    raise;
   end;
+
+  if fLdapSessions.Count > 1 then Exit;
+
   LDAPTree.PopupMenu := EditPopup;
   EntryListView.PopupMenu := EditPopup;
   ListPopup.AutoPopup := true;
@@ -540,36 +583,42 @@ begin
       2: ActListView.Checked := true;
     end;
   except end;
-  RefreshTree;
-  InitStatusBar;
+  {RefreshTree;
+  InitStatusBar;}
 end;
 
 procedure TMainFrm.ServerDisconnect;
+var
+  idx: Integer;
 begin
-  ldapSession.Disconnect;
-  ClearLdapSchema;
-  LDAPTree.PopupMenu := nil;
-  ListPopup.AutoPopup := false;
-  MainFrm.Caption := cAppName;
-  LDAPTree.Items.BeginUpdate;
-  LDAPTree.Items.Clear;
-  LDAPTree.Items.EndUpdate;
-  ValueListView.Items.Clear;
-  EntryListView.Items.Clear;
-  GlobalConfig.WriteInteger(rMwLTWidth, LdapTree.Width);
-  GlobalConfig.WriteInteger(rMwShowEntries, Ord(ActEntries.Checked));
-  GlobalConfig.WriteInteger(rMwShowValues, Ord(ActValues.Checked));
-  GlobalConfig.WriteInteger(rMwViewSplit, ViewSplitter.Top);
-  GlobalConfig.WriteInteger(rEvViewStyle, Ord(EntryListView.ViewStyle));
-  ValueListView.Align := alClient;
-  ValueListView.Visible := true;
-  EntryListView.Visible := false;
-  ViewSplitter.Visible := false;
-  ActValues.Checked := true;
-  ActEntries.Checked := false;
-  SetAccount(nil);
-  if Visible then
-    LDAPTree.SetFocus;
+  idx := TabSet1.TabIndex;
+  if idx >= 0 then
+  begin
+    ldapSession.Disconnect;
+    fLdapSessions.Delete(idx);
+    ldapSession := nil;
+    TabSet1.Tabs.Delete(idx);
+    idx := TabSet1.TabIndex;
+    { force onchange event }
+    TabSet1.TabIndex := -1;
+    TabSet1.TabIndex := idx;
+  end;
+  if fLdapSessions.Count = 0 then
+  begin
+    ClearLdapSchema;
+    LDAPTree.PopupMenu := nil;
+    ListPopup.AutoPopup := false;
+    MainFrm.Caption := cAppName;
+    LDAPTree.Items.BeginUpdate;
+    LDAPTree.Items.Clear;
+    LDAPTree.Items.EndUpdate;
+    ValueListView.Items.Clear;
+    EntryListView.Items.Clear;
+    fTreeHistory.Clear;
+    SetAccount(nil);
+    if Visible then
+      LDAPTree.SetFocus;
+  end;
 end;
 
 procedure TMainFrm.InitStatusBar;
@@ -577,11 +626,11 @@ var
  s: string;
 begin
   if (ldapSession <> nil) and (ldapSession.Connected) then begin
-    s := ' Server: ' + ldapSession.Server;
+    s := Format(cServer, [ldapSession.Server]);
     StatusBar.Panels[1].Style := psOwnerDraw;
     StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(s) + 16;
     StatusBar.Panels[0].Text := s;
-    s := ' User: ' + ldapSession.User;
+    s := Format(cUser, [ldapSession.User]);
     StatusBar.Panels[2].Width := StatusBar.Canvas.TextWidth(s) + 16;
     StatusBar.Panels[2].Text := s;
   end
@@ -617,11 +666,11 @@ procedure TMainFrm.RefreshStatusBar;
 var
   s3, s4: string;
 begin
+  if StatusBar.Tag <> 0 then Exit;
   s4 := '';
   if LDAPTree.Selected <> nil then with LDAPTree.Selected do
   begin
     s3 := ' ' + PChar(Data);
-    //StatusBar.Panels[3].Width := StatusBar.Canvas.TextWidth(s3) + 16;
     if (Count=0) or (Integer(Item[0].Data) <> ncDummyNode) then
     begin
       s4 := Format(stCntSubentries, [Count]);
@@ -833,9 +882,13 @@ end;
 
 procedure TMainFrm.FormCreate(Sender: TObject);
 begin
-  ldapSession := TLDAPSession.Create;
+  fDisableImages := TBetaDisabledImageList.Create(self);
+  fDisableImages.MasterImages := ImageList;
+  ToolBar.DisabledImages := fDisableImages;
+  fLdapSessions := TObjectList.Create;
   fSearchList := TLdapEntryList.Create;
   fLocateList := TLdapEntryList.Create;
+  fTreeHistory := TTreeHistory.Create;
   ValueListView.Align := alClient;
   ViewSplitter.Visible := false;
   ReadConfig;
@@ -843,9 +896,16 @@ end;
 
 procedure TMainFrm.FormDestroy(Sender: TObject);
 begin
-  ServerDisconnect;
+  GlobalConfig.WriteInteger(rMwLTWidth, LdapTree.Width);
+  GlobalConfig.WriteInteger(rMwShowEntries, Ord(ActEntries.Checked));
+  GlobalConfig.WriteInteger(rMwShowValues, Ord(ActValues.Checked));
+  GlobalConfig.WriteInteger(rMwViewSplit, ViewSplitter.Top);
+  GlobalConfig.WriteInteger(rEvViewStyle, Ord(EntryListView.ViewStyle));
+  fDisableImages.Free;
+  fLdapSessions.Free;
   fSearchList.Free;
   fLocateList.Free;
+  fTreeHistory.Free;
 end;
 
 procedure TMainFrm.LDAPTreeExpanding(Sender: TObject; Node: TTreeNode; var AllowExpansion: Boolean);
@@ -871,6 +931,8 @@ procedure TMainFrm.LDAPTreeChange(Sender: TObject; Node: TTreeNode);
 var
   CanExpand: Boolean;
 begin
+    fTreeHistory.Current:=LdapTree.Selected;
+
     // Update Value List
     if ValueListView.Visible then
       RefreshValueListView(Node);
@@ -1099,10 +1161,7 @@ begin
   with TConnListFrm.Create(Self) do
   try
     if ShowModal = mrOk then
-    begin
       ServerConnect(AccountConfig);
-      MainFrm.Caption := cAppName + ': ' + AccountConfig.Name;
-    end;
   finally
     Screen.Cursor := crDefault;
     Destroy;
@@ -1124,13 +1183,14 @@ procedure TMainFrm.ActionListUpdate(Action: TBasicAction; var Handled: Boolean);
 var
   Enbl: boolean;
 begin
-  Enbl:=ldapSession.Connected;
-  ActConnect.Enabled:= not Enbl;
+  Enbl := Assigned(ldapSession) and ldapSession.Connected;
+  //ActConnect.Enabled:= not Enbl;
   ActDisconnect.Enabled:= Enbl;
   ActSchema.Enabled:= Enbl;
   ActImport.Enabled:= Enbl;
   ActRefresh.Enabled:=Enbl;
   ActSearch.Enabled:=Enbl;
+  ActModifySet.Enabled:=Enbl;
   ActPreferences.Enabled:=Enbl;
   ActEntries.Enabled:= Enbl;
   ActValues.Enabled:= Enbl;
@@ -1154,13 +1214,16 @@ begin
   Enbl := Enbl and IsContainer(SelectedNode);
   mbNew.Enabled:=Enbl;
   pbNew.Enabled:=Enbl;
-  Enbl := ldapSession.Connected and Assigned(ValueListView.Selected);
+  Enbl := Assigned(ldapSession) and ldapSession.Connected and Assigned(ValueListView.Selected);
   ActViewBinary.Enabled := Enbl;
   ActCopy.Enabled := Enbl;
   ActCopyValue.Enabled := Enbl;
   ActCopyName.Enabled := Enbl;
 
   mbViewStyle.Enabled := EntryListView.Visible;
+
+  UndoBtn.Enabled:=fTreeHistory.IsUndo;
+  RedoBtn.Enabled:=fTreeHistory.IsRedo;
 end;
 
 procedure TMainFrm.ActSchemaExecute(Sender: TObject);
@@ -1706,6 +1769,64 @@ begin
       s := ValueListView.Selected.SubItems[0];
     ShowSchema.Search(s, true, false);
   end;
+end;
+
+procedure TMainFrm.TabSet1Change(Sender: TObject; NewTab: Integer; var AllowChange: Boolean);
+begin
+  if TabSet1.TabIndex <> -1 then
+    TSessionNode(fLdapSessions[TabSet1.TabIndex]).Selected := PChar(LDAPTree.Selected.Data);
+  if NewTab <> -1 then with TSessionNode(fLdapSessions[NewTab]) do
+  begin
+    fTreeHistory.Clear;
+    if SearchPanel.Visible then
+      edSearchExit(nil);
+    ldapSession := Session;
+    SetAccount(Account);
+    LdapTree.Items.BeginUpdate;
+    LdapTree.OnChange := nil;
+    try
+      StatusBar.Tag := 1;
+      try
+        RefreshTree;
+        LocateEntry(Selected, true);
+      finally
+        StatusBar.Tag := 0;
+      end;
+      LDAPTreeChange(LDAPTree, LDAPTree.Selected);
+    except
+      on E: Exception do
+      begin
+        ValueListView.Items.Clear;
+        EntryListview.Items.Clear;
+        MessageDlg(E.Message, mtError, [mbOk], 0);
+      end;
+    end;
+    LdapTree.OnChange := LDAPTreeChange;
+    LdapTree.Items.EndUpdate;
+  end;
+end;
+
+procedure TMainFrm.mbGetTemplatesClick(Sender: TObject);
+begin
+  ShellExecute(Handle, 'open', 'http://ldapadmin.sourceforge.net/download/templates', nil, nil, SW_SHOWNORMAL);
+end;
+
+procedure TMainFrm.UndoBtnClick(Sender: TObject);
+begin
+  fTreeHistory.Undo;
+  fTreeHistory.Current.Selected:=true;
+end;
+
+procedure TMainFrm.RedoBtnClick(Sender: TObject);
+begin
+  fTreeHistory.Redo;
+  fTreeHistory.Current.Selected:=true;
+end;
+
+procedure TMainFrm.ActModifySetExecute(Sender: TObject);
+begin
+  if LDAPTree.Selected = nil then LDAPTree.Selected := LDAPTree.TopItem;
+  TSearchFrm.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession).ShowModify;
 end;
 
 end.

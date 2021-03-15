@@ -58,7 +58,9 @@ uses
   Core in 'Core.pas',
   Cert in 'Cert.pas',
   Dsml in 'Dsml.pas',
-  Gss in 'Gss.pas';
+  Gss in 'Gss.pas',
+  uBetaImgLists in 'uBetaImgLists.pas',
+  Params in 'Params.pas';
 
 {$R *.RES}
 

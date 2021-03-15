@@ -71,7 +71,7 @@ var
 
 implementation
 
-uses Pickup, Main, Constant;
+uses Pickup, Main, Misc, Constant;
 
 {$R *.DFM}
 
@@ -132,7 +132,7 @@ begin
     if rbNever.Checked then
       KickoffTime := SAMBA_MAX_KICKOFF_TIME
     else
-      KickoffTime := Trunc(DatePicker.Date) + Frac(TimePicker.DateTime);
+      KickoffTime := LocalDateTimeToUTC(Trunc(DatePicker.Date) + Frac(TimePicker.DateTime));
 
     NoPasswordExpiration := cbNoExpire.Checked;
     DomainTrust := cbDomTrust.Checked;

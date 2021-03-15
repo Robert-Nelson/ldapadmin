@@ -60,6 +60,9 @@ type
     fElements:    TObjectList;
     fAutoSize:    Boolean;
     fCaption:     string;
+    fName:        string;
+    fDataControlName: string;
+    fDataControl: TTemplateControl;
     procedure     OnChangeProc(Sender: TObject);
     procedure     OnExitProc(Sender: TObject);
     procedure     SetParentControl(AControl: TTemplateControl);
@@ -76,6 +79,7 @@ type
     procedure     AdjustSizes;
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); virtual; abstract;
     procedure     SetValue(AValue: TTemplateAttributeValue); virtual; abstract;
+    procedure     SetDataControl(AControl: TTemplateControl); virtual;
     procedure     Read; virtual; abstract;
     procedure     Write; virtual; abstract;
     procedure     Load(XmlNode: TXmlNode);
@@ -90,6 +94,8 @@ type
     property      Elements: TObjectList read fElements;
     property      AutoSize: Boolean read fAutoSize;
     property      Caption: string read fCaption;
+    property      Name: string read fName;
+    property      DataControlName: string read fDataControlName;
   end;
 
   TTemplateSVControl = class(TTemplateControl)
@@ -117,6 +123,16 @@ type
     procedure     LoadProc(XmlNode: TXmlNode); override;
   public
     procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
+    procedure     SetValue(AValue: TTemplateAttributeValue); override;
+    procedure     Read; override;
+    procedure     Write; override;
+  end;
+
+  TTemplateDriverControl = class(TTemplateControl)
+  protected
+    function      GetParams: TStringList; override;
+    procedure     SetLdapAttribute(Attribute: TLdapAttribute); override;
+  public
     procedure     SetValue(AValue: TTemplateAttributeValue); override;
     procedure     Read; override;
     procedure     Write; override;
@@ -157,6 +173,20 @@ type
     procedure     Write; override;
   end;
 
+  TTemplateCtrlComboLookupList = class(TTemplateCtrlComboList)
+  private
+    fScope:       Integer;
+    fSearchFilter: string;
+    fDisplayAttribute: string;
+    fValueAttribute: string;
+    fBase: string;
+  protected
+    procedure     SetLdapAttribute(Attribute: TLdapAttribute); override;
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+  end;
+
   TTemplateCtrlImage=class(TTemplateSVControl)
   protected
     procedure     LoadProc(XmlNode: TXmlNode); override;
@@ -170,12 +200,12 @@ type
 
   TEditGrid = class(TStringGrid)
   private
-    procedure TabMove;
-    procedure SubClassWndProc(var Message: TMessage);
+    procedure     TabMove;
+    procedure     SubClassWndProc(var Message: TMessage);
   protected
-    procedure Resize; override;
+    procedure     Resize; override;
   public
-    constructor Create(AOwner: TComponent); override;
+    constructor   Create(AOwner: TComponent); override;
   end;
 
   TTemplateCtrlGrid = class(TTemplateMVControl)
@@ -249,7 +279,7 @@ type
     procedure     Read; override;
     procedure     Write; override;
   end;
-  
+
   TTemplateCtrlTabbedPanel = class(TTemplateSVControl)
   protected
     procedure     LoadProc(XmlNode: TXmlNode); override;
@@ -269,17 +299,17 @@ type
 
   TDateTimePickerFixed = class(TDateTimePicker)
   private
-    fChanging: Boolean;
+    fChanging:    Boolean;
     {$IFDEF VER130}
-    fFormat: string;
-    procedure SetFormat(Value: string);
+    fFormat:       string;
+    procedure      SetFormat(Value: string);
     {$ENDIF}
-    procedure CNNotify(var Message: TWMNotify); message CN_NOTIFY;
+    procedure      CNNotify(var Message: TWMNotify); message CN_NOTIFY;
   protected
-    function MsgSetDateTime(Value: TSystemTime): Boolean; override;
+    function       MsgSetDateTime(Value: TSystemTime): Boolean; override;
   public
     {$IFDEF VER130}
-    property Format: string read fFormat write SetFormat;
+    property       Format: string read fFormat write SetFormat;
     {$ENDIF}
   end;
 
@@ -329,6 +359,23 @@ type
     procedure     Read; override;
     procedure     Write; override;
     property      Vertical: Boolean read fVertical write SetVertical;
+  end;
+
+  TTemplateCtrlPickupDlg = class(TTemplateDriverControl)
+  private
+    fFilter:      string;
+    fColumns:     array of string;
+    fColNames:    array of string;
+    fReturns:     string;
+    procedure     ButtonClick(Sender: TObject);
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+    procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
+    procedure     SetValue(AValue: TTemplateAttributeValue); override;
+    procedure     Read; override;
+    procedure     Write; override;
   end;
 
   { Template classes }
@@ -417,21 +464,21 @@ type
 
   TTemplateList = class(TList)
   private
-    function GetItem(Index: Integer): TTemplate;
+    function      GetItem(Index: Integer): TTemplate;
   public
-    property Templates[Index: Integer]: TTemplate read GetItem; default;
+    property      Templates[Index: Integer]: TTemplate read GetItem; default;
   end;
 
   TExtensionList = class
   private
     fExtensionList: TStringList;
-    function    GetTemplates(Index: string): TTemplateList;
+    function      GetTemplates(Index: string): TTemplateList;
   public
-    constructor Create;
-    destructor  Destroy; override;
-    procedure   Clear;
-    procedure   Add(AValue: string; ATemplate: TTemplate);
-    property    Extensions[Index: string]: TTemplateList read GetTemplates; default;
+    constructor   Create;
+    destructor    Destroy; override;
+    procedure     Clear;
+    procedure     Add(AValue: string; ATemplate: TTemplate);
+    property      Extensions[Index: string]: TTemplateList read GetTemplates; default;
   end;
 
   TTemplateParser = class
@@ -452,21 +499,22 @@ type
     property      Paths: string write SetCommaPaths;
   end;
 
-function GetParameter(var P: PChar): string;
-function IsParametrized(s: string): Boolean;
-function FormatValue(const AValue: string; Entry: TLdapEntry): string;
-
 var
   TemplateParser: TTemplateParser;
 
 implementation
+  {$I LdapAdmin.inc}
 
-uses commctrl, base64, SysUtils, Misc, Config, PassDlg, Constant;
+uses
+  {$IFDEF VARIANTS} variants, {$ENDIF}
+  commctrl, base64, SysUtils, Misc, Params, Config, PassDlg, Constant, WinLdap,
+  Pickup;
 
 const
-  CONTROLS_CLASSES: array[0..12] of TTControl = ( TTemplateCtrlEdit,
+  CONTROLS_CLASSES: array[0..14] of TTControl = ( TTemplateCtrlEdit,
                                                   TTemplateCtrlCombo,
                                                   TTemplateCtrlComboList,
+                                                  TTemplateCtrlComboLookupList,
                                                   TTemplateCtrlImage,
                                                   TTemplateCtrlGrid,
                                                   TTemplateCtrlPasswordButton,
@@ -476,7 +524,8 @@ const
                                                   TTemplateCtrlTabbedPanel,
                                                   TTemplateCtrlDate,
                                                   TTemplateCtrlTime,
-                                                  TTemplateCtrlDateTime);
+                                                  TTemplateCtrlDateTime,
+                                                  TTemplateCtrlPickupDlg);
   //DEFAULT_CONTROL_CLASS: TTControl = TTemplateCtrlEdit;
 
 function GetXmlTypeByClass(AClass: TTControl): string;
@@ -521,103 +570,6 @@ begin
   else
   if Lowercase(XmlType) = 'boolean' then
     Result := GetClassByXmlType('checkbox');
-end;
-
-function ScanParam(const p: PChar): PChar;
-begin
-  Result := p;
-  while Result^ <> #0 do
-  begin
-    case Result^ of
-      '\': begin
-             inc(Result);
-             if not Assigned(Result) then Break;
-            end;
-      '%': Break;
-    end;
-    inc(Result);
-  end;
-end;
-
-function RemoveEsc(const s: string): string;
-var
-  p, p1, p2: PChar;
-begin
-  SetLength(Result, Length(s));
-  p1 := PChar(s);
-  p2 := PChar(Result);
-  p := p2;
-  while p1^ <> #0 do
-  begin
-    if p1^ = '\' then
-    begin
-      inc(p1);
-      if p1^ = #0 then
-        Break;
-    end;
-    p2^ := p1^;
-    inc(p1);
-    inc(p2);
-  end;
-  SetLength(Result, p2 - p);
-end;
-
-function GetParameter(var P: PChar): string;
-var
-  p1: PChar;
-begin
-  Result := '';
-  P := ScanParam(P);
-  if P^ <> #0 then
-  begin
-    inc(P);
-    p1 := ScanParam(P);
-    if p1 = #0 then
-      raise Exception.Create(stUnclosedParam);
-    if p1 - P > 0 then
-      SetString(Result, p, p1 - p);
-    P := p1 + 1;
-  end;
-end;
-
-function IsParametrized(s: string): Boolean;
-var
-  p: PChar;
-begin
-  p := pChar(s);
-  Result := GetParameter(p) <> '';
-end;
-
-function FormatValue(const AValue: string; Entry: TLdapEntry): string;
-var
-  p0, p1, p2: PChar;
-  name, val, s: string;
-begin
-  Result := '';
-  p0 := PChar(AValue);
-  p1 := ScanParam(p0);
-  while p1^ <> #0 do
-  begin
-    inc(p1);
-    p2 := ScanParam(p1);
-    if p2 = #0 then
-      raise Exception.Create(stUnclosedParam);
-    if p2 - p1 > 0 then
-    begin
-      SetString(name, p1, p2 - p1);
-      val := Entry.AttributesByName[name].AsString;
-      if val = '' then
-      begin
-        Result := '';
-        Exit;
-      end;
-      SetString(s, p0, p1 - p0 - 1);
-      Result := Result + s + val;
-      p0 := p2 + 1;
-    end;
-    p1 := ScanParam(p2 + 1);
-  end;
-  Result := RemoveEsc(Result + p0);
 end;
 
 function CheckStrToInt(Value, Tag: string): Integer;
@@ -681,6 +633,8 @@ var
   i: Integer;
 begin
   fLdapAttribute := Attribute;
+  {if fLdapAttribute.ValueCount = 0 then
+    fLdapAttribute.AddValue;}
   if UseDefaults then
     for i := 0 to TemplateAttribute.ValuesCount - 1 do
     begin
@@ -799,6 +753,11 @@ begin
   end;
 end;
 
+procedure TTemplateControl.SetDataControl(AControl: TTemplateControl);
+begin
+  fDataControl := AControl;
+end;
+
 procedure TTemplateControl.Load(XmlNode: TXmlNode);
 var
   NotParented: boolean;
@@ -836,7 +795,13 @@ begin
       end
       else
       if Name = 'caption' then
-        fCaption := Content;
+        fCaption := Content
+      else
+      if Name = 'name' then
+        fName := Content
+      else
+      if Name = 'datacontrol' then
+        fDataControlName := Content;
      end;
 
     NotParented:=(fControl.Parent=nil);
@@ -1001,6 +966,32 @@ begin
       if not IsParametrized(s) then
         fLdapAttribute.Values[i].AsString := s;
     end;
+end;
+
+{ TTemplateDriverControl }
+
+function TTemplateDriverControl.GetParams: TStringList;
+begin
+  Result := nil;
+end;
+
+procedure TTemplateDriverControl.SetLdapAttribute(Attribute: TLdapAttribute);
+begin
+  fLdapAttribute := Attribute;
+end;
+
+procedure TTemplateDriverControl.Read;
+begin
+
+end;
+
+procedure TTemplateDriverControl.Write;
+begin
+end;
+
+procedure TTemplateDriverControl.SetValue(AValue: TTemplateAttributeValue);
+begin
+
 end;
 
 { TTemplateCtrlEdit }
@@ -1182,6 +1173,94 @@ begin
   end;
 end;
 
+{ TTemplateCtrlComboList }
+
+constructor TTemplateCtrlComboLookupList.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+  fScope := LDAP_SCOPE_SUBTREE;
+end;
+
+procedure TTemplateCtrlComboLookupList.LoadProc(XmlNode: TXmlNode);
+var
+  i: Integer;
+begin
+  for i:=0 to XmlNode.Count-1 do with XmlNode[i] do
+    if Name = 'filter' then
+      fSearchFilter := Content
+    else
+    if Name = 'base' then
+      fBase := Content
+    else
+    if Name = 'displayattribute' then
+      fDisplayAttribute := Content
+    else
+    if Name = 'valueattribute' then
+      fValueAttribute := Content
+    else
+    if Name = 'scope' then
+    begin
+      if Content = 'base' then
+        fScope := LDAP_SCOPE_BASE
+      else
+      if Content = 'one' then
+        fScope := LDAP_SCOPE_ONELEVEL
+      else
+      if Content = 'sub' then
+        fScope := LDAP_SCOPE_SUBTREE
+    end;
+end;
+
+procedure TTemplateCtrlComboLookupList.SetLdapAttribute(Attribute: TLdapAttribute);
+var
+  EntryList: TLdapEntryList;
+  Session: TLdapSession;
+  i: Integer;
+  val, cap: string;
+begin
+  inherited;
+
+  if not Assigned(fLdapAttribute) then Exit;
+  try
+    Session := Attribute.Entry.Session;
+  except
+    Session := nil;
+  end;
+  if not Assigned(Session) then Exit;
+
+  if fSearchFilter = '' then
+    fSearchFilter := sANYCLASS;
+  if fBase = '' then
+    fBase := Session.Base;
+  EntryList := TLdapEntryList.Create;
+  try
+    Session.Search(fSearchFilter, fBase, fScope, [fDisplayAttribute, fValueAttribute], False, EntryList);
+    for i := 0 to EntryList.Count - 1 do with EntryList[i] do
+    try
+      if fDisplayAttribute <> '' then
+        cap := Attributes[0].AsString
+      else
+        cap := dn;
+      if CompareText(fValueAttribute, fDisplayAttribute) = 0 then
+        val := cap
+      else
+        if fValueAttribute <> '' then
+        begin
+          if fDisplayAttribute <> '' then
+            val := Attributes[1].AsString
+          else
+            val := Attributes[0].AsString;
+        end
+        else
+          val := dn;
+      TComboBox(fControl).Items.AddObject(cap, Pointer(StrNew(PChar(val))));
+    except end;
+    Read;
+  finally
+    EntryList.Free;
+  end;
+end;
+
 { TTemplateCtrlImage }
 
 procedure TTemplateCtrlImage.SetValue(AValue: TTemplateAttributeValue);
@@ -1309,12 +1388,29 @@ end;
 { TTemplateCtrlGrid }
 
 procedure TTemplateCtrlGrid.SetValue(AValue: TTemplateAttributeValue);
+var
+  i: Integer;
 begin
+  if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
+    Exit;
   with (Control as TStringGrid) do
   begin
-    RowCount := RowCount + 1;
-    Cells[0, RowCount - 1] := AValue.AsString;
+    i := RowCount;
+    while i > 0 do
+    begin
+      if Cells[0, i - 1] <> '' then
+        break;
+      dec(i);
+    end;
+    if i = RowCount then
+    begin
+      RowCount := RowCount + 1;
+      Cells[0, RowCount - 1] := AValue.AsString;
+    end
+    else
+      Cells[0, i] := AValue.AsString;
   end;
+  OnChangeProc(Self);
 end;
 
 procedure TTemplateCtrlGrid.Read;
@@ -1483,7 +1579,7 @@ function TTemplateCtrlCheckBox.GetCbState(const AState: string): TCheckBoxState;
 var
   s: string;
 begin
-  s := lowercase(AState);
+  s := AState;
   if s = fTrue then
     Result := cbChecked
   else
@@ -1522,10 +1618,10 @@ begin
     TCheckBox(fControl).Caption := fCaption;
   for i:=0 to XmlNode.Count-1 do with XmlNode[i] do begin
     if Name = 'true' then
-      fTrue := lowercase(Content)
+      fTrue := Content
     else
     if Name = 'false' then
-      fFalse := lowercase(Content);
+      fFalse := Content;
   end;
 end;
 
@@ -2073,7 +2169,7 @@ end;
 constructor TTemplateCtrlDateTime.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
-  //fControl := TPanel.Create(nil);
+  
   TPanel(fControl).OnResize := MyOnResizeProc;
   TPanel(fControl).BevelInner := bvRaised;
   TPanel(fControl).BevelOuter := bvNone;
@@ -2092,6 +2188,151 @@ begin
   fDate.Control.Top := CT_FIX_TOP;
   fTime.Control.Top := CT_FIX_TOP;
   fControl.Height := fTime.Control.Top + fTime.Control.Height + CT_SPACING;
+end;
+
+{ TTemplateCtrlPickupDlg }
+
+procedure TTemplateCtrlPickupDlg.ButtonClick(Sender: TObject);
+var
+  i, j: Integer;
+  Value: TTemplateAttributeValue;
+  Attr: TLdapAttribute;
+begin
+  if Assigned(fLdapAttribute) and Assigned(fLdapAttribute.Entry) and Assigned(fLdapAttribute.Entry.Session) then
+  with TPickupDlg.Create(Sender as TControl) do
+  try
+    Caption := fCaption;
+    for i := 0 to High(fColNames) do
+      Columns[i].Caption := fColNames[i];
+    Populate(fLdapAttribute.Entry.Session, fFilter, fColumns);
+    if (ShowModal = mrOK) and Assigned(fDataControl) then
+    begin
+      Value := TTemplateAttributeValue.Create(nil);
+      try
+        Attr := nil;
+        for i:=0 to SelCount-1 do
+        begin
+          if (fReturns = '') or (fReturns = PSEUDOATTR_DN) then
+            Value.fValue := Selected[i].DN
+          else
+          if fReturns = PSEUDOATTR_RDN then
+            Value.fValue := GetRdnFromDn(Selected[i].DN)
+          else
+          if fReturns = PSEUDOATTR_PATH then
+            Value.fValue := CanonicalName(GetDirFromDn(Selected[i].DN))
+          else
+            Attr := Selected[i].AttributesByName[fReturns];
+            
+          if Assigned(Attr) then
+          begin
+            for j := 0 to Attr.ValueCount - 1 do
+            begin
+              Value.fValue := Attr.Values[j].AsString;
+              fDataControl.SetValue(Value);
+            end;
+          end
+          else
+            fDataControl.SetValue(Value);
+        end;
+      finally
+        Value.Free;
+      end;
+    end;
+  finally
+    Free;
+  end;
+end;
+
+procedure TTemplateCtrlPickupDlg.SetValue(AValue: TTemplateAttributeValue);
+begin
+
+end;
+
+procedure TTemplateCtrlPickupDlg.Read;
+begin
+
+end;
+
+procedure TTemplateCtrlPickupDlg.Write;
+begin
+
+end;
+
+procedure TTemplateCtrlPickupDlg.LoadProc(XmlNode: TXmlNode);
+var
+  i: Integer;
+  t: string;
+
+  procedure SetColumnValues(Node: TXmlNode);
+  var
+    N: TXmlNode;
+  begin
+    if not Assigned(Node) then Exit;
+    SetLength(fColumns, Length(fColumns) + 1);
+    SetLength(fColNames, Length(fColumns));
+    N := Node.NodeByName('value');
+    if Assigned(N) then
+      fColumns[High(fColumns)] := N.Content;
+    N := Node.NodeByName('caption');
+    if Assigned(N) then
+      fColNames[High(fColNames)] := N.Content;
+  end;
+
+begin
+  if fCaption <> '' then TButton(fControl).Caption := fCaption;
+  for i:=0 to XmlNode.Count-1 do with XmlNode[i] do
+  begin
+    if Name = 'returns' then
+      fReturns := Content
+    else
+    if Name = 'filter' then
+    begin
+      t := Attributes.Values['type'];
+      if t = 'custom' then
+        fFilter := Content
+      else
+      if t = 'groups' then
+        fFilter := sGroups
+      else
+      if t = 'users' then
+        fFilter := sUsers
+      else
+        raise Exception.Create('pickupdlg: ' + stInvalidFilter);
+    end
+    else
+    if Name = 'column' then
+      SetColumnValues(XmlNode[i]);
+  end;
+  if fReturns <> '' then
+  begin
+    SetLength(fColumns, Length(fColumns) + 1);
+    fColumns[High(fColumns)] := fReturns;
+  end;
+  if High(fColumns) = -1 then
+  begin
+    SetLength(fColumns, 2);
+    fColumns[0] := PSEUDOATTR_RDN;
+    fColumns[1] := PSEUDOATTR_PATH;
+    SetLength(fColNames, 2);
+    fColNames[0] := 'Entry';
+    fColNames[1] := 'Path';
+  end;
+end;
+
+procedure TTemplateCtrlPickupDlg.EventProc(Attribute: TLdapAttribute; Event: TEventType);
+begin
+
+end;
+
+constructor TTemplateCtrlPickupDlg.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+  fControl := TButton.Create(nil);
+  with TButton(fControl) do begin
+    OnExit := OnExitProc;
+    OnClick := ButtonClick;
+    Caption := 'Browse...';
+  end;
 end;
 
 { TTemplateList }

@@ -127,6 +127,7 @@ const
   sMAILACCNT        = '(objectclass=mailUser)';
   sGROUPS           = '(objectclass=posixGroup)';
   sCOMPUTERS        = '(&'+sPOSIXACCNT+'(uid=*$))';
+  sUSERS            = '(&'+sPOSIXACCNT+'(!(uid=*$)))';
   sMAILGROUPS       = '(objectclass=mailGroup)';
   {sMY_GROUP         = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
                         '(&(objectclass=groupOfNames)(member=%1:s))' +
@@ -159,7 +160,10 @@ const
   cEditAddress      = 'Edit Address';
   cSmtpAddress      = 'SMTP Address:';
   cConfirm          = 'Confirmation';
-  cEditEntry        = 'Edit entry: %s';
+  cServer           = 'Server: %s';
+  cPath             = 'Path: %s';
+  cUser             = 'User: %s';
+  cEditEntry        = 'Edit entry';
   cNewEntry         = 'New entry';
   cSurname          = 'Second name';
   cName             = 'Name';
@@ -184,18 +188,22 @@ const
   cSearchResults    = 'Search results:';
   cAttribute        = 'Attribute';
   cValue            = 'Value';
+  cOldValue         = 'Old value';
+  cNewValue         = 'New value';
   cObjectclass      = 'Objectclass';
-  cNewValue         = '<<new>>';
+  cNew              = '<<new>>';
   cSetPassword      = 'Set password...';
   cRegistryCfgName  = 'Private';
   sConnectSuccess   = 'Connection is successful.';
   cAddAttribute     = 'Add attribute...';
   cAttributeName    = 'Attribute name:';
+  cProgress         = 'Progress:';
   
 // Messages
   stOverwrite       = 'Do you want to overwrite?';
   stLdapError       = 'LDAP error: %s!';
-  stLdapErrorEx     = stLdapError + #10#13 + '%s.';
+  //stLdapErrorEx     = stLdapError + #10#13 + '%s.';
+  stLdapErrorEx     = 'LDAP error! %s: %s.';
   stReqAttr         = 'Attribute %s may not be empty!';
   stReqNoEmpty      = '%s must have a value!';
   stReqMail         = 'At least one E-Mail address must be defined!';
@@ -257,6 +265,7 @@ const
   stDuplicateEntry  = 'EntryList does not allow duplicates';
   stCantStorPass    = 'This storage does not allow to keep the password';
   stAccntExist      = 'Account with this name already exists.' + #10#13 + stOverwrite;
+  stInvalidFilter   = 'Invalid or unsupported filter type!';
 
 implementation
 

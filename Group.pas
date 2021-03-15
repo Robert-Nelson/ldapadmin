@@ -25,7 +25,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Core, Constant;
+  StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Core, TemplateCtrl,
+  Constant;
 
 type
   TGroupDlg = class(TForm)
@@ -79,11 +80,13 @@ type
     ColumnToSort: Integer;
     Descending: Boolean;
     DomList: TDomainList;
+    EventHandler: TEventHandler;
     procedure EnableControls(const Controls: array of TControl; Color: TColor; Enable: Boolean);
     procedure Load;
     function FindDataString(dstr: PChar): Boolean;
     procedure Save;
     function GetGroupType: Integer;
+    procedure TemplateCbxClick(Sender: TObject);
   public
     constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0); reintroduce;
   end;
@@ -93,7 +96,7 @@ var
 
 implementation
 
-uses Pickup, WinLDAP, Input, Main, Config;
+uses Pickup, WinLDAP, Input, Main, Templates, Misc, Config;
 
 {$R *.DFM}
 
@@ -161,6 +164,9 @@ end;
 constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0);
 var
   n: Integer;
+  TemplateList: TTemplateList;
+  TabSheet: TTabSheet;
+  Oc: TLdapAttribute;
 begin
   inherited Create(AOwner);
   ParentDn := dn;
@@ -210,6 +216,108 @@ begin
     if Assigned(GroupOfUniqueNames) then
       GroupOfUniqueNames.New;
   end;
+
+  // Show template extensions
+  TemplateList := nil;
+  if GlobalConfig.ReadBool(rTemplateExtensions, true) then
+    TemplateList := TemplateParser.Extensions['group'];
+  if Assigned(TemplateList) then
+  begin
+    if (Mode = EM_MODIFY) and GlobalConfig.ReadBool(rTemplateAutoload, true) then
+      Oc := Entry.AttributesByName['objectclass']
+    else
+      Oc := nil;
+    EventHandler := TEventHandler.Create;
+    with TemplateList do
+      for n := 0 to Count - 1 do
+      begin
+        TabSheet := TTabSheet.Create(PageControl1);
+        TabSheet.Caption := Templates[n].Name;
+        TabSheet.PageControl := PageControl1;
+        TabSheet.Tag := Integer(TTemplatePanel.Create(Self));
+        with TTemplatePanel(TabSheet.Tag) do begin
+          Template := Templates[n];
+          EventHandler := EventHandler;
+          Parent := TabSheet;
+          Left := 4;
+          Top := cbSambaGroup.Top + cbSambaGroup.Height + 4;
+          Height := TabSheet2.Height - Top;
+          Width := TabSheet.Width - 8;
+        end;
+        with TCheckBox.Create(TabSheet) do begin
+          Parent := TabSheet;
+          Left := 4;
+          Top := cbSambaGroup.Top;
+          Width := Bevel1.Width;
+          if Templates[n].Description <> '' then
+            Caption := Templates[n].Description
+          else
+            Caption := Templates[n].Name;
+          OnClick := TemplateCbxClick;
+          Checked := Assigned(Oc) and TTemplatePanel(TabSheet.Tag).Template.Matches(Oc);
+        end;
+      end;
+  end;
+end;
+
+procedure TGroupDlg.TemplateCbxClick(Sender: TObject);
+var
+  i, j: Integer;
+  s: string;
+
+  function SafeDelete(const name: string): boolean;
+  var
+    i: Integer;
+    s: string;
+  begin
+    Result := false;
+    s := lowercase(name);
+    if Assigned(GroupOfUniqueNames) then
+      for i := Low(Core.PropAttrNames) to High(Core.PropAttrNames) do
+        if s = lowercase(Core.PropAttrNames[i]) then Exit;
+    for i := Low(Posix.PropAttrNames) to High(Posix.PropAttrNames) do
+      if s = lowercase(Posix.PropAttrNames[i]) then Exit;
+    Result := true;
+  end;
+
+begin
+  with (Sender as TCheckBox), TTemplatePanel(Parent.Tag) do
+  if Checked then
+  begin
+    LdapEntry := Entry;
+    Left := 4;
+    Top := cbSambaGroup.Top + cbSambaGroup.Height + 4;
+    Height := TabSheet2.Height - Top;
+    Width := (Parent as TTabSheet).Width - 8;
+  end
+  else begin
+    { Handle removing of the template - remove only attributes and
+      objectclasses which are not used by builtin registers }
+    for i := 0 to Attributes.Count - 1 do with Attributes[i] do
+    begin
+      if (lowercase(Name) = 'objectclass') then
+      begin
+        with Entry.AttributesByName['objectclass'] do
+        for j := 0 to Template.ObjectclassCount - 1 do
+        begin
+          s := lowercase(Template.Objectclasses[j]);
+          if (s <> 'top') and
+             (s <> 'posixgroup') and
+             not (Assigned(GroupOfUniqueNames) and (s = GroupOfUniqueNames.Objectclass)) then
+          begin
+            DeleteValue(s);
+            if Assigned(SambaGroup) and (AnsiCompareText(s, SambaGroup.Objectclass) = 0) then
+              cbSambaGroup.Checked := false
+          end;
+        end;
+      end
+      else
+      if SafeDelete(Name) then
+        Entry.AttributesByName[Name].Delete;
+    end;
+    // Empty the template panel
+    LdapEntry := nil;
+  end;
 end;
 
 procedure TGroupDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -253,9 +361,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickAccounts;
-    Populate(Session, sPOSIXACCNT, ['uid', PSEUDOATTR_PATH]);
-    Images:=MainFrm.ImageList;
-    ImageIndex:=bmPosixUser;
+    Populate(Session, sUSERS, ['uid', PSEUDOATTR_PATH]);
     ShowModal;
 
     for i:=0 to SelCount-1 do  begin

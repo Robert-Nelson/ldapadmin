@@ -66,7 +66,7 @@ procedure ParseURL(const URL: string; var proto, user, password, host, path: str
 { Some handy dialogs }
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
-function  ExtraButtonMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; ReplaceCaption: string; Event: TNotifyEvent = nil): TModalResult;
+function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
 { everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 function  FormatMemoInput(const Text: string): string;
@@ -76,6 +76,7 @@ procedure LockControl(c: TWinControl; bLock: Boolean);
 function  PeekKey: Integer;
 procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
 function  SupportedPropertyObjects(const Index: Integer): Boolean;
+procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
 
 const
   mrCustom   = 1000;
@@ -133,11 +134,14 @@ begin
   fillchar(tzi, 0, SizeOf(tzi));
   err := GetTimeZoneInformation(tzi);
   if (err = TIME_ZONE_ID_UNKNOWN) or (err = TIME_ZONE_ID_INVALID) then
-    raise Exception.Create('Invalid time zone!');
-  Bias := tzi.Bias;
-  if err = TIME_ZONE_ID_DAYLIGHT then
-    inc(Bias, tzi.DayLightBias);
-  Result := DateTime + Bias * 60 / 86400;
+    //raise Exception.Create('Invalid time zone!');
+    Result := DateTime
+  else begin
+    Bias := tzi.Bias;
+    if err = TIME_ZONE_ID_DAYLIGHT then
+      inc(Bias, tzi.DayLightBias);
+    Result := DateTime + Bias * 60 / 86400;
+  end;
 end;
 
 { URL handling routines }
@@ -570,29 +574,33 @@ begin
     Form.Free;
   end;
 end;
-{ Uses Help button to display it with ReplaceCaption, returns mrCustom on click}
-function ExtraButtonMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; ReplaceCaption: string; Event: TNotifyEvent): TModalResult;
+
+{ Uses Caption array to replaces captions and Events array to assign OnClick event to buttons}
+function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
 var
   Form: TForm;
-  i: Integer;
+  i, ci, ce: Integer;
 begin
-  if ReplaceCaption <> '' then
-    Buttons := Buttons + [mbHelp];
   Form:=CreateMessageDialog(Msg, DlgType, Buttons);
   with Form do
   try
-    if ReplaceCaption <> '' then
-    for i:=0 to ComponentCount-1 do begin
+    ci := 0;
+    ce := 0;
+    for i:=0 to ComponentCount - 1 do
+    begin
       if (Components[i] is TButton) then with TButton(Components[i]) do
       begin
-        if ModalResult = mrNone then
+        if ci <= High(Captions) then
         begin
-          Caption := ReplaceCaption;
-          if Assigned(Event) then
-            OnClick := Event
-          else
-            ModalResult := mrCustom;
-          Break;
+          if Captions[ci] <> '' then
+            Caption := Captions[ci];
+          inc(ci);
+        end;
+        if ce <= High(Events) then
+        begin
+          if Assigned(Events[ce]) then
+            OnClick := Events[ce];
+          inc(ce);
         end;
       end;
     end;
@@ -600,6 +608,68 @@ begin
   finally
     Form.Free;
   end;
+end;
+
+procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
+var
+  R1, R2: TRect;
+  o1, o2: Integer;
+
+  procedure ToLeft;
+  begin
+    if R2.Left - o1 > 0 then
+      Form.Left := R2.Left - o1
+    else
+      Form.Left := Form.Left + R2.Right - R1.Right + o1;
+  end;
+
+  procedure ToRight;
+  begin
+    if R2.Right + o1 > Screen.Width then
+    begin
+      Form.Left := R2.Left - o1;
+      if Form.Left < 0 then Form.Left := 0;
+    end
+    else
+      Form.Left := Form.Left + R2.Right - R1.Right + o1;
+  end;
+
+  procedure ToTop;
+  begin
+    if R2.Top - o2 > 0 then
+      Form.Top := R2.Top - o2
+    else
+      Form.Top := Form.Top + R2.Bottom - R1.Bottom + o2;
+  end;
+
+  procedure ToBottom;
+  begin
+    if R2.Bottom + o2 > Screen.Height then
+    begin
+      Form.Top := R2.Top - o2;
+      if Form.Top < 0 then Form.Top := 0;
+    end
+    else
+      Form.Top := Form.Top + R2.Bottom - R1.Bottom + o2;
+  end;
+
+begin
+  if fsShowing in Form.FormState then Exit;
+  //if Application.MainForm.WindowState = wsMaximized then Exit;
+  o1 := 48 + Random(32);
+  o2 := 48 + Random(32);
+  GetWindowRect(Form.Handle, R1);
+  GetWindowRect(Application.MainForm.Handle, R2);
+  if (R1.Top < R2.Top) or (R1.Bottom > R2.Bottom) or
+     (R1.Left < R2.Left) or (R1.Right > R2.Right) then Exit;
+  if MoveLeft then
+    ToLeft
+  else
+    ToRight;
+  if MoveTop then
+    ToTop
+  else
+    ToBottom;
 end;
 
 end.

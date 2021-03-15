@@ -118,7 +118,7 @@ object GroupDlg: TGroupDlg
       end
     end
     object TabSheet2: TTabSheet
-      Caption = '&Advanced'
+      Caption = '&Samba'
       ImageIndex = 2
       object Label3: TLabel
         Left = 24

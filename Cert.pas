@@ -248,7 +248,7 @@ begin
       cap := '&View...'
     else
       cap := '';
-    if ExtraButtonMessageDlg(Format(stCertConfirmConn, [errStr]), mtWarning, [mbYes, mbNo], cap, uiDlg.OnClickProc) = mrYes then
+    if MessageDlgEx(Format(stCertConfirmConn, [errStr]), mtWarning, [mbYes, mbNo, mbHelp], ['','',cap], [nil,nil,uiDlg.OnClickProc]) = mrYes then
       Result := true
     else
       CertUserAbort := true;

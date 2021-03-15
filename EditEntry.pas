@@ -36,7 +36,7 @@ type
     Panel2: TPanel;
     edDn: TEdit;
     Label1: TLabel;
-    StatusBar1: TStatusBar;
+    StatusBar: TStatusBar;
     ToolBar1: TToolBar;
     ImageList1: TImageList;
     SaveBtn: TToolButton;
@@ -149,6 +149,7 @@ type
     procedure StringGridMouseWheelUp(Sender: TObject; Shift: TShiftState; MousePos: TPoint; var Handled: Boolean);
     procedure StringGridMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure ActFindInSchemaExecute(Sender: TObject);
+    procedure FormDeactivate(Sender: TObject);
   private
     Entry: TLDAPEntry;
     ObjectCombo: TInplaceComboBox;
@@ -457,7 +458,7 @@ begin
   Entry := TLDAPEntry.Create(ASession, adn);
   if Mode = EM_MODIFY then
   begin
-    Caption := Format(cEditEntry, [adn]);
+    Caption := cEditEntry;
     edDn.Enabled := false;
     cbRdn.Enabled := false;
     edDn.Text := GetDirFromDn(adn);
@@ -472,17 +473,20 @@ begin
   with objStringGrid do
   begin
     Cells[0,0] := cObjectclass;
-    Cells[0,RowCount-1] := cNewValue;
+    Cells[0,RowCount-1] := cNew;
   end;
   with attrStringGrid do
   begin
     Cells[0,0] := cAttribute;
     Cells[1,0] := cValue;
-    Cells[0,RowCount-1] := cNewValue;
+    Cells[0,RowCount-1] := cNew;
   end;
   FButtonWidth := GetSystemMetrics(SM_CXVSCROLL);
   edDn.Width := Panel2.Width - edDn.Left - FButtonWidth - 4;
   ASession.OnDisconnect.Add(SessionDisconnect);
+  StatusBar.Panels[0].Text := Format(cServer, [ASession.Server]);
+  StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(StatusBar.Panels[0].Text) + 16;
+  StatusBar.Panels[1].Text := Format(cPath, [adn]);
 end;
 
 procedure TEditEntryFrm.SessionDisconnect(Sender: TObject);
@@ -834,8 +838,19 @@ begin
   Entry.Write;
   with MainFrm, LdapTree do
   begin
-    if Assigned(Selected) and (PChar(Selected.Data) = Entry.dn) then
-      LDAPTreeChange(nil, LDAPTree.Selected);
+    {if Assigned(Selected) and (PChar(Selected.Data) = Entry.dn) then
+      LDAPTreeChange(nil, LDAPTree.Selected);}
+    if Assigned(Selected) then
+    begin
+      if esNew in Entry.State then
+      begin
+        if PChar(Selected.Data) = GetDirFromDn(Entry.dn) then
+          ActRefreshExecute(nil)
+      end
+      else
+      if PChar(Selected.Data) = Entry.dn then
+        LDAPTreeChange(nil, LDAPTree.Selected);
+    end;
   end;
   Close;
 end;
@@ -1147,8 +1162,8 @@ end;
 
 procedure TEditEntryFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  if Owner = MainFrm then
-    MainFrm.ActRefreshExecute(nil);
+  {if Owner = MainFrm then
+    MainFrm.ActRefreshExecute(nil);}
   Action := caFree;
   AccountConfig.WriteBool(rEditorSchemaHelp, SchemaCheckBtn.Down);
   Entry.Session.OnDisconnect.Delete(SessionDisconnect);
@@ -1321,6 +1336,11 @@ begin
     StringGrid := attrStringGrid;
   s := StringGrid.Cells[0, StringGrid.Row];
   MainFrm.ShowSchema.Search(s, true, false);
+end;
+
+procedure TEditEntryFrm.FormDeactivate(Sender: TObject);
+begin
+  RevealWindow(Self, True, True);
 end;
 
 end.

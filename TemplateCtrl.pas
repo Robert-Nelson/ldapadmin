@@ -1,5 +1,5 @@
   {      LDAPAdmin - TemplateCtrl.pas
-  *      Copyright (C) 2006 Tihomir Karlovic
+  *      Copyright (C) 2006-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -25,13 +25,6 @@ interface
 
 uses Classes, Forms, Controls, ComCtrls, StdCtrls, ExtCtrls, Templates, LdapClasses,
      Graphics, Windows, Contnrs, Constant;
-
-const
-  CT_LEFT_BORDER     = 8;
-  CT_RIGHT_BORDER    = 8;
-  CT_FIX_TOP         = 8;
-  CT_GROUP_SPACING   = 2;
-  CT_SPACING         = 8;
 
 type
   TEventHandler = class
@@ -176,6 +169,7 @@ procedure TEventHandler.SetEvents(AControl: TTemplateControl);
 var
   i, idx: Integer;
 begin
+  if Assigned(AControl.Params) then
   for i := 0 to AControl.Params.Count - 1 do
   begin
     idx := fEvents.IndexOf(AControl.Params[i]);
@@ -240,8 +234,6 @@ begin
   if fTemplate = Template then Exit;
   LockControl(Self, true);
   try
-    fControls.Clear;
-    fAttributes.Clear;
     fTemplate := Template;
     LoadTemplate;
   finally
@@ -259,8 +251,14 @@ end;
 
 procedure TTemplatePanel.SetEntry(AEntry: TLdapEntry);
 begin
-  fEntry := AEntry;
-  LoadTemplate;
+  if fEntry = AEntry then Exit;
+  LockControl(Self, true);
+  try
+    fEntry := AEntry;
+    LoadTemplate;
+  finally
+    LockControl(Self, false);
+  end;
 end;
 
 procedure TTemplatePanel.InstallHandlers;
@@ -343,12 +341,27 @@ var
     end;
   end;
 
-begin
-  if not (Assigned(fTemplate) and Assigned(fEntry)) then
-    Exit;
+  { Attach datacontrols to driver controls }
+  procedure HandleDataControls;
+  var
+    i, j: Integer;
+  begin
+    for i := 0 to fControls.Count - 1 do with fControls[i] do
+      if DataControlName <> '' then
+        for j := 0 to fControls.Count - 1 do
+          if (j <> i) and (DataControlName = fControls[j].Name) then
+            SetDataControl(fControls[j]);
+  end;
 
+begin
   fControls.Clear;
   fAttributes.Clear;
+  fPanel.Elements.Clear; // added 27.12.07 --
+  with TPanel(fPanel.Control) do
+    while ControlCount > 0 do Controls[ControlCount - 1].Free; // --
+
+  if not (Assigned(fTemplate) and Assigned(fEntry)) then
+    Exit;
 
   { Some VCL Controls require visible parents on property access!!! ( like
     TComboBox for access to Items or ItemIndex properties! )               }
@@ -373,6 +386,7 @@ begin
         AddValue(Template.Objectclasses[i]);
 
     HandleElements(fPanel.Elements);
+    HandleDataControls;
 
     fPanel.ArrangeControls;
     AdjustControls;

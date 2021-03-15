@@ -1005,6 +1005,11 @@ end;
 
 destructor TLDAPSession.Destroy;
 begin
+  try
+    Disconnect;
+  except
+    on E: exception do MessageDlg(E.Message, mtError, [mbOk], 0);
+  end;
   fOnConnect.Free;
   fOnDisconnect.Free;
   OperationalAttrs := ''; // dispose string array

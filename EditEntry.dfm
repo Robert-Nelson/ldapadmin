@@ -14,6 +14,7 @@ object EditEntryFrm: TEditEntryFrm
   Position = poDefault
   OnClose = FormClose
   OnDestroy = FormDestroy
+  OnDeactivate = FormDeactivate
   OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 13
@@ -58,12 +59,18 @@ object EditEntryFrm: TEditEntryFrm
       OnDropDown = cbRdnDropDown
     end
   end
-  object StatusBar1: TStatusBar
+  object StatusBar: TStatusBar
     Left = 0
     Top = 509
     Width = 779
     Height = 22
-    Panels = <>
+    Panels = <
+      item
+        Width = 50
+      end
+      item
+        Width = 50
+      end>
     SimplePanel = False
   end
   object ToolBar1: TToolBar

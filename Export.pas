@@ -173,7 +173,7 @@ begin
     else
       Session.Search(Filter, s, FScope, nil, false, fEntryList, SearchCallback)
     {$ELSE}
-    Session.Search(Filter, s, FScope, FAttributes, false, EntryList, SearchCallback);
+    Session.Search(Filter, s, FScope, FAttributes, false, fEntryList, SearchCallback);
     {$ENDIF}
   end;
   ProgressBar.Step := (MaxInt - ProgressBar.Position) div fEntryList.Count;

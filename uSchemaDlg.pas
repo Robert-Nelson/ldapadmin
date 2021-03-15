@@ -29,7 +29,7 @@ uses
 
 type
 
-  TTabInfo=class
+  TTreeHistory=class
   private
     FCurrent:       TTreeNode;
     FUndo:          TList;
@@ -42,6 +42,7 @@ type
     destructor      Destroy; override;
     procedure       Undo;
     procedure       Redo;
+    procedure       Clear;
     property        Current: TTreeNode read FCurrent write SetCurrent;
     property        IsUndo: boolean read GetIsUndo;
     property        IsRedo: boolean read GetIsRedo;
@@ -90,6 +91,7 @@ type
     procedure       pmUndoClick(Sender: TObject);
     function        GetLinkRect(Node: TTreeNode): TRect;
     procedure       SpeedButton1Click(Sender: TObject);
+    procedure FormDeactivate(Sender: TObject);
   private
     FSchema:        TLDAPSchema;
     FLastSerched:   string;
@@ -117,7 +119,7 @@ type
 
 implementation
 
-uses Math, Export, WinLdap;
+uses Math, Export, WinLdap, Constant, Misc;
 
 const
   FOLDER_IMG          = 0;
@@ -167,6 +169,9 @@ begin
 
   ASession.OnDisconnect.Add(SessionDisconnect);
 
+  StatusBar.Panels[0].Text := Format(cServer, [ASession.Server]);
+  StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(StatusBar.Panels[0].Text) + 16;
+
   Show;
 end;
 
@@ -175,7 +180,7 @@ var
   i: integer;
 begin
   for i:=0 to Tabs.Tabs.Count-1 do
-    if Tabs.Tabs.Objects[i] is TTabInfo then TTabInfo(Tabs.Tabs.Objects[i]).Free;
+    if Tabs.Tabs.Objects[i] is TTreeHistory then TTreeHistory(Tabs.Tabs.Objects[i]).Free;
 
   inherited;
   FSchema.Free;
@@ -189,13 +194,13 @@ end;
 procedure TSchemaDlg.TreeChange(Sender: TObject; Node: TTreeNode);
 begin
   if Tree.Selected=nil then exit;
-  if not(Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo) then Tabs.Tabs.Objects[Tabs.TabIndex]:=TTabInfo.Create;
+  if not(Tabs.Tabs.Objects[Tabs.TabIndex] is TTreeHistory) then Tabs.Tabs.Objects[Tabs.TabIndex]:=TTreeHistory.Create;
 
   begin
     Tabs.Tabs.Strings[Tabs.TabIndex]:=Tree.Selected.Text;
-    TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).Current:=Tree.Selected;
-    UndoBtn.Enabled:=TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).IsUndo;
-    RedoBtn.Enabled:=TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).IsRedo;
+    TTreeHistory(Tabs.Tabs.Objects[Tabs.TabIndex]).Current:=Tree.Selected;
+    UndoBtn.Enabled:=TTreeHistory(Tabs.Tabs.Objects[Tabs.TabIndex]).IsUndo;
+    RedoBtn.Enabled:=TTreeHistory(Tabs.Tabs.Objects[Tabs.TabIndex]).IsRedo;
   end;
 
   View.Items.BeginUpdate;
@@ -211,12 +216,12 @@ begin
   View.Items.EndUpdate;
 
   if Tree.Selected.Parent=nil then begin
-    StatusBar.Panels[0].Text:=' '+Tree.Selected.Text;
-    StatusBar.Panels[1].Text:=' '+inttostr(Tree.Selected.Count)+ ' items';
+    StatusBar.Panels[1].Text:=' '+Tree.Selected.Text;
+    StatusBar.Panels[2].Text:=' '+inttostr(Tree.Selected.Count)+ ' items';
   end
   else begin
-    StatusBar.Panels[0].Text:=' '+Tree.Selected.Parent.Text;
-    StatusBar.Panels[1].Text:=' '+Tree.Selected.Text;
+    StatusBar.Panels[1].Text:=' '+Tree.Selected.Parent.Text;
+    StatusBar.Panels[2].Text:=' '+Tree.Selected.Text;
   end;
 
 end;
@@ -324,8 +329,8 @@ end;
 
 procedure TSchemaDlg.UndoBtnClick(Sender: TObject);
 begin
-  if not (Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo) then exit;
-  with Tabs.Tabs.Objects[Tabs.TabIndex] as TTabInfo do begin
+  if not (Tabs.Tabs.Objects[Tabs.TabIndex] is TTreeHistory) then exit;
+  with Tabs.Tabs.Objects[Tabs.TabIndex] as TTreeHistory do begin
     Undo;
     Current.Selected:=true;
   end;
@@ -333,8 +338,8 @@ end;
 
 procedure TSchemaDlg.RedoBtnClick(Sender: TObject);
 begin
-  if not (Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo) then exit;
-  with Tabs.Tabs.Objects[Tabs.TabIndex] as TTabInfo do begin
+  if not (Tabs.Tabs.Objects[Tabs.TabIndex] is TTreeHistory) then exit;
+  with Tabs.Tabs.Objects[Tabs.TabIndex] as TTreeHistory do begin
     Redo;
     Current.Selected:=true;
   end;
@@ -573,7 +578,7 @@ end;
 function TSchemaDlg.AddTab(TreeNode: TTreeNode): integer;
 var
   i: integer;
-  TabInfo: TTabInfo;
+  TreeHistory: TTreeHistory;
 begin
   if TreeNode=nil then begin
     result:=Tabs.TabIndex;
@@ -581,7 +586,7 @@ begin
   end;
 
   for i:=0 to Tabs.Tabs.Count-1 do begin
-    if (Tabs.Tabs.Objects[i] is TTabInfo) and (TTabInfo(Tabs.Tabs.Objects[i]).Current=TreeNode) then begin
+    if (Tabs.Tabs.Objects[i] is TTreeHistory) and (TTreeHistory(Tabs.Tabs.Objects[i]).Current=TreeNode) then begin
       result:=i;
       exit;
     end;
@@ -592,15 +597,15 @@ begin
     exit;
   end;
 
-  TabInfo:=TTabInfo.Create;
-  TabInfo.Current:=TreeNode;
-  result:=Tabs.Tabs.AddObject(TreeNode.Text, TabInfo);
+  TreeHistory:=TTreeHistory.Create;
+  TreeHistory.Current:=TreeNode;
+  result:=Tabs.Tabs.AddObject(TreeNode.Text, TreeHistory);
 end;
 
 procedure TSchemaDlg.TabsChange(Sender: TObject);
 begin
-  if Tabs.Tabs.Objects[Tabs.TabIndex] is TTabInfo then begin
-    if TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).Current<>nil then TTabInfo(Tabs.Tabs.Objects[Tabs.TabIndex]).Current.Selected:=true;
+  if Tabs.Tabs.Objects[Tabs.TabIndex] is TTreeHistory then begin
+    if TTreeHistory(Tabs.Tabs.Objects[Tabs.TabIndex]).Current<>nil then TTreeHistory(Tabs.Tabs.Objects[Tabs.TabIndex]).Current.Selected:=true;
   end;
 end;
 
@@ -645,7 +650,7 @@ var
 begin
   if (ssDouble in Shift) and (Tabs.Tabs.Count>1) then begin
     Idx:=Tabs.TabIndex;
-    if Tabs.Tabs.Objects[Idx] is TTabInfo then TTabInfo(Tabs.Tabs.Objects[Idx]).Free;
+    if Tabs.Tabs.Objects[Idx] is TTreeHistory then TTreeHistory(Tabs.Tabs.Objects[Idx]).Free;
     Tabs.Tabs.Delete(Idx);
     if Idx<Tabs.Tabs.Count then
       Tabs.TabIndex := Idx
@@ -668,23 +673,23 @@ begin
 end;
 
 
-{ TTabInfo }
+{ TTreeHistory }
 
-constructor TTabInfo.Create;
+constructor TTreeHistory.Create;
 begin
   inherited;
   FUndo:=TList.Create;
   FRedo:=TList.Create;
 end;
 
-destructor TTabInfo.Destroy;
+destructor TTreeHistory.Destroy;
 begin
   FUndo.Free;
   FRedo.Free;
   inherited;
 end;
 
-procedure TTabInfo.SetCurrent(const Value: TTreeNode);
+procedure TTreeHistory.SetCurrent(const Value: TTreeNode);
 begin
   if FCurrent=Value then exit;
   if FCurrent<>nil then FUndo.Insert(0,FCurrent);
@@ -692,7 +697,7 @@ begin
   FRedo.Clear;
 end;
 
-procedure TTabInfo.Undo;
+procedure TTreeHistory.Undo;
 begin
   if not IsUndo then exit;
   if FCurrent<>nil then FRedo.Insert(0,FCurrent);
@@ -700,7 +705,7 @@ begin
   FUndo.Delete(0);
 end;
 
-procedure TTabInfo.Redo;
+procedure TTreeHistory.Redo;
 begin
   if not ISRedo then exit;
   if FCurrent<>nil then FUndo.Insert(0,FCurrent);
@@ -708,12 +713,19 @@ begin
   FRedo.Delete(0);
 end;
 
-function TTabInfo.GetIsUndo: boolean;
+procedure TTreeHistory.Clear;
+begin
+  FUndo.Clear;
+  FRedo.Clear;
+  FCurrent := nil;
+end;
+
+function TTreeHistory.GetIsUndo: boolean;
 begin
   result:=FUndo.Count>0;
 end;
 
-function TTabInfo.GetIsRedo: boolean;
+function TTreeHistory.GetIsRedo: boolean;
 begin
   result:=FRedo.Count>0;
 end;
@@ -721,6 +733,11 @@ end;
 procedure TSchemaDlg.SpeedButton1Click(Sender: TObject);
 begin
   TExportDlg.Create(FSchema.Dn, FSchema.Session, ['ldapSyntaxes', 'attributeTypes', 'objectclasses', 'matchingRules', 'matchingRuleUse'], false).ShowModal;
+end;
+
+procedure TSchemaDlg.FormDeactivate(Sender: TObject);
+begin
+  RevealWindow(Self, False, False);
 end;
 
 end.

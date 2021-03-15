@@ -509,7 +509,7 @@ begin
     if RadioGroup1.ItemIndex = 0 then
       KickoffTime := SAMBA_MAX_KICKOFF_TIME
     else
-      KickoffTime := DateTimePicker.DateTime;
+      KickoffTime := LocalDateTimeToUTC(DateTimePicker.DateTime);
   end;
 end;
 
@@ -874,7 +874,7 @@ begin
 end;
 
 { This works as follows: if cn is new group then it wont be in origGroup list so
-  we add it there. If its already there add operation modus to its tag value
+  we add it there. If it's already there add operation modus to its tag value
   (which is casted Objects array). This way we can handle repeatingly adding and
   removing of same groups: if it sums up to 0 we dont have to do anything, if
   its > 0 we add user to this group in LDAP directory and if its < 0 we remove
@@ -906,8 +906,8 @@ begin
     Caption := cPickGroups;
     Columns[1].Caption:='Description';
     Populate(Session, sGROUPS, ['cn', 'description']);
-    Images:=MainFrm.ImageList;
-    ImageIndex:=bmGroup;
+    {Images:=MainFrm.ImageList;
+    ImageIndex:=bmGroup;}
 
     if ShowModal=MrOK then begin
       CopyGroups;
@@ -1293,7 +1293,7 @@ begin
   { CheckListBox holds pointers to Templates or TabSheets in its Object array:
     Checked[i] = FALSE:  Objects[i] = Pointer(Template)
     Checked[i] = TRUE:   Objects[i] = Pointer(TTabSheet)
-    TabSheet holds in its Tag filed pointer to TemplatePanel.
+    TabSheet holds pointer to TemplatePanel in its Tag filed.
   }
   with CheckListBox do begin
     Tag := Integer(Sender);

@@ -3,7 +3,6 @@ object SearchFrm: TSearchFrm
   Top = 193
   Width = 730
   Height = 537
-  ActiveControl = edName
   Caption = 'Search'
   Color = clBtnFace
   Constraints.MinHeight = 409
@@ -13,12 +12,13 @@ object SearchFrm: TSearchFrm
   Font.Height = -11
   Font.Name = 'MS Sans Serif'
   Font.Style = []
-  FormStyle = fsStayOnTop
   KeyPreview = True
   OldCreateOrder = False
   Position = poMainFormCenter
   OnClose = FormClose
+  OnCloseQuery = FormCloseQuery
   OnDestroy = FormDestroy
+  OnDeactivate = FormDeactivate
   OnKeyPress = FormKeyPress
   PixelsPerInch = 96
   TextHeight = 13
@@ -27,14 +27,20 @@ object SearchFrm: TSearchFrm
     Top = 491
     Width = 722
     Height = 19
-    Panels = <>
-    SimplePanel = True
+    Panels = <
+      item
+        Width = 50
+      end
+      item
+        Width = 50
+      end>
+    SimplePanel = False
   end
   object Panel1: TPanel
     Left = 0
     Top = 0
     Width = 722
-    Height = 169
+    Height = 193
     Align = alTop
     BorderWidth = 3
     TabOrder = 1
@@ -42,7 +48,7 @@ object SearchFrm: TSearchFrm
       Left = 4
       Top = 4
       Width = 105
-      Height = 161
+      Height = 185
       Align = alLeft
       Color = clAppWorkSpace
       Font.Charset = DEFAULT_CHARSET
@@ -53,8 +59,7 @@ object SearchFrm: TSearchFrm
       ItemHeight = 32
       Items.Strings = (
         'Search'
-        'Advanced'
-        'Options')
+        'Modify')
       ParentFont = False
       Style = lbOwnerDrawFixed
       TabOrder = 0
@@ -65,7 +70,7 @@ object SearchFrm: TSearchFrm
       Left = 109
       Top = 4
       Width = 609
-      Height = 161
+      Height = 185
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 1
@@ -73,13 +78,13 @@ object SearchFrm: TSearchFrm
         Left = 504
         Top = 0
         Width = 105
-        Height = 161
+        Height = 185
         Align = alRight
         BevelOuter = bvNone
         TabOrder = 0
         object StartBtn: TBitBtn
           Left = 16
-          Top = 16
+          Top = 8
           Width = 83
           Height = 25
           Action = ActStart
@@ -123,7 +128,7 @@ object SearchFrm: TSearchFrm
         end
         object GotoBtn: TBitBtn
           Left = 16
-          Top = 48
+          Top = 40
           Width = 83
           Height = 25
           Action = ActGoto
@@ -167,7 +172,7 @@ object SearchFrm: TSearchFrm
         end
         object SaveBtn: TBitBtn
           Left = 16
-          Top = 80
+          Top = 72
           Width = 83
           Height = 25
           Action = ActSave
@@ -211,7 +216,7 @@ object SearchFrm: TSearchFrm
         end
         object CloseBtn: TBitBtn
           Left = 16
-          Top = 120
+          Top = 104
           Width = 83
           Height = 25
           Action = ActClose
@@ -259,7 +264,7 @@ object SearchFrm: TSearchFrm
         Left = 0
         Top = 0
         Width = 504
-        Height = 161
+        Height = 185
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 1
@@ -267,29 +272,29 @@ object SearchFrm: TSearchFrm
           Left = 0
           Top = 0
           Width = 504
-          Height = 57
+          Height = 49
           Align = alTop
           BevelOuter = bvNone
           TabOrder = 0
           object Label5: TLabel
-            Left = 8
-            Top = 18
+            Left = 16
+            Top = 12
             Width = 25
             Height = 13
             Caption = 'Path:'
           end
-          object Bevel2: TBevel
-            Left = 48
-            Top = 48
-            Width = 449
-            Height = 9
+          object Bevel1: TBevel
+            Left = 8
+            Top = 28
+            Width = 492
+            Height = 10
             Anchors = [akLeft, akTop, akRight]
             Shape = bsBottomLine
           end
           object cbBasePath: TComboBox
-            Left = 48
-            Top = 16
-            Width = 377
+            Left = 56
+            Top = 8
+            Width = 369
             Height = 21
             Anchors = [akLeft, akTop, akRight]
             ItemHeight = 13
@@ -297,7 +302,7 @@ object SearchFrm: TSearchFrm
           end
           object PathBtn: TButton
             Left = 436
-            Top = 15
+            Top = 7
             Width = 65
             Height = 23
             Anchors = [akTop, akRight]
@@ -306,50 +311,150 @@ object SearchFrm: TSearchFrm
             OnClick = PathBtnClick
           end
         end
-        object Panel42: TPanel
+        object Panel4: TPanel
           Left = 0
-          Top = 57
+          Top = 49
           Width = 504
-          Height = 104
+          Height = 136
           Align = alClient
           BevelOuter = bvNone
           TabOrder = 1
-          object Panel6: TPanel
-            Left = 0
+          object PageControl: TPageControl
+            Left = 8
             Top = 0
-            Width = 504
-            Height = 104
-            Align = alClient
-            BevelOuter = bvNone
+            Width = 496
+            Height = 136
+            ActivePage = TabSheet1
+            Align = alRight
+            Anchors = [akLeft, akTop, akRight, akBottom]
             TabOrder = 0
-            Visible = False
-            object GroupBox5: TGroupBox
-              Left = 48
-              Top = 16
-              Width = 449
-              Height = 97
-              Anchors = [akLeft, akTop, akRight]
-              Caption = 'Result set'
-              TabOrder = 0
+            object TabSheet1: TTabSheet
+              Caption = '&Search'
+              object Label6: TLabel
+                Left = 8
+                Top = 23
+                Width = 31
+                Height = 13
+                Caption = '&Name:'
+              end
+              object Label7: TLabel
+                Left = 8
+                Top = 66
+                Width = 32
+                Height = 13
+                Caption = '&E-Mail:'
+              end
+              object edName: TEdit
+                Left = 48
+                Top = 20
+                Width = 425
+                Height = 21
+                Anchors = [akLeft, akTop, akRight]
+                TabOrder = 0
+              end
+              object edEmail: TEdit
+                Left = 48
+                Top = 64
+                Width = 425
+                Height = 21
+                Anchors = [akLeft, akTop, akRight]
+                TabOrder = 1
+              end
+            end
+            object TabSheet2: TTabSheet
+              Caption = '&Custom'
+              ImageIndex = 1
+              object Label1: TLabel
+                Left = 8
+                Top = 8
+                Width = 25
+                Height = 13
+                Caption = 'Filter:'
+              end
+              object Memo1: TMemo
+                Left = 39
+                Top = 8
+                Width = 442
+                Height = 65
+                Anchors = [akLeft, akTop, akRight]
+                Font.Charset = DEFAULT_CHARSET
+                Font.Color = clWindowText
+                Font.Height = -12
+                Font.Name = 'Courier New'
+                Font.Style = []
+                ParentFont = False
+                TabOrder = 0
+              end
+              object cbFilters: TComboBox
+                Left = 40
+                Top = 80
+                Width = 305
+                Height = 21
+                Anchors = [akLeft, akTop, akRight]
+                ItemHeight = 13
+                TabOrder = 1
+                OnChange = cbFiltersChange
+                OnDropDown = cbFiltersDropDown
+              end
+              object SaveFilterBtn: TButton
+                Left = 348
+                Top = 79
+                Width = 65
+                Height = 23
+                Anchors = [akTop, akRight]
+                Caption = 'Sa&ve'
+                Enabled = False
+                TabOrder = 2
+                OnClick = SaveFilterBtnClick
+              end
+              object DeleteFilterBtn: TButton
+                Left = 415
+                Top = 79
+                Width = 65
+                Height = 23
+                Anchors = [akTop, akRight]
+                Caption = '&Delete'
+                Enabled = False
+                TabOrder = 3
+                OnClick = DeleteFilterBtnClick
+              end
+            end
+            object TabSheet3: TTabSheet
+              Caption = '&Options'
+              ImageIndex = 2
               object Label4: TLabel
                 Left = 16
-                Top = 44
+                Top = 8
                 Width = 47
                 Height = 13
                 Caption = 'Attributes:'
               end
+              object Label2: TLabel
+                Left = 16
+                Top = 56
+                Width = 62
+                Height = 13
+                Caption = 'Search level:'
+              end
+              object Label3: TLabel
+                Left = 224
+                Top = 56
+                Width = 97
+                Height = 13
+                Caption = 'Dereference aliases:'
+              end
               object cbAttributes: TComboBox
-                Left = 72
-                Top = 40
-                Width = 289
+                Left = 16
+                Top = 24
+                Width = 393
                 Height = 21
                 Anchors = [akLeft, akTop, akRight]
                 ItemHeight = 13
                 TabOrder = 0
               end
               object edAttrBtn: TButton
-                Left = 368
-                Top = 40
+                Left = 416
+                Top = 24
                 Width = 67
                 Height = 23
                 Anchors = [akTop, akRight]
@@ -357,61 +462,28 @@ object SearchFrm: TSearchFrm
                 TabOrder = 1
                 OnClick = edAttrBtnClick
               end
-            end
-            object GroupBox3: TGroupBox
-              Left = 48
-              Top = 128
-              Width = 449
-              Height = 97
-              Anchors = [akLeft, akTop, akRight]
-              Caption = 'Search level:'
-              TabOrder = 1
-              object Label2: TLabel
-                Left = 16
-                Top = 44
-                Width = 93
-                Height = 13
-                Caption = 'Select search level:'
-              end
               object cbSearchLevel: TComboBox
-                Left = 120
-                Top = 40
-                Width = 241
+                Left = 16
+                Top = 72
+                Width = 201
                 Height = 21
                 Style = csDropDownList
-                Anchors = [akLeft, akTop, akRight]
                 ItemHeight = 13
-                TabOrder = 0
+                TabOrder = 2
                 Items.Strings = (
                   'This entry only'
                   'Next level'
                   'Entire subtree')
               end
-            end
-            object GroupBox4: TGroupBox
-              Left = 48
-              Top = 240
-              Width = 449
-              Height = 97
-              Anchors = [akLeft, akTop, akRight]
-              Caption = 'Alias options:'
-              TabOrder = 2
-              object Label3: TLabel
-                Left = 16
-                Top = 44
-                Width = 97
-                Height = 13
-                Caption = 'Dereference aliases:'
-              end
               object cbDerefAliases: TComboBox
-                Left = 120
-                Top = 40
-                Width = 241
+                Left = 224
+                Top = 72
+                Width = 185
                 Height = 21
                 Style = csDropDownList
                 Anchors = [akLeft, akTop, akRight]
                 ItemHeight = 13
-                TabOrder = 0
+                TabOrder = 3
                 Items.Strings = (
                   'Never'
                   'When searching'
@@ -420,118 +492,15 @@ object SearchFrm: TSearchFrm
               end
             end
           end
-          object Panel5: TPanel
-            Left = 0
-            Top = 0
-            Width = 504
-            Height = 104
-            Align = alClient
-            BevelOuter = bvNone
-            TabOrder = 1
-            Visible = False
-            object Label1: TLabel
-              Left = 8
-              Top = 8
-              Width = 25
-              Height = 13
-              Caption = 'Filter:'
-            end
-            object Memo1: TMemo
-              Left = 48
-              Top = 8
-              Width = 449
-              Height = 65
-              Anchors = [akLeft, akTop, akRight]
-              Font.Charset = DEFAULT_CHARSET
-              Font.Color = clWindowText
-              Font.Height = -12
-              Font.Name = 'Courier New'
-              Font.Style = []
-              ParentFont = False
-              TabOrder = 0
-            end
-            object cbFilters: TComboBox
-              Left = 48
-              Top = 80
-              Width = 305
-              Height = 21
-              Anchors = [akLeft, akTop, akRight]
-              ItemHeight = 13
-              TabOrder = 1
-              OnChange = cbFiltersChange
-              OnDropDown = cbFiltersDropDown
-            end
-            object SaveFilterBtn: TButton
-              Left = 364
-              Top = 79
-              Width = 65
-              Height = 23
-              Anchors = [akTop, akRight]
-              Caption = 'Sa&ve'
-              Enabled = False
-              TabOrder = 2
-              OnClick = SaveFilterBtnClick
-            end
-            object DeleteFilterBtn: TButton
-              Left = 436
-              Top = 79
-              Width = 65
-              Height = 23
-              Anchors = [akTop, akRight]
-              Caption = '&Delete'
-              Enabled = False
-              TabOrder = 3
-              OnClick = DeleteFilterBtnClick
-            end
-          end
-          object Panel4: TPanel
-            Left = 0
-            Top = 0
-            Width = 504
-            Height = 104
-            Align = alClient
-            BevelOuter = bvNone
-            TabOrder = 2
-            object Label6: TLabel
-              Left = 8
-              Top = 23
-              Width = 31
-              Height = 13
-              Caption = '&Name:'
-            end
-            object Label7: TLabel
-              Left = 8
-              Top = 66
-              Width = 32
-              Height = 13
-              Caption = '&E-Mail:'
-            end
-            object edName: TEdit
-              Left = 48
-              Top = 20
-              Width = 449
-              Height = 21
-              Anchors = [akLeft, akTop, akRight]
-              TabOrder = 0
-            end
-            object edEmail: TEdit
-              Left = 48
-              Top = 64
-              Width = 449
-              Height = 21
-              Anchors = [akLeft, akTop, akRight]
-              TabOrder = 1
-            end
-          end
         end
       end
     end
   end
   object ResultPanel: TPanel
     Left = 0
-    Top = 169
+    Top = 193
     Width = 722
-    Height = 322
+    Height = 298
     Align = alClient
     BorderWidth = 3
     TabOrder = 2
@@ -604,5 +573,148 @@ object SearchFrm: TSearchFrm
     Options = [ofOverwritePrompt, ofHideReadOnly, ofEnableSizing]
     Left = 72
     Top = 448
+  end
+  object ImageList: TImageList
+    Left = 104
+    Top = 448
+    Bitmap = {
+      494C010102000400040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
+      0000000000003600000028000000400000001000000001002000000000000010
+      000000000000000000000000000000000000000000004A667C00BE9596000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000006B9CC3001E89E8004B7AA300C896
+      9300000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000008080800000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000004BB4FE0051B5FF002089E9004B7A
+      A200C69592000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000051B7FE0051B3FF001D87
+      E6004E7AA000CA97920000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000000000000000000000000000000FFFF000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000000000000000000000000000000000000000000000000000051B7FE004EB2
+      FF001F89E6004E7BA200B9949700000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000000000000000000000FFFF0000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000000000000000000000000000000000000000000052B8
+      FE004BB1FF002787D9005F6A760000000000B0857F00C09F9400C09F9600BC98
+      8E00000000000000000000000000000000000000000000000000000000000000
+      00000000000000FFFF0000FFFF0000FFFF0000FFFF0000FFFF00000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000055BDFF00B5D6ED00BF9D9200BB9B8C00E7DAC200FFFFE300FFFFE500FDFA
+      DA00D8C3B300B58D850000000000000000000000000000000000000000000000
+      00000000000000000000FFFFFF0000FFFF000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000CEA79500FDEEBE00FFFFD800FFFFDA00FFFFDB00FFFF
+      E600FFFFFB00EADDDC00AE837F00000000000000000000000000000000000000
+      0000000000000000000000FFFF0000FFFF0000FFFF0000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000C1A09100FBDCA800FEF7D000FFFFDB00FFFFE300FFFF
+      F800FFFFFD00FFFFFD00C6A99C00000000000000000000000000000000000000
+      000000000000000000000000000000FFFF00FFFFFF0000FFFF00000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000000000000C1A09100FEE3AC00F1C49100FCF2CA00FFFFDD00FFFFE400FFFF
+      F700FFFFF700FFFFE900EEE5CB00B9948C00000000000000000000000000FFFF
+      FF0000FFFF0000FFFF0000FFFF00FFFFFF0000FFFF0000FFFF0000FFFF000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000000000000C2A19100FFE6AE00EEB58100F7DCAE00FEFDD800FFFFDF00FFFF
+      E300FFFFE400FFFFE000F3ECD200BB968E000000000000000000000000000000
+      0000FFFFFF0000FFFF00FFFFFF0000FFFF000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000000000000BC978C00FBE7B700F4C79100F2C99400F8E5B900FEFCD800FFFF
+      DD00FFFFDC00FFFFE000E2D2BA00B68E86000000000000000000000000000000
+      000000FFFF00FFFFFF0000FFFF00FFFFFF0000FFFF0000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000D9C3A900FFFEE500F7DCB800F2C99400F5D4A500FAE8
+      BD00FDF4C900FDFBD600B6908900000000000000000000000000000000000000
+      00000000000000FFFF00FFFFFF0000FFFF00FFFFFF0000FFFF00000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000B58D8500E8DEDD00FFFEF200F9D8A300F4C48C00F9D4
+      9F00FDEAB800D0B49F00B8908600000000000000000000000000000000000000
+      000000000000FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000AD827F00C9AA9E00EFE0B700EFDFB200E7CE
+      AC00B8908600B890860000000000000000000000000000000000000000000000
+      00000000000000000000FFFFFF0000FFFF00FFFFFF00FFFFFF0000FFFF00FFFF
+      FF00000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      00000000000000000000000000000000000000000000BA968A00BB988C00B791
+      8800000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      0000000000000000000000000000000000000000000000000000000000000000
+      000000000000000000000000000000000000424D3E000000000000003E000000
+      2800000040000000100000000100010000000000800000000000000000000000
+      000000000000000000000000FFFFFF009FFFFBFF000000000FFFF9FF00000000
+      07FFFCFF0000000083FFFC7F00000000C1FFF03F00000000E10FF01F00000000
+      F003F80F00000000FC01F83F00000000FC01C01F00000000F800C00F00000000
+      F800E00700000000F800E03F00000000FC01F01F00000000FC01F00F00000000
+      FE03F80700000000FF8FF8030000000000000000000000000000000000000000
+      000000000000}
   end
 end

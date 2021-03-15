@@ -1,5 +1,5 @@
   {      LDAPAdmin - Pickup.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003 - 2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -47,6 +47,7 @@ type
     procedure         ListViewData(Sender: TObject; Item: TListItem);
     procedure         FormClose(Sender: TObject; var Action: TCloseAction);
     procedure         ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
+    procedure FormCreate(Sender: TObject);
   private
     FPopulates:       array of TPopulateColumns;
     FOnGetImageIndex: TOnGetImageIndex;
@@ -86,7 +87,7 @@ implementation
 
 {$R *.DFM}
 
-uses WinLDAP, Constant;
+uses WinLDAP, Constant, Main;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -123,6 +124,8 @@ procedure TPickupDlg.Populate(const Session: TLDAPSession; const Filter: string;
 var
   i: integer;
   popIdx: integer;
+  attrs: PCharArray;
+  len: Integer;
 begin
   popIdx:=length(FPopulates);
   setlength(FPopulates, popIdx+1);
@@ -133,7 +136,26 @@ begin
     FPopulates[popIdx][i].Attribute:=Attributes[i];
   end;
   //////////////////////////////////////////////////////////////////////////////
-  Session.Search(Filter, Session.Base, LDAP_SCOPE_SUBTREE, Attributes, false, FEntries);
+  attrs := nil;
+  len := Length(Attributes);
+  if ImageIndex = -1 then
+    inc(len);
+  if Len > 0 then
+  begin
+    SetLength(attrs, len + 1);
+    attrs[len] := nil;
+    if ImageIndex = -1 then
+    begin
+      dec(len);
+      attrs[len] := 'objectclass';
+    end;
+    repeat
+      dec(len);
+      attrs[len] := PChar(Attributes[len]);
+    until len = 0;
+  end;
+
+  Session.Search(Filter, Session.Base, LDAP_SCOPE_SUBTREE, attrs, false, FEntries);
 end;
 
 procedure TPickupDlg.FilterEditChange(Sender: TObject);
@@ -167,6 +189,7 @@ procedure TPickupDlg.ListViewData(Sender: TObject; Item: TListItem);
 var
   i: integer;
   IcoIndex: integer;
+  b: Boolean;
 begin
   Item.Caption:=GetText(0, TLdapEntry(FShowed[Item.Index]));
   for i:=1 to ListView.Columns.Count-1 do
@@ -174,6 +197,8 @@ begin
 
   IcoIndex:=FImageIndex;
   if assigned(FOnGetImageIndex) then FOnGetImageIndex(TLdapEntry(FShowed[Item.Index]), IcoIndex);
+  if IcoIndex = -1 then
+    ClassifyLdapEntry(TLdapEntry(FShowed[Item.Index]), b, IcoIndex);
   Item.ImageIndex := IcoIndex;
 end;
 
@@ -300,6 +325,11 @@ end;
 procedure TPickupDlg.ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
 begin
   OkBtn.Enabled := ListView.SelCount>0;
+end;
+
+procedure TPickupDlg.FormCreate(Sender: TObject);
+begin
+  SetImages(MainFrm.ImageList);
 end;
 
 end.
