@@ -48,7 +48,8 @@ const
   oidIdPool            = oidSambaDomain + 1;
   { AD objects }
   oidAdUser            = oidIdPool + 1;
-  oidADContainer       = oidAdUser + 1;
+  oidADComputer        = oidAdUser + 1;
+  oidADContainer       = oidAdComputer + 1;
   oidADGroup           = oidADContainer + 1;
   oidADClassSchema     = oidADGroup + 1;
   oidADAttributeSchema = oidADClassSchema + 1;
@@ -74,6 +75,7 @@ const
                     bmSambaDomain,
                     bmIdPool,
                     bmSamba3USer,
+                    bmComputer,
                     bmContainer,
                     bmADGroup,
                     bmClassSchema,
@@ -505,7 +507,7 @@ begin
     end
     else
     if s = 'computer' then
-      Result := oidComputer
+      Result := oidADComputer
     else if s = 'group' then
       Result := oidADGroup
     else if s = 'locality' then

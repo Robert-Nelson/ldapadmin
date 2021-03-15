@@ -26,7 +26,7 @@ interface
 {$DEFINE REGEXPR}
 
 uses ComCtrls, LdapClasses, Classes, Contnrs, Controls, StdCtrls, ExtCtrls, Xml, Windows,
-     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask, Script
+     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask, Script, Math
     {$IFDEF REGEXPR}
     { Note: If you want to compile templates with regex support you'll need }
     { Regexpr.pas unit from TRegeExpr library (http://www.regexpstudio.com) }
@@ -1583,19 +1583,11 @@ end;
 procedure TTemplateCtrlComboLookupList.SetLdapAttribute(Attribute: TLdapAttribute);
 var
   EntryList: TLdapEntryList;
-  //Session: TLdapSession;
   i: Integer;
   val, cap: string;
 begin
   inherited;
 
-  {if not Assigned(fLdapAttribute) then Exit;
-  try
-    Session := Attribute.Entry.Session;
-  except
-    Session := nil;
-  end;
-  if not Assigned(Session) then Exit;}
   if not Assigned(LdapSession) then Exit;
 
   if fSearchFilter = '' then
@@ -1778,13 +1770,6 @@ begin
       if AnsiCompareText(Cells[0, j], AValue.AsString) = 0 then
         exit;
 
-    {if i = RowCount then
-    begin
-      RowCount := RowCount + 1;
-      Cells[0, RowCount - 1] := AValue.AsString;
-    end
-    else
-      Cells[0, i] := AValue.AsString;}
     if i = RowCount then
       RowCount := RowCount + 1;
     Cells[0, i] := AValue.AsString;
@@ -2323,8 +2308,8 @@ begin
       if (fDateFormat = FMT_DATE_TIME_UNIX) or (fTimeFormat = FMT_DATE_TIME_UNIX) then
       begin
         case Kind of
-          dtkDate: Result := IntToStr(DateTimeToUnixTime(Trunc(DateTime)) + DateTimeToUnixTime(Frac(ldapTime)));
-          dtkTime: Result := IntToStr(DateTimeToUnixTime(Frac(DateTime)) + DateTimeToUnixTime(Trunc(ldapTime)));
+          dtkDate: Result := IntToStr(DateTimeToUnixTime(Trunc(DateTime) + Frac(ldapTime)));
+          dtkTime: Result := IntToStr(DateTimeToUnixTime(Frac(DateTime) + Max(Trunc(ldapTime), 25569.0)));
         end;
       end
       else
@@ -2357,22 +2342,26 @@ begin
         end;
       end;
     end
-    else
+    else // not Checked
       if (fDateFormat = FMT_DATE_TIME_UNIX) or (fTimeFormat = FMT_DATE_TIME_UNIX) then
       begin
         case Kind of
-          dtkDate: Result := IntToStr(DateTimeToUnixTime(0) + DateTimeToUnixTime(Frac(ldapTime)));
-          dtkTime: Result := IntToStr(DateTimeToUnixTime(Frac(DateTime)) + DateTimeToUnixTime(0));
+          dtkDate: if Frac(ldapTime) <> 0 then
+                     Result := IntToStr(DateTimeToUnixTime(25569.0 + Frac(ldapTime)));
+          dtkTime: if Trunc(DateTime) <> 0 then
+                     Result := IntToStr(DateTimeToUnixTime(Trunc(DateTime)));
         end;
       end
       else
       if (fDateFormat = FMT_DATE_TIME_GTZ) or (fTimeFormat = FMT_DATE_TIME_GTZ) then
       begin
         case Kind of
-          dtkDate: Result := GetDateOrTime(0, 'yyyyMMdd', dtkDate) +
-                             GetDateOrTime(Frac(ldapTime), 'HHmmssZ', dtkTime);
-          dtkTime: Result := GetDateOrTime(Trunc(ldapTime), 'yyyyMMdd', dtkDate) +
-                             GetDateOrTime(0, 'HHmmssZ', dtkTime);
+          dtkDate: if Frac(ldapTime) <> 0 then
+                     Result := GetDateOrTime(0, 'yyyyMMdd', dtkDate) +
+                               GetDateOrTime(Frac(ldapTime), 'HHmmssZ', dtkTime);
+          dtkTime: if Trunc(ldapTime) <> 0 then
+                     Result := GetDateOrTime(Trunc(ldapTime), 'yyyyMMdd', dtkDate) +
+                               GetDateOrTime(0, 'HHmmssZ', dtkTime);
         end;
       end
       else
@@ -2596,7 +2585,6 @@ var
   Attr: TLdapAttribute;
   s: string;
 begin
-  //if Assigned(fLdapAttribute) and Assigned(fLdapAttribute.Entry) and Assigned(fLdapAttribute.Entry.Session) then
   if Assigned(LdapSession) then
   with TPickupDlg.Create(Sender as TControl) do
   try
@@ -2604,7 +2592,6 @@ begin
     for i := 0 to High(fColNames) do
       s := s + '"' + fColNames[i] + '"' + ',';
     ColumnNames := s;
-    //Populate(fLdapAttribute.Entry.Session, fFilter, fColumns, fBase);
     Populate(LdapSession, fFilter, fColumns, fBase);
     if (ShowModal = mrOK) and Assigned(fDataControl) then
     begin
@@ -2822,10 +2809,6 @@ end;
 
 procedure TTemplateCtrlList.SetValue(AValue: TTemplateAttributeValue);
 begin
-  {if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
-    Exit;
-  (Control as TListBox).Items.Add(AValue.AsString);
-  OnChangeProc(Self);}
   if (Control as TListBox).Items.IndexOf(AValue.AsString) = -1 then
   begin
     (Control as TListBox).Items.Add(AValue.AsString);

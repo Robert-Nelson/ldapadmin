@@ -153,7 +153,6 @@ begin
   fSortProc := SortProc;
   TreeView.Images := ImageList;
   cbConnections.ItemIndex := MainConnectionIdx;
-  cbConnectionsChange(nil);
 end;
 
 procedure TCopyDlg.cbConnectionsChange(Sender: TObject);
@@ -186,7 +185,7 @@ begin
     end;
   end;
   ddRoot := TreeView.Items.Add(nil, Format('%s [%s]', [Connection.Base, Connection.Server]));
-  ddRoot.Data := TLdapEntry.Create(Connection, Connection.Base);
+  ddRoot.Data := TObjectInfo.Create(TLdapEntry.Create(Connection, Connection.Base));
   fExpandNode(ddRoot, Connection);
   ddRoot.ImageIndex := bmRoot;
   ddRoot.SelectedIndex := bmRoot;

@@ -1429,7 +1429,7 @@ var
     S := Copy(Code, Pos(' ', Code) + 1, MaxInt);
     Result := Copy(S, 1, Pos('(', S) - 1);
     if Result = '' then
-      raise EIntScriptException.Create(DISP_E_PARAMNOTFOUND, 'Error extracting method name!');
+      raise EIntScriptException.Create(DISP_E_PARAMNOTFOUND, stErrExtMethName);
   end;
 
 begin
@@ -1757,11 +1757,11 @@ constructor TStringsScriptlet.Create(Script: TCustomScript; Strings: TStrings);
 begin
   inherited Create(Script, Strings);
   FStrings := Strings;
-  Methods.Add('Add');
-  Methods.Add('Delete');
-  Methods.Add('Insert');
-  Methods.Add('IndexOf');
-  Methods.Add('IndexOfName');
+  Methods.Add('add');
+  Methods.Add('delete');
+  Methods.Add('insert');
+  Methods.Add('indexOf');
+  Methods.Add('indexOfName');
 end;
 
 { TLdapEntryListScriptlet }

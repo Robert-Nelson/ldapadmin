@@ -374,6 +374,7 @@ const
   stMenuLocateTempl = 'The template "%s" which is assigned to this action could not be located!';
   stMenuAssignTempl = 'A template name must not be empty!';
   stDuplicateSC     = 'Shortcut ''%s'' is already assigned to ''%s'' menu item!';
+  stErrExtMethName  = 'Error extracting method name!';
 
 implementation
 

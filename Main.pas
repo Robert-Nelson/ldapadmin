@@ -514,7 +514,10 @@ begin
       end;
     end;
     if Select and Assigned(Result) then
+    begin
       Result.Selected := true;
+      Result.MakeVisible;
+    end;
   finally
     ldap_value_free(comp);
   end;
@@ -1237,6 +1240,7 @@ begin
   ActSearch.Enabled:=Enbl;
   ActModifySet.Enabled:=Enbl;
   ActPreferences.Enabled:=Enbl;
+  ActCustomizeMenu.Enabled := Enbl;
   ActEntries.Enabled:= Enbl;
   ActValues.Enabled:= Enbl;
   ActLocateEntry.Enabled := Enbl;

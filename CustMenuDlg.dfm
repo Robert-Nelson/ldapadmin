@@ -13,7 +13,7 @@ object CustomMenuDlg: TCustomMenuDlg
   Font.Style = []
   Menu = MainMenu
   OldCreateOrder = False
-  Position = poDesktopCenter
+  Position = poMainFormCenter
   OnCloseQuery = FormCloseQuery
   OnResize = FormResize
   PixelsPerInch = 96

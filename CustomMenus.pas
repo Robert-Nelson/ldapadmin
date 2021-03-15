@@ -215,6 +215,7 @@ const
                     aidNone,
                     aidNone,
                     aidNone,
+                    aidNone,
                     aidNone);
 
 function GetActionImage(ActionId: Integer): Integer;
