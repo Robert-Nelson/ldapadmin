@@ -201,11 +201,14 @@ object MainFrm: TMainFrm
         end>
       ReadOnly = True
       RowSelect = True
+      ParentShowHint = False
       PopupMenu = ListPopup
+      ShowHint = True
       SortType = stText
       TabOrder = 0
       ViewStyle = vsReport
       OnCustomDrawItem = ValueListViewCustomDrawItem
+      OnInfoTip = ValueListViewInfoTip
     end
     object EntryListView: TListView
       Left = 0
@@ -2299,6 +2302,7 @@ object MainFrm: TMainFrm
   object ListPopup: TPopupMenu
     AutoPopup = False
     Images = ImageList
+    OnPopup = ListPopupPopup
     Left = 488
     Top = 536
     object pbViewCopy: TMenuItem
@@ -2321,6 +2325,14 @@ object MainFrm: TMainFrm
     end
     object pbViewBinary: TMenuItem
       Action = ActViewBinary
+    end
+    object pbViewCert: TMenuItem
+      Caption = 'View &certificate...'
+      OnClick = pbViewCertClick
+    end
+    object pbViewPicture: TMenuItem
+      Caption = 'View &picture...'
+      OnClick = pbViewPictureClick
     end
   end
 end

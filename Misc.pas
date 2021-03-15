@@ -60,7 +60,12 @@ function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
 { Time conversion routines }
 function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
 function  UnixTimeToDateTime(const AValue: Int64): TDateTime;
+function  GTZToDateTime(AValue: string): TDateTime;
 function  LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
+{ String handling routines }
+procedure Split(Source: string; Result: TStrings; Separator: Char);
+function  FormatMemoInput(const Text: string): string;
+function  FormatMemoOutput(const Text: string): string;
 { URL handling routines }
 procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer);
 { Some handy dialogs }
@@ -69,8 +74,6 @@ function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: st
 function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
 { everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
-function  FormatMemoInput(const Text: string): string;
-function  FormatMemoOutput(const Text: string): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
 procedure LockControl(c: TWinControl; bLock: Boolean);
 function  PeekKey: Integer;
@@ -83,7 +86,9 @@ const
 
 implementation
 
-uses SysUtils, CommCtrl, StdCtrls, Messages, Constant;
+{$I LdapAdmin.inc}
+
+uses SysUtils, CommCtrl, StdCtrls, Messages, Constant {$IFDEF VARIANTS} ,variants {$ENDIF};
 
 { String conversion routines }
 
@@ -93,8 +98,11 @@ var
   l: Integer;
 begin
   SetLength(Result, Len);
-  l := MultiByteToWideChar( CP_UTF8, 0, src, Len, PWChar(Result), Len*SizeOf(WideChar));
-  SetLength(Result, l);
+  if Len > 0 then
+  begin
+    l := MultiByteToWideChar( CP_UTF8, 0, src, Len, PWChar(Result), Len*SizeOf(WideChar));
+    SetLength(Result, l);
+  end;
 end;
 
 function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
@@ -108,7 +116,8 @@ begin
   begin
     StringToWideChar(src, PWideChar(Temp), bsiz);
     SetLength(Result, bsiz);
-    bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), Len, PChar(Result), bsiz, nil, nil);
+    bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), -1, PChar(Result), bsiz, nil, nil);
+    if bsiz > 0 then dec(bsiz);
     SetLength(Result, bsiz);
   end;
 end;
@@ -125,6 +134,19 @@ begin
   Result := AValue / 86400 + 25569.0;
 end;
 
+function GTZToDateTime(AValue: string): TDateTime;
+begin
+  if (Length(AValue) < 15) or (Uppercase(AValue[Length(AValue)]) <> 'Z') then
+        raise EConvertError.Create(stInvalidTimeFmt);
+  AValue[15] := ' ';
+  Insert(':', AValue, 13);
+  Insert(':', AValue, 11);
+  Insert(' ', AValue, 9);
+  Insert('-', AValue, 7);
+  Insert('-', AValue, 5);
+  Result := VarToDateTime(AValue);
+end;
+
 function LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
 var
   tzi: TTimeZoneInformation;
@@ -134,7 +156,7 @@ begin
   fillchar(tzi, 0, SizeOf(tzi));
   err := GetTimeZoneInformation(tzi);
   if (err = TIME_ZONE_ID_UNKNOWN) or (err = TIME_ZONE_ID_INVALID) then
-    //raise Exception.Create('Invalid time zone!');
+    //raise Exception.Create(stInvalidTimeZone);
     Result := DateTime
   else begin
     Bias := tzi.Bias;
@@ -204,6 +226,27 @@ begin
     Result := Result + IntToHex(PByteArray(P)[i], 2) + ' ';
   if Ellipsis and (Result <> '') then
     Result := Result + '...';
+end;
+
+{ String handling routines }
+
+procedure Split(Source: string; Result: TStrings; Separator: Char);
+var
+  p0, p: PChar;
+  s: string;
+begin
+  p0 := PChar(Source);
+  p := p0;
+  repeat
+    while (p^<> #0) and (p^ <> Separator) do
+      p := CharNext(p);
+    SetString(s, p0, p - p0);
+    Result.Add(s);
+    if p^ = #0 then
+      exit;
+    p := CharNext(p);
+    p0 := p;
+  until false;
 end;
 
 { Address fields take $ sign as newline tag so we have to convert this to LF/CR }

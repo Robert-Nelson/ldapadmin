@@ -203,19 +203,6 @@ procedure THexView.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftStat
 begin
   with ScrollBar1 do
   case Key of
-    {VK_TAB:    if not (ssShift in Shift) and (Col = ColCount - 1) and (Row = RowCount - 1) then
-                 AddRow;
-    VK_INSERT: if (ssCtrl in Shift) then
-               begin
-                 InsertRow(StringGrid.Row);
-                 Key := 0;
-               end;
-    VK_DELETE: if (ssCtrl in Shift) then
-               begin
-                 DeleteRow(StringGrid.Row);
-                 Key := 0;
-               end;
-    VK_ESCAPE: Cells[Col, Row] := SaveVal;}
     VK_UP:     begin
                  Position := Position - 1;
                  Key := 0;

@@ -329,7 +329,7 @@ end;
 
 procedure TGroupDlg.Save;
 begin
-  if edName.Text = '' then //TODO: Need this?
+  if edName.Text = '' then 
     raise Exception.Create(stGroupNameReq);
   if cbSambaGroup.Checked and Assigned(DomList) and (cbSambaDomain.ItemIndex = -1) then
     raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));

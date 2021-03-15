@@ -1,5 +1,5 @@
   {      LDAPAdmin - Main.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2008 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -191,6 +191,8 @@ type
     ActModifySet: TAction;
     ModifyBtn: TToolButton;
     Modifyset1: TMenuItem;
+    pbViewCert: TMenuItem;
+    pbViewPicture: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LDAPTreeExpanding(Sender: TObject; Node: TTreeNode;
@@ -256,6 +258,11 @@ type
     procedure UndoBtnClick(Sender: TObject);
     procedure RedoBtnClick(Sender: TObject);
     procedure ActModifySetExecute(Sender: TObject);
+    procedure ListPopupPopup(Sender: TObject);
+    procedure pbViewCertClick(Sender: TObject);
+    procedure pbViewPictureClick(Sender: TObject);
+    procedure ValueListViewInfoTip(Sender: TObject; Item: TListItem;
+      var InfoTip: String);
   private
     Root: TTreeNode;
     fLdapSessions: TObjectList;
@@ -319,7 +326,7 @@ implementation
 uses EditEntry, Group, User, Computer, PassDlg, ConnList, Transport, Search, Ou,
      Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs,
      LdapCopy, Schema, BinView, Misc, Input, ConfigDlg, Templates, TemplateCtrl,
-     Shellapi, About;
+     Shellapi, Cert, PicView, About;
 
 {$R *.DFM}
 {$I LdapAdmin.inc}
@@ -583,8 +590,6 @@ begin
       2: ActListView.Checked := true;
     end;
   except end;
-  {RefreshTree;
-  InitStatusBar;}
 end;
 
 procedure TMainFrm.ServerDisconnect;
@@ -640,6 +645,7 @@ begin
     StatusBar.Panels[1].Text := '';
     StatusBar.Panels[2].Text := '';
     StatusBar.Panels[3].Text := '';
+    StatusBar.Panels[4].Text := '';    
   end;
 end;
 
@@ -657,7 +663,7 @@ begin
   if Visible then
   begin
     DoTemplateMenu;
-    if ((a <> fIdObject) or (b <> fEnforceContainer)) then
+    if Assigned(ldapSession) and ((a <> fIdObject) or (b <> fEnforceContainer)) then
       RefreshTree;
   end;
 end;
@@ -1416,6 +1422,8 @@ begin
     try
       if ShowModal = mrOk then
         Entry.Write;
+      if ValueListView.Visible then
+        RefreshValueListView(SelectedNode);
     finally
       Free;
     end;
@@ -1803,6 +1811,7 @@ begin
     end;
     LdapTree.OnChange := LDAPTreeChange;
     LdapTree.Items.EndUpdate;
+    InitStatusBar;
   end;
 end;
 
@@ -1827,6 +1836,83 @@ procedure TMainFrm.ActModifySetExecute(Sender: TObject);
 begin
   if LDAPTree.Selected = nil then LDAPTree.Selected := LDAPTree.TopItem;
   TSearchFrm.Create(Self, PChar(LDAPTree.Selected.Data), ldapSession).ShowModify;
+end;
+
+procedure TMainFrm.ListPopupPopup(Sender: TObject);
+var
+  s: string;
+begin
+  pbViewCert.Visible := false;
+  pbViewPicture.Visible := false;
+  s := ValueListView.Selected.SubItems[0];
+  if Copy(s, 1, 5) = '30 82' then // DER Sequence
+    pbViewCert.Visible := true
+  else
+    if Copy(s, 1, 5) = 'FF D8' then // Exif header
+      pbViewPicture.Visible := true;
+end;
+
+procedure TMainFrm.pbViewCertClick(Sender: TObject);
+var
+  Entry: TLdapEntry;
+begin
+  if Assigned(LdapTree.Selected) and Assigned(ValueListView.Selected) then
+  begin
+    Entry := TLdapEntry.Create(ldapSession, PChar(LdapTree.Selected.Data));
+    try
+      Entry.Read;
+      with Entry.AttributesByName[ValueListView.Selected.Caption].Values[Integer(ValueListView.Selected.Data)] do
+        ShowCert(Data, DataSize);
+    finally
+      Entry.Free;
+    end;
+  end;
+end;
+
+procedure TMainFrm.pbViewPictureClick(Sender: TObject);
+var
+  Entry: TLdapEntry;
+begin
+  if Assigned(LdapTree.Selected) and Assigned(ValueListView.Selected) then
+  begin
+    Entry := TLdapEntry.Create(ldapSession, PChar(LdapTree.Selected.Data));
+    try
+      Entry.Read;
+      TViewPicFrm.Create(Self, Entry.AttributesByName[ValueListView.Selected.Caption].Values[Integer(ValueListView.Selected.Data)]).Show;
+    finally
+      Entry.Free;
+    end;
+  end;
+end;
+
+procedure TMainFrm.ValueListViewInfoTip(Sender: TObject; Item: TListItem; var InfoTip: String);
+const
+  TimeStamps = 'sambapwdlastset,sambapwdcanchange,sambapwdmustchange';
+var
+  n: Int64;
+  c: Integer;
+  s, Value: string;
+begin
+  InfoTip := '';
+  try
+    Value := Item.SubItems[0];
+    if (Length(Value) >= 15) and (Uppercase(Value[Length(Value)]) = 'Z') then // Possibly GTZ
+    begin
+      InfoTip := DateTimeToStr(GTZToDateTime(Value));
+      Exit;
+    end;
+    s := lowercase(Item.Caption);
+    if (Pos(s, TimeStamps) > 0) or // Timestamp
+       (Pos('time', s) > 0) then   // Possibly timestamp
+    begin
+      Val(Value, n, c);
+      if c = 0 then
+        InfoTip := DateTimeToStr(UnixTimeToDateTime(n));
+    end
+    else
+    if s = 'shadowexpire' then
+      InfoTip := DateTimeToStr(25569 + StrToInt(Value));
+  except end;
 end;
 
 end.

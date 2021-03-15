@@ -449,7 +449,7 @@ object SearchFrm: TSearchFrm
                 Width = 393
                 Height = 21
                 Anchors = [akLeft, akTop, akRight]
-                ItemHeight = 13
+                ItemHeight = 0
                 TabOrder = 0
               end
               object edAttrBtn: TButton

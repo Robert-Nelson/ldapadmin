@@ -1563,7 +1563,6 @@ procedure TLDAPEntry.Write;
 var
   i, j: Integer;
 begin
-  { added *TEST* }
   if esModified in fState then
   begin
     Session.WriteEntry(Self);
@@ -1581,7 +1580,6 @@ end;
 procedure TLDAPEntry.Delete;
 begin
   Session.DeleteEntry(dn);
-  { added *TEST* }
   fState := fState + [esDeleted];
 end;
 

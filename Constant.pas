@@ -90,6 +90,7 @@ const
   rTemplateAutoload   = 'TemplateAutoload';
   rTemplateProperties = 'TemplateProperites';
   rStartupSession     = 'StartupSession';
+  rSearchFilter       = 'SearchFilter';
   rQuickSearchFilter  = 'QuickSearchFilter';
   rSmartDelete        = 'SmartDelete';
   rEditorSchemaHelp   = 'General\EdSchemaHelp';
@@ -114,10 +115,11 @@ const
   rSearchBase         = 'Search\Base';
   rSearchAttributes   = 'Search\Attributes';
   rSearchScope        = 'Search\Scope';
-  rSearchFilters      = 'Search\Filters\';
+  rSearchCustFilters  = 'Search\Filters\';
   rSearchDerefAliases = 'Search\DereferenceAliases';
   rTemplateFormHeight = 'TemplateForm\Height';
   rTemplateFormWidth  = 'TemplateForm\Width';
+  rLocalTransTable    = 'TranscodeTable';
 
 // Search filters
 
@@ -143,6 +145,7 @@ const
   sGROUPBYGID       = '(&(objectclass=posixGroup)(gidNumber=%d))';
   sACCNTBYUID       = '(&(objectclass=posixAccount)(uid=%s))';
   sDEFQUICKSRCH     = '(|(cn=*%s*)(uid=*%s*)(displayName=*%s*))';
+  sDEFSRCH          = '(|(uid=*%s*)(displayName=*%s*)(cn=*%s*)(sn=*%s*))';
 
 // Captions
 
@@ -262,10 +265,17 @@ const
   stCntSubentries   = '%d subentries';
   stUnclosedParam   = 'Invalid (Unclosed) parameter!';
   stIdentIsnotValid = '"%s" is not a valid %s!';
+  stInvalidTagValue = 'Invalid value %s for <%s>!';
+  stNumber          = 'number';
+  stInteger         = 'integer number';
+  stDateFormat      = 'date format';
+  stTimeFormat      = 'time format';
   stDuplicateEntry  = 'EntryList does not allow duplicates';
   stCantStorPass    = 'This storage does not allow to keep the password';
   stAccntExist      = 'Account with this name already exists.' + #10#13 + stOverwrite;
   stInvalidFilter   = 'Invalid or unsupported filter type!';
+  stRegexFailed     = 'Regexp validation failed!';
+  stInvalidTimeFmt  = 'Invalid time format!';
 
 implementation
 

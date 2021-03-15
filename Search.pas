@@ -205,6 +205,7 @@ type
     Session: TLDAPSession;
     ResultPages: TResultPageControl;
     ModifyBox: TModifyBox;
+    fSearchFilter: string;
     procedure Search(const Filter: string);
     procedure Modify(const Filter: string);
   public
@@ -804,7 +805,7 @@ begin
       ExtractParams(attrs, PChar(TEdit(Ctrls[3]).Text));
     end;
     ModifyBox.SearchList.Free;
-    ModifyBox.SearchList := TSearchList.Create(Session, cbBasePath.Text,                                          Filter, attrs,//cbAttributes.Text,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    ModifyBox.Run;  finally
+    ModifyBox.SearchList := TSearchList.Create(Session, cbBasePath.Text,                                          Filter, attrs,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    ModifyBox.Run;  finally
     Screen.Cursor := crDefault;
   end;
 end;
@@ -823,6 +824,7 @@ begin
   ResultPages.Parent := ResultPanel;
   ResultPages.AddPage;
   ResultPages.ActivePage.Caption := cSearchResults;
+  fSearchFilter := GlobalConfig.ReadString(rSearchFilter, sDEFSRCH);
   with AccountConfig do begin
     cbBasePath.Items.CommaText := ReadString(rSearchBase, '');
     cbAttributes.Items.CommaText := ReadString(rSearchAttributes, '');
@@ -955,7 +957,7 @@ begin
   begin
     s := '';
     if edName.Text <> '' then
-      s := Format('(|(uid=*%s*)(displayName=*%0:s*)(cn=*%0:s*)(sn=*%0:s*))', [edName.Text]);
+      s := StringReplace(fSearchFilter, '%s', edName.Text, [rfReplaceAll, rfIgnoreCase]);
     if edEmail.Text <> '' then
       s := Format('%s(mail=*%s*)', [s, edEMail.Text]);
     if s = '' then
@@ -1119,7 +1121,7 @@ begin
     idx := Items.IndexOf(Text);
     if idx = - 1 then
       Items.Add(Text);
-    AccountConfig.WriteString(rSearchFilters + Text, Memo1.Text);
+    AccountConfig.WriteString(rSearchCustFilters + Text, Memo1.Text);
   end;
 end;
 
@@ -1132,7 +1134,7 @@ begin
     DeleteFilterBtn.Enabled := SaveFilterBtn.Enabled;
     idx := Items.IndexOf(Text);
     if idx <> -1 then
-      Memo1.Text := AccountConfig.ReadString(rSearchFilters + Text);
+      Memo1.Text := AccountConfig.ReadString(rSearchCustFilters + Text);
   end;
 end;
 
@@ -1144,7 +1146,7 @@ begin
     idx := Items.IndexOf(Text);
     if idx <> -1 then
     begin
-      AccountConfig.Delete(AccountConfig.RootPath + '\' + rSearchFilters + Text);
+      AccountConfig.Delete(AccountConfig.RootPath + '\' + rSearchCustFilters + Text);
       Items.Delete(idx);
     end;
   end;
@@ -1159,7 +1161,7 @@ begin
   begin
     FilterNames := TStringList.Create;
     try
-      AccountConfig.GetValueNames(rSearchFilters, FilterNames);
+      AccountConfig.GetValueNames(rSearchCustFilters, FilterNames);
       for i := 0 to FilterNames.Count - 1 do
         cbFilters.Items.Add(FilterNames[i]);
     finally

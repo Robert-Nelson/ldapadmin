@@ -24,7 +24,7 @@ unit ConfigDlg;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, Dialogs, LdapClasses, ComCtrls, LAControls;
+  Buttons, ExtCtrls, Dialogs, LdapClasses, ComCtrls, LAControls, Grids;
 
 type
   TConfigDlg = class(TForm)
@@ -55,6 +55,11 @@ type
     Button1: TButton;
     CheckAssocCbk: TCheckBox;
     cbSmartDelete: TCheckBox;
+    TabSheet3: TTabSheet;
+    TranscodingTable: TStringGrid;
+    Label3: TLabel;
+    edSearch: TEdit;
+    Label4: TLabel;
     procedure btnAddClick(Sender: TObject);
     procedure btnDelClick(Sender: TObject);
     procedure cbConnectClick(Sender: TObject);
@@ -62,6 +67,8 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure TranscodingTableSetEditText(Sender: TObject; ACol,
+      ARow: Integer; const Value: String);
   private
     cbStartupConnection: TLAComboBox;
     procedure cbStartupConnectionDrawItem(Control: TWinControl;
@@ -73,7 +80,7 @@ type
 
 implementation
 
-uses FileCtrl, Config, Templates, Constant, Main;
+uses FileCtrl, Config, Templates, Constant, Misc, Main;
 
 {$R *.DFM}
 
@@ -81,13 +88,14 @@ constructor TConfigDlg.Create(AOwner: TComponent; ASession: TLdapSession);
 var
   i, j: Integer;
   s: string;
+  names: TStrings;
 begin
   inherited Create(AOwner);
   cbStartupConnection := TLAComboBox.Create(Self);
   with cbStartupConnection do begin
     Parent := GroupBox3;
     Left := 136;
-    Top := 28;
+    Top := cbConnect.Top - 2;
     Width := 265;
     Height := 21;
     ItemHeight := 16;
@@ -122,7 +130,20 @@ begin
       end;
     cbIdObject.Checked := ReadBool(rMwLTIdentObject, true);
     cbEnforceContainer.Checked := ReadBool(rMwLTEnfContainer, true);
+    edSearch.Text := ReadString('SearchFilter', sDEFSRCH);
     edQSearch.Text := ReadString('QuickSearchFilter', sDEFQUICKSRCH);
+    names := TStringList.Create;
+    with TranscodingTable do
+    try
+      Split(ReadString(rLocalTransTable), names, #$1E);
+      for i := 0 to names.Count - 1 do
+      begin
+        Cells[0, FixedRows + i] := Copy(names[i], 1, Pos(#$1F, names[i]) - 1);
+        Cells[1, FixedRows + i] := Copy(names[i], Length(Cells[0, FixedRows + i]) + 2, MaxInt);
+      end;
+    finally
+      names.Free;
+    end;
   end;
 end;
 
@@ -174,6 +195,8 @@ end;
 procedure TConfigDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 var
   Account: TAccount;
+  i: Integer;
+  s: string;
 begin
   Action := caFree;
   if ModalResult = mrOk then with GlobalConfig do
@@ -197,7 +220,18 @@ begin
     end;
     WriteBool(rMwLTIdentObject, cbIdObject.Checked);
     WriteBool(rMwLTEnfContainer, cbEnforceContainer.Checked);
+    WriteString(rSearchFilter, edSearch.Text);
     WriteString(rQuickSearchFilter, edQSearch.Text);
+    Delete(CONFIG_PREFIX + '\' + rLocalTransTable);
+    s := '';
+    with TranscodingTable do
+    for i := FixedRows to RowCount - 1 do
+      if Cells[0, i] <> '' then
+        s := s + Cells[0, i] + #$1F + Cells[1, i] + #$1E;
+    if s <> '' then
+      WriteString(rLocalTransTable, s)
+    else
+      Delete(rLocalTransTable);
   end;
 end;
 
@@ -248,7 +282,14 @@ end;
 procedure TConfigDlg.Button1Click(Sender: TObject);
 begin
   RegProtocol('LDAP');
-  RegProtocol('LDAPS');  
+  RegProtocol('LDAPS');
+end;
+
+procedure TConfigDlg.TranscodingTableSetEditText(Sender: TObject; ACol, ARow: Integer; const Value: String);
+begin
+  with TranscodingTable do
+  if (ARow = RowCount - 1) and (Cells[ACol, ARow] <> '') then
+    RowCount := RowCount + 1;
 end;
 
 end.

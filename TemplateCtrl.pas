@@ -1,5 +1,5 @@
   {      LDAPAdmin - TemplateCtrl.pas
-  *      Copyright (C) 2006-2007 Tihomir Karlovic
+  *      Copyright (C) 2006-2008 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -135,6 +135,8 @@ type
     fRdn: string;
     procedure OKBtnClick(Sender: TObject);
     procedure CancelBtnClick(Sender: TObject);
+  protected
+    procedure KeyPress(var Key: Char); override;
   public
     PageControl: TPageControl;
     constructor Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; Mode: TEditMode); reintroduce;
@@ -146,7 +148,7 @@ type
 
 implementation
 
-uses SysUtils, Misc, Config;
+uses SysUtils, Misc, Config, Grids;
 
 { TEventHandler }
 
@@ -740,12 +742,29 @@ begin
     Close;
 end;
 
+procedure TTemplateForm.KeyPress(var Key: Char);
+begin
+  inherited;
+  if (Key = #27) then
+  begin
+    if ActiveControl is TCustomEdit then
+      TCustomEdit(ActiveControl).Text := ''
+    else
+    if ActiveControl is TComboBox then
+      TComboBox(ActiveControl).Text := ''
+    else
+    if ActiveControl is TStringGrid then with TStringGrid(ActiveControl) do
+      Cells[Col, Row] := '';
+  end;
+end;
+
 constructor TTemplateForm.Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; Mode: TEditMode);
 var
   Panel: TPanel;
   Btn : TButton;
 begin
   inherited CreateNew(AOwner);
+  KeyPreview := true;
 
   fEventHandler := TEventHandler.Create;
   fTemplatePanels := TList.Create;
@@ -780,7 +799,7 @@ begin
     Anchors := [akTop, akRight];
     ModalResult := mrCancel;
     Caption := '&Cancel';
-    Cancel := true;
+    //Cancel := true;
   end;
 
   with TButton.Create(Self) do begin
@@ -828,7 +847,7 @@ begin
   Panel.Align := alClient;
   fTemplatePanels.Add(Panel);
   if TabSheet.TabIndex = 0 then
-    ActiveControl := Panel.FindNextControl(nil, true, true, true);
+    ActiveControl := Panel.FindNextControl(nil, true, true, false);
 end;
 
 procedure TTemplateForm.LoadMatching;

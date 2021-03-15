@@ -1,5 +1,5 @@
   {      LDAPAdmin - Templates.pas
-  *      Copyright (C) 2006-2007 Tihomir Karlovic
+  *      Copyright (C) 2006-2008 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -23,8 +23,17 @@ unit Templates;
 
 interface
 
+{$DEFINE REGEXPR}
+
 uses ComCtrls, LdapClasses, Classes, Contnrs, Controls, StdCtrls, ExtCtrls, Xml, Windows,
-     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask;
+     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask
+    {$IFDEF REGEXPR}
+    { Note: If you want to compile templates with regex support you'll need }
+    { Regexpr.pas unit from TRegeExpr library (http://www.regexpstudio.com) }
+    , Regexpr
+    {$ENDIF}
+     ;
+
 
 const
   TEMPLATE_EXT        = 'ltf';
@@ -63,6 +72,10 @@ type
     fName:        string;
     fDataControlName: string;
     fDataControl: TTemplateControl;
+    {$IFDEF REGEXPR}
+    fRegex:       TRegExpr;
+    fRegexMsg:    string;
+    {$ENDIF}
     procedure     OnChangeProc(Sender: TObject);
     procedure     OnExitProc(Sender: TObject);
     procedure     SetParentControl(AControl: TTemplateControl);
@@ -72,6 +85,10 @@ type
     procedure     SetOnExit(Event: TNotifyEvent); virtual;
     procedure     SetLdapAttribute(Attribute: TLdapAttribute); virtual; abstract;
     procedure     LoadProc(XmlNode: TXmlNode); virtual; abstract;
+    procedure     Validate; virtual;
+    {$IFDEF REGEXPR}
+    procedure     RegexEvaluate; virtual;
+    {$ENDIF}
   public
     constructor   Create(Attribute: TTemplateAttribute); virtual;
     destructor    Destroy; override;
@@ -112,6 +129,9 @@ type
     fLdapValue:   TLdapAttributeData;
     fParams:      TStringList;
   protected
+    {$IFDEF REGEXPR}
+    procedure     RegexEvaluate; override;
+    {$ENDIF}
     function      GetParams: TStringList; override;
     procedure     SetLdapAttribute(Attribute: TLdapAttribute); override;
   public
@@ -209,6 +229,8 @@ type
   end;
 
   TTemplateCtrlGrid = class(TTemplateMVControl)
+  private
+    procedure     MyExitProc(Sender: TObject);
   protected
     procedure     LoadProc(XmlNode: TXmlNode); override;
   public
@@ -378,6 +400,16 @@ type
     procedure     Write; override;
   end;
 
+  TTemplateCtrlNumber = class(TTemplateCtrlEdit)
+  protected
+    procedure     Validate; override;
+  end;
+
+  TTemplateCtrlInteger = class(TTemplateCtrlEdit)
+  protected
+    procedure     Validate; override;
+  end;
+
   { Template classes }
 
   TTemplateControlList = class(TObjectList)
@@ -500,6 +532,7 @@ type
   end;
 
 var
+  Iso639LangName: string;
   TemplateParser: TTemplateParser;
 
 implementation
@@ -511,7 +544,7 @@ uses
   Pickup;
 
 const
-  CONTROLS_CLASSES: array[0..14] of TTControl = ( TTemplateCtrlEdit,
+  CONTROLS_CLASSES: array[0..16] of TTControl = ( TTemplateCtrlEdit,
                                                   TTemplateCtrlCombo,
                                                   TTemplateCtrlComboList,
                                                   TTemplateCtrlComboLookupList,
@@ -525,7 +558,9 @@ const
                                                   TTemplateCtrlDate,
                                                   TTemplateCtrlTime,
                                                   TTemplateCtrlDateTime,
-                                                  TTemplateCtrlPickupDlg);
+                                                  TTemplateCtrlPickupDlg,
+                                                  TTemplateCtrlNumber,
+                                                  TTemplateCtrlInteger );
   //DEFAULT_CONTROL_CLASS: TTControl = TTemplateCtrlEdit;
 
 function GetXmlTypeByClass(AClass: TTControl): string;
@@ -561,15 +596,28 @@ var
 begin
   Result := nil;
   if XmlNode.Name = 'objectclass' then Exit;
+
   XmlType := XmlNode.Attributes.Values['type'];
+
   if XmlType = '' then
-    Result := TTemplateNoCtrl
-  else
+  begin
+    Result := TTemplateNoCtrl;
+    exit;
+  end;
+
   if Lowercase(XmlType) = 'text' then
     Result := GetClassByXmlType('edit')
   else
   if Lowercase(XmlType) = 'boolean' then
-    Result := GetClassByXmlType('checkbox');
+    Result := GetClassByXmlType('checkbox')
+  else
+  if Lowercase(XmlType) = 'jpeg' then
+    Result := GetClassByXmlType('image')
+  else
+    Result := GetClassByXmlType(XmlType);
+
+  if Result = nil then
+    Result := TTemplateNoCtrl;
 end;
 
 function CheckStrToInt(Value, Tag: string): Integer;
@@ -578,8 +626,34 @@ begin
     Result := StrToInt(Value);
   except
     on E:EConvertError do
-      raise Exception.Create(Format('Invalid value %s for <%s>!', [Value, Tag]));
+      raise Exception.Create(Format(stInvalidTagValue, [Value, Tag]));
   end;
+end;
+
+function GetIso639LangName: string;
+var
+  Buffer: array[0..8] of Char;
+begin
+  if GetLocaleInfo(SysLocale.DefaultLCID, LOCALE_SISO639LANGNAME, @Buffer, SizeOf(Buffer)) > 0 then
+    Result := PChar(@Buffer)
+  else
+    Result := '';
+end;
+
+function XmlLanguageMatch(XmlNode: TXmlNode): Boolean;
+var
+  Lang: string;
+begin
+  if Iso639LangName <> '' then
+  begin
+    Lang := XmlNode.Attributes.Values['lang'];
+    if (Lang <> '') and not AnsiSameText(Iso639LangName, Lang) then
+    begin
+      Result := false;
+      Exit;
+    end;
+  end;
+  Result := true;
 end;
 
 function CreateControl(ControlTemplate: TXmlNode; Attribute: TTemplateAttribute): TTemplateControl;
@@ -627,6 +701,37 @@ begin
   end;
   Result := fParams;
 end;
+
+{$IFDEF REGEXPR}
+procedure TTemplateMVControl.RegexEvaluate;
+var
+  Res: Boolean;
+  err, i: Integer;
+  val, msg: string;
+begin
+ if Assigned(fLdapAttribute) and (fRegex.Expression <> '') then
+ for i := 0 to fLdapAttribute.ValueCount - 1 do
+ begin
+   val := fLdapAttribute.Values[i].AsString;
+   if val = '' then Continue;
+   Res := fRegex.Exec(val);
+   if not Res then
+   begin
+     if fControl is TWinControl then
+       TWinControl(fControl).SetFocus;
+     err := fRegEx.LastError;
+     if err <> 0 then
+       msg := fRegEx.ErrorMsg(err)
+     else
+     if fRegexMsg <> '' then
+       msg := fRegexMsg
+     else
+       msg := stRegexFailed;
+     raise Exception.Create(msg);
+   end;
+ end;
+end;
+{$ENDIF}
 
 procedure TTemplateMVControl.SetLdapAttribute(Attribute: TLdapAttribute);
 var
@@ -732,6 +837,10 @@ end;
 
 procedure TTemplateControl.OnExitProc(Sender: TObject);
 begin
+  {$IFDEF REGEXPR}
+  RegexEvaluate;
+  {$ENDIF}
+  Validate;
   if Assigned(fExitProc) then fExitProc(Self);
 end;
 
@@ -764,12 +873,25 @@ var
   i, j: Integer;
   AAttribute: TTemplateAttribute;
   AControl: TTemplateControl;
+  Node: TXmlNode;
 begin
 
   if Assigned(XmlNode) then
   begin
     for i:=0 to XmlNode.Count-1 do with XmlNode[i] do
     begin
+      {$IFDEF REGEXPR}
+      if Name = 'regex' then
+      begin
+        Node := XmlNode[i].NodeByName('expression');
+        if Assigned(Node) then
+          fRegex.Expression := Node.Content;
+        Node := XmlNode[i].NodeByName('errormessage');
+        if Assigned(Node) then
+          fRegexMsg := Node.Content;
+      end
+      else
+      {$ENDIF}
       if Name = 'attribute' then
       begin
         AAttribute := TTemplateAttribute.Create(XmlNode[i]);
@@ -795,7 +917,10 @@ begin
       end
       else
       if Name = 'caption' then
-        fCaption := Content
+      begin
+        if XmlLanguageMatch(XmlNode[i]) then
+          fCaption := Content
+      end
       else
       if Name = 'name' then
         fName := Content
@@ -831,6 +956,38 @@ procedure TTemplateControl.SetOnExit(Event: TNotifyEvent);
 begin
   fExitProc := Event;
 end;
+
+procedure TTemplateControl.Validate;
+begin
+end;
+
+{$IFDEF REGEXPR}
+procedure TTemplateControl.RegexEvaluate;
+var
+  Res: Boolean;
+  err: Integer;
+  msg: string;
+begin
+ if Assigned(fLdapAttribute) and (fRegex.Expression <> '') and (fLdapAttribute.AsString <> '') then
+ begin
+   Res := fRegex.Exec(fLdapAttribute.AsString);
+   if not Res then
+   begin
+     if fControl is TWinControl then
+       TWinControl(fControl).SetFocus;
+     err := fRegEx.LastError;
+     if err <> 0 then
+       msg := fRegEx.ErrorMsg(err)
+     else
+     if fRegexMsg <> '' then
+       msg := fRegexMsg
+     else
+       msg := stRegexFailed;
+     raise Exception.Create(msg);
+   end;
+ end;
+end;
+{$ENDIF}
 
 procedure TTemplateControl.ArrangeControls;
 var
@@ -923,12 +1080,18 @@ begin
   fElements := TObjectList.Create;
   fTemplateAttribute := Attribute;
   fAutoSize := true;
+  {$IFDEF REGEXPR}
+  fRegex := TRegExpr.Create;
+  {$ENDIF}
 end;
 
 destructor TTemplateControl.Destroy;
 begin
   fElements.Free;
   fControl.Free;
+  {$IFDEF REGEXPR}
+  fRegex.Free;
+  {$ENDIF}
   inherited;
 end;
 
@@ -964,7 +1127,11 @@ begin
     begin
       s := FormatValue(Values[i].AsString, Attribute.Entry);
       if not IsParametrized(s) then
+      begin
         fLdapAttribute.Values[i].AsString := s;
+        if Assigned(fChangeProc) then
+          fChangeProc(Self);
+      end;
     end;
 end;
 
@@ -1151,7 +1318,7 @@ begin
     begin
       cap := '';
       val := '';
-      Node := NodeByName('caption');
+      Node := NodeByName('caption', true, Iso639LangName);
       if Assigned(Node) then
         cap := Node.Content;
       Node := NodeByName('value');
@@ -1387,6 +1554,12 @@ end;
 
 { TTemplateCtrlGrid }
 
+procedure TTemplateCtrlGrid.MyExitProc(Sender: TObject);
+begin
+  OnChangeProc(Sender);
+  OnExitProc(sender);
+end;
+
 procedure TTemplateCtrlGrid.SetValue(AValue: TTemplateAttributeValue);
 var
   i: Integer;
@@ -1482,8 +1655,8 @@ constructor TTemplateCtrlGrid.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
   fControl := TEditGrid.Create(nil);
-  TEditGrid(fControl).OnExit := OnExitProc;
-  TEditGrid(fControl).OnExit := OnChangeProc;
+  //TEditGrid(fControl).OnExit := OnExitProc;
+  TEditGrid(fControl).OnExit := MyExitProc;
 end;
 
 { TTemplateCtrlPasswordButton }
@@ -1862,20 +2035,10 @@ begin
   if (fDateFormat = FMT_DATE_TIME_UNIX) or (fTimeFormat = FMT_DATE_TIME_UNIX) then
     Result := UnixTimeToDateTime(StrToInt64(Value))
   else
-  begin
-    if (fDateFormat = FMT_DATE_TIME_GTZ) or (fTimeFormat = FMT_DATE_TIME_GTZ) then
-    begin
-      if (Length(Value) < 15) or (Uppercase(Value[Length(Value)]) <> 'Z') then
-        raise EConvertError.Create('');
-      Value[15] := ' ';
-      Insert(':', Value, 13);
-      Insert(':', Value, 11);
-      Insert(' ', Value, 9);
-      Insert('-', Value, 7);
-      Insert('-', Value, 5);
-    end;
+  if (fDateFormat = FMT_DATE_TIME_GTZ) or (fTimeFormat = FMT_DATE_TIME_GTZ) then
+    Result := GTZToDateTime(Value)
+  else
     Result := VarToDateTime(Value);
-  end;
 end;
 
 function TTemplateCtrlDate.GetDisplayFormat: string;
@@ -1996,8 +2159,8 @@ procedure TTemplateCtrlDate.SetTimeString(Value: string);
   begin
     with (Control as TDateTimePicker) do begin
       case Kind of
-        dtkDate: s := 'date format';
-        dtkTime: s := 'time format';
+        dtkDate: s := stDateFormat;
+        dtkTime: s := stTimeFormat;
       end;
       Checked := false;
     end;
@@ -2273,7 +2436,7 @@ var
     N := Node.NodeByName('value');
     if Assigned(N) then
       fColumns[High(fColumns)] := N.Content;
-    N := Node.NodeByName('caption');
+    N := Node.NodeByName('caption', true, Iso639LangName);
     if Assigned(N) then
       fColNames[High(fColNames)] := N.Content;
   end;
@@ -2332,6 +2495,40 @@ begin
     OnExit := OnExitProc;
     OnClick := ButtonClick;
     Caption := 'Browse...';
+  end;
+end;
+
+{ TTemplateCtrlNumber }
+
+procedure TTemplateCtrlNumber.Validate;
+begin
+  inherited;
+  if TEdit(fControl).Text <> '' then
+  try
+    StrToFloat(TEdit(fControl).Text);
+  except
+    on E: EConvertError do begin
+      if fControl is TWinControl then
+        TWinControl(fControl).SetFocus;
+      raise Exception.Create(Format(stIdentIsNotValid, [TEdit(fControl).Text, stNumber]));
+    end;
+  end;
+end;
+
+{ TTemplateCtrlInteger }
+
+procedure TTemplateCtrlInteger.Validate;
+begin
+  inherited;
+  if TEdit(fControl).Text <> '' then
+  try
+    StrToInt(TEdit(fControl).Text);
+  except
+    on E: EConvertError do begin
+      if fControl is TWinControl then
+       TWinControl(fControl).SetFocus;
+      raise Exception.Create(Format(stIdentIsNotValid, [TEdit(fControl).Text, stInteger]));
+    end;
   end;
 end;
 
@@ -2550,7 +2747,11 @@ begin
   for i:=0 to FXmlTree.Root.Count-1 do with FXmlTree.Root[i] do begin
     if Name='name' then FName:= Content
     else
-    if Name='description' then FDescription:=Content
+    if Name='description' then
+    begin
+      if XmlLanguageMatch(FXmlTree.Root[i]) then
+        FDescription:=Content
+    end
     else
     if Name='extends' then fExtends.Add(Content)
     else
@@ -2642,7 +2843,11 @@ begin
   for i:=0 to XmlNode.Count-1 do with XmlNode[i] do begin
     if Name='name'  then FName:=Content
     else
-    if Name='description' then FDescription := Content
+    if Name='description' then
+    begin
+      if XmlLanguageMatch(XmlNode[i]) then
+        FDescription:=Content
+    end
     else
     if Name='control' then
     begin
@@ -2738,6 +2943,8 @@ end;
 
 initialization
 
+  Iso639LangName := GetIso639LangName;
+
   TemplateParser := TTemplateParser.Create;
   try
     TemplateParser.Paths := GlobalConfig.ReadString('TemplateDir');
@@ -2752,3 +2959,4 @@ finalization
   TemplateParser.Free;
 
 end.
+

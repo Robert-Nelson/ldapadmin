@@ -1,5 +1,5 @@
   {      LDAPAdmin - Cert.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2008 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -25,8 +25,8 @@ interface
 
 uses WinLdap, wcrypt2, Windows;
 
-
-function VerifyCert(Connection: PLDAP; pServerCert: PCCERT_CONTEXT): BOOLEAN; cdecl ;
+procedure ShowCert(x509Cert: Pointer; x509CertLen: Cardinal);
+function  VerifyCert(Connection: PLDAP; pServerCert: PCCERT_CONTEXT): BOOLEAN; cdecl ;
 
 { Global variables used by VerifyCert }
 var
@@ -107,6 +107,24 @@ begin
   end;
 end;
 
+procedure ShowCert(x509Cert: Pointer; x509CertLen: Cardinal);
+var
+  pCertContext: PCCERT_CONTEXT;
+  uiDlg: TUIDlg;
+begin
+  pCertContext := CertCreateCertificateContext(X509_ASN_ENCODING + PKCS_7_ASN_ENCODING, x509Cert, x509CertLen);
+  if Assigned(pCertContext) then
+  try
+    uiDlg := TUIDlg.Create(pCertContext, 'Certificate');
+    try
+      uidlg.ShowCert;
+    finally
+      uiDlg.Free;
+    end;
+  finally
+     CertFreeCertificateContext(pCertContext);
+  end;
+end;
 
 function VerifyCertHostName(pCertContext: PCCERT_CONTEXT; HostName: string): boolean;
 type
@@ -242,7 +260,6 @@ begin
     Result := true
   else
   begin
-    //if MessageDlg(Format(stCertConfirmConn, [errStr]), mtWarning, [mbYes, mbNo], 0) = idYes then
     uiDlg := TUIDlg.Create(pSub, 'Certificate');
     if Assigned(UIDlg.OnClickProc) then
       cap := '&View...'

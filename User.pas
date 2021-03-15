@@ -204,6 +204,7 @@ type
     DomList: TDomainList;
     AsTop: Integer;
     originalPanelWindowProc : TWndMethod;
+    TranscodeList: TStringList;
     procedure PanelWindowProc (var Msg : TMessage) ;
     procedure PanelImageDrop (var Msg : TWMDROPFILES) ;
     function FormatString(const Src : string) : string;
@@ -351,21 +352,30 @@ procedure TUserDlg.PosixPreset;
 var
   s: string;
 
-  function ConvertUmlauts(s: string): string;
+  function Transcode(Source: string): string;
   var
+    i, l: Integer;
     p: PChar;
   begin
-    REsult := '';
-    p := PChar(s);
+    Result := '';
+    p := PChar(Source);
     while p^ <> #0 do begin
-      case p^ of
-        'ä': Result := Result + 'ae';
-        'ö': Result := Result + 'oe';
-        'ü': Result := Result + 'ue';
-      else
-        Result := Result + p^;
+      i := TranscodeList.Count - 1;
+      while i >= 0 do begin
+        l := Pos(#$1F, TranscodeList[i]) - 1;
+        if (l >= 0) and (AnsiStrLComp(PChar(TranscodeList[i]), p, l) = 0) then
+        begin
+          Result := Result + Copy(TranscodeList[i], l + 2, MaxInt);
+          p := p + l;
+          break;
+        end;
+        dec(i);
       end;
-      p := CharNext(p);
+      if i = -1 then
+      begin
+        Result := Result + p^;
+        p := CharNext(p);
+      end;
     end;
   end;
 
@@ -389,7 +399,7 @@ begin
     end;
     if uid.Text = '' then
     begin
-      SetText(uid, ConvertUmlauts(s));
+      SetText(uid, Transcode(s));
       SetText(homeDirectory, FormatString(AccountConfig.ReadString(rposixHomeDir)));
       SambaPreset;
     end;
@@ -449,6 +459,11 @@ begin
 
    with SambaAccount do
    begin
+     if not Active then
+     begin
+       New;
+       UserAccount := true;
+     end;
      i := cbDomain.ItemIndex;
      if i = -1 then
        DomainData := nil
@@ -462,11 +477,6 @@ begin
      except end; // not critical
      //cbAccntDisabled.Checked := Disabled;
      SetCheckbox(cbAccntDisabled, Disabled or Autolocked);
-     if not Active then
-     begin
-       New;
-       UserAccount := true;
-     end;
    end;
 end;
 
@@ -634,6 +644,9 @@ begin
 
   Session := ASession;
   ParentDn := adn;
+
+  TranscodeList := TStringList.Create;
+  Split(GlobalConfig.ReadString(rLocalTransTable, 'ä'#$1F'ae'#$1E'ö'#$1F'oe'#$1E'ü'#$1F'ue'#$1E), TranscodeList, #$1E);
 
   Entry := TLdapEntry.Create(ASession, adn);
 
@@ -953,7 +966,9 @@ end;
 procedure TUserDlg.SaveGroups;
 var
   i, modop: Integer;
-  Entry: TLdapEntry;
+  GroupEntry: TLdapEntry;
+  MemberAttr: TLdapAttribute;
+  MemberValue: string;
 begin
   if Assigned(origGroups) then with origGroups do
   begin
@@ -962,17 +977,35 @@ begin
       modop := Integer(Objects[i]);
       if modop <> 0 then
       begin
-        Entry := TLdapEntry.Create(Session, origGroups[i]);
-        Entry.Read;
+        GroupEntry := TLdapEntry.Create(Session, origGroups[i]);
+        GroupEntry.Read;
+        with GroupEntry.AttributesByName['objectclass'] do
+        begin
+          if IndexOf('groupofuniquenames') <> -1 then
+          begin
+            MemberAttr := GroupEntry.AttributesByName['uniqueMember'];
+            MemberValue := Self.Entry.dn;
+          end
+          else
+          if IndexOf('groupofnames') <> -1 then
+          begin
+            MemberAttr := GroupEntry.AttributesByName['member'];
+            MemberValue := Self.Entry.dn;
+          end
+          else begin
+            MemberAttr := GroupEntry.AttributesByName['memberUid'];
+            MemberValue := uid.Text;
+          end;
+        end;
         try
           // modify user attributes always must happend before savegroups so we don't get inconsistent here
           if modop > 0 then
-            Entry.AttributesByName['memberUid'].AddValue(uid.Text)
+            MemberAttr.AddValue(MemberValue)
           else
-            Entry.AttributesByName['memberUid'].DeleteValue(uid.Text);
-          Entry.Write;
+            MemberAttr.DeleteValue(MemberValue);
+          GroupEntry.Write;
         finally
-          Entry.Free;
+          GroupEntry.Free;
         end;
       end;
     end;
@@ -1119,6 +1152,7 @@ begin
   ShadowAccount.Free;
   SambaAccount.Free;
   MailAccount.Free;
+  TranscodeList.Free;
   with CheckListBox.Items do
     for i := 0 to Count - 1 do
       if Objects[i] is TTabSheet then Objects[i].Free;

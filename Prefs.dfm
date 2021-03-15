@@ -361,11 +361,11 @@ object PrefDlg: TPrefDlg
           Caption = 'Default Maildrop:'
         end
         object Label13: TLabel
-          Left = 48
+          Left = 40
           Top = 44
-          Width = 94
+          Width = 100
           Height = 13
-          Caption = 'Default Mail Adress:'
+          Caption = 'Default Mail Address:'
         end
         object edMaildrop: TEdit
           Left = 152

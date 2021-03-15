@@ -57,7 +57,7 @@ type
     function    Add(const AName: string=''; const AContent: string=''; const AAttributes: TstringList=nil): TXmlNode;
     function    Clone(const Recurse: boolean): TxmlNode;
     procedure   Delete(Index: integer);
-    function    NodeByName(AName: string; CaseSensitive: boolean=true): TXmlNode;
+    function    NodeByName(AName: string; CaseSensitive: boolean=true; Lang: string=''): TXmlNode;
     property    CaseSensitive: boolean read GetCaseSens;
    end;
 
@@ -136,18 +136,25 @@ begin
   if AAttributes<>nil then Attributes.Assign(AAttributes);
 end;
 
-function TXmlNode.NodeByName(AName: string; CaseSensitive: boolean=true): TXmlNode;
+function TXmlNode.NodeByName(AName: string; CaseSensitive: boolean=true; Lang: string=''): TXmlNode;
 type
   TCompareProc=function(const AText, AOther: string): Boolean;
 var
   i: integer;
   proc: TCompareProc;
+  l: string;
 begin
   result:=nil;
   if CaseSensitive then proc:=AnsiSameStr
   else proc:=AnsiSameText;
 
   for i:=0 to Count-1 do begin
+    if Lang <> '' then
+    begin
+      l := Nodes[i].Attributes.Values['lang'];
+      if (l <> '') and not AnsiSameText(Lang, l) then
+        continue;
+    end;
     if proc(Nodes[i].Name, AName) then begin
       result:=Nodes[i];
       exit;

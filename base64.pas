@@ -97,7 +97,7 @@ function  Base64Decode(const InBuf; const Length: Cardinal; var OutBuf): Cardina
 
 function  Base64Encode(const InBuf; const Length: Cardinal): string; overload;
 function  Base64DecSize(InBuf: string): Cardinal; overload;
-function Base64Decode(const InBuf: string; var OutBuf): integer; overload;
+function  Base64Decode(const InBuf: string; var OutBuf): integer; overload;
 
 implementation
 
