@@ -1,6 +1,6 @@
 object MainFrm: TMainFrm
-  Left = 192
-  Top = 107
+  Left = 193
+  Top = 108
   Width = 871
   Height = 642
   Caption = 'LDAP Admin'
@@ -1707,8 +1707,17 @@ object MainFrm: TMainFrm
       object mbMove: TMenuItem
         Action = ActMoveEntry
       end
+      object N21: TMenuItem
+        Caption = '-'
+      end
+      object mbRename: TMenuItem
+        Action = ActRenameEntry
+      end
       object mbDeleteEntry: TMenuItem
         Action = ActDeleteEntry
+      end
+      object N22: TMenuItem
+        Caption = '-'
       end
       object mbRefresh: TMenuItem
         Action = ActRefresh
@@ -1889,8 +1898,17 @@ object MainFrm: TMainFrm
     object pbMove: TMenuItem
       Action = ActMoveEntry
     end
+    object N19: TMenuItem
+      Caption = '-'
+    end
+    object pbRename: TMenuItem
+      Action = ActRenameEntry
+    end
     object pbDelete: TMenuItem
       Action = ActDeleteEntry
+    end
+    object N20: TMenuItem
+      Caption = '-'
     end
     object pbRefresh: TMenuItem
       Action = ActRefresh
@@ -2088,6 +2106,17 @@ object MainFrm: TMainFrm
       Caption = 'Copy Attribute name'
       OnExecute = ActCopyNameExecute
     end
+    object ActRenameEntry: TAction
+      Category = 'Edit'
+      Caption = '&Rename...'
+      ShortCut = 113
+      OnExecute = ActRenameEntryExecute
+    end
+    object ActFindInSchema: TAction
+      Category = 'View'
+      Caption = '&Find in schema...'
+      OnExecute = ActFindInSchemaExecute
+    end
   end
   object ListPopup: TPopupMenu
     AutoPopup = False
@@ -2102,6 +2131,12 @@ object MainFrm: TMainFrm
     end
     object pbViewCopyValue: TMenuItem
       Action = ActCopyValue
+    end
+    object N23: TMenuItem
+      Caption = '-'
+    end
+    object pbFindInSchema: TMenuItem
+      Action = ActFindInSchema
     end
     object N18: TMenuItem
       Caption = '-'

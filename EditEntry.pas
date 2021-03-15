@@ -112,6 +112,9 @@ type
     TemplateBtnDel: TToolButton;
     Splitter2: TSplitter;
     TemplatePopupMenu: TPopupMenu;
+    ActFindInSchema: TAction;
+    N6: TMenuItem;
+    pbFindInSchema: TMenuItem;
     procedure mbSaveClick(Sender: TObject);
     procedure mbExitClick(Sender: TObject);
     procedure mbDeleteRowClick(Sender: TObject);
@@ -145,6 +148,7 @@ type
     procedure StringGridMouseWheelDown(Sender: TObject; Shift: TShiftState; MousePos: TPoint; var Handled: Boolean);
     procedure StringGridMouseWheelUp(Sender: TObject; Shift: TShiftState; MousePos: TPoint; var Handled: Boolean);
     procedure StringGridMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure ActFindInSchemaExecute(Sender: TObject);
   private
     Entry: TLDAPEntry;
     ObjectCombo: TInplaceComboBox;
@@ -1304,6 +1308,19 @@ begin
     else
       Hint := '';
   end;
+end;
+
+procedure TEditEntryFrm.ActFindInSchemaExecute(Sender: TObject);
+var
+  StringGrid: TStringGrid;
+  s: string;
+begin
+  if objStringGrid.Focused then
+    StringGrid := objStringGrid
+  else
+    StringGrid := attrStringGrid;
+  s := StringGrid.Cells[0, StringGrid.Row];
+  MainFrm.ShowSchema.Search(s, true, false);
 end;
 
 end.

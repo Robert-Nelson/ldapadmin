@@ -1,5 +1,5 @@
   {      LDAPAdmin - Group.pas
-  *      Copyright (C) 2003-2006 Tihomir Karlovic
+  *      Copyright (C) 2003-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -85,7 +85,7 @@ type
     procedure Save;
     function GetGroupType: Integer;
   public
-    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Boolean = false); reintroduce;
+    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0); reintroduce;
   end;
 
 var
@@ -131,7 +131,10 @@ begin
     if IndexOf('posixgroup') <> -1 then
       PosixGroup := TPosixGroup.Create(Entry);
     if IndexOf('groupofuniquenames') <> -1 then
-      GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry);
+      GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry)
+    else
+    if IndexOf('groupofnames') <> -1 then
+      GroupOfUniqueNames := TGroupOfNames.Create(Entry)
   end;
   edName.Text := Entry.AttributesByName['cn'].AsString;
   edDescription.Text := Entry.AttributesByName['description'].AsString;
@@ -155,7 +158,7 @@ begin
     RemoveUserBtn.Enabled := true;
 end;
 
-constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Boolean = false);
+constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0);
 var
   n: Integer;
 begin
@@ -200,11 +203,12 @@ begin
       PosixGroup := TPosixGroup.Create(Entry);
       PosixGroup.New;
     end;
-    if AGroupOfUniqueNames then
-    begin
-      GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry);
-      GroupOfUniqueNames.New;
+    case AGroupOfUniqueNames of
+      1: GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry);
+      2: GroupOfUniqueNames := TGroupOfNames.Create(Entry);
     end;
+    if Assigned(GroupOfUniqueNames) then
+      GroupOfUniqueNames.New;
   end;
 end;
 

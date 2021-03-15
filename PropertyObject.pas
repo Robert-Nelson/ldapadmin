@@ -1,4 +1,4 @@
-  {      LDAPAdmin - Main.pas
+  {      LDAPAdmin - PropertyObject.pas
   *      Copyright (C) 2005 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
@@ -67,6 +67,8 @@ type
 
 
 implementation
+
+uses Misc;
 
 { TPropertyObject }
 
@@ -165,12 +167,14 @@ begin
   if s = '' then
     Result := -1
   else
-    Result := StrToInt(s) / 86400 + 25569.0;
+    //Result := StrToInt(s) / 86400 + 25569.0;
+    Result := UnixTimeToDateTime(StrToInt64(s));
 end;
 
 procedure TPropertyObject.SetAsUnixTime(Index: TProperties; AValue: TDateTime);
 begin
-  SetString(Index, IntToStr(Round((AValue - 25569.0) * 86400)));
+  //SetString(Index, IntToStr(Round((AValue - 25569.0) * 86400)));
+  SetString(Index, IntToStr(DateTimeToUnixTime(AValue)));
 end;
 
 function TPropertyObject.GetCommaText(Index: Integer): string;

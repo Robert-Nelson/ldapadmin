@@ -100,7 +100,6 @@ type
     procedure       AddValues(const Name: string; const Values: TLdapSchemaItems; const AsString: string; const Parent: TTreeNode=nil); overload;
     procedure       AddValues(const Name: string; const Values: TStringList; const Parent: TTreeNode=nil); overload;
 
-    function        Search(const SearchStr: string; const WholeWords: boolean; const InNewTab: boolean): TTreeNode;
     procedure       ShowObjectClass(const ObjClass: TLDAPSchemaClass);
     procedure       ShowAttribute(const Attribute: TLDAPSchemaAttribute);
     procedure       ShowSyntax(const Syntax: TLDAPSchemaSyntax);
@@ -113,6 +112,7 @@ type
     constructor     Create(const ASession: TLDAPSession); reintroduce;
     destructor      Destroy; override;
     procedure       SessionDisconnect(Sender: TObject);
+    function        Search(const SearchStr: string; const WholeWords: boolean; const InNewTab: boolean): TTreeNode;
   end;
 
 implementation

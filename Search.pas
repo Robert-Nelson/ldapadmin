@@ -1,5 +1,5 @@
   {      LDAPAdmin - Search.pas
-  *      Copyright (C) 2003-2006 Tihomir Karlovic
+  *      Copyright (C) 2003-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -124,6 +124,9 @@ type
     GotoBtn: TBitBtn;
     SaveBtn: TBitBtn;
     CloseBtn: TBitBtn;
+    cbFilters: TComboBox;
+    SaveFilterBtn: TButton;
+    DeleteFilterBtn: TButton;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure PickListBoxDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
@@ -140,6 +143,10 @@ type
     procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure ListViewDblClick(Sender: TObject);
     procedure edAttrBtnClick(Sender: TObject);
+    procedure cbFiltersChange(Sender: TObject);
+    procedure SaveFilterBtnClick(Sender: TObject);
+    procedure DeleteFilterBtnClick(Sender: TObject);
+    procedure cbFiltersDropDown(Sender: TObject);
   private
     Session: TLDAPSession;
     RList: TLdapEntryList;
@@ -156,7 +163,7 @@ var
 
 implementation
 
-uses EditEntry, Constant, Main, Ldif, PickAttr, Schema, Config;
+uses EditEntry, Constant, Main, Ldif, PickAttr, Schema, Xml, Config, Dsml;
 
 {$R *.DFM}
 
@@ -284,34 +291,30 @@ begin
   sdref := Session.DereferenceAliases;
   Session.DereferenceAliases := fDerefAliases;
   try
-    Session.Search(FFilter, FBase, FSearchLevel, attrs, false, FEntries, CallbackProc);
-    try
-      FListView.Items.BeginUpdate;
-      FListView.Columns.BeginUpdate;
-      setlength(attrs, FAttributes.Count+1);
-      w := Width;
-      if FAttributes.Count > 0 then
-        w := (w - 400) div FAttributes.Count;
-      if w < 40 then w := 40;
-      for i:=0 to FAttributes.Count-1 do begin
-        with FListView.Columns.Add do begin
-          Caption:=FAttributes[i];
-          Width:=w;
-          Tag:=i;
-        end;
-        attrs[i]:=FAttributes[i];
+    FListView.Items.BeginUpdate;
+    FListView.Columns.BeginUpdate;
+    setlength(attrs, FAttributes.Count+1);
+    w := Width;
+    if FAttributes.Count > 0 then
+      w := (w - 400) div FAttributes.Count;
+    if w < 40 then w := 40;
+    for i:=0 to FAttributes.Count-1 do begin
+      if FAttributes[i] <> '*' then
+      with FListView.Columns.Add do begin
+        Caption:=FAttributes[i];
+        Width:=w;
+        Tag:=i;
       end;
-      FListView.Columns[0].Width := 400;
-      attrs[length(attrs)-1]:='objectClass';
-    finally
-      FListView.Columns.EndUpdate;
-      FListView.Items.EndUpdate;
+      attrs[i]:=FAttributes[i];
     end;
+    FListView.Columns[0].Width := 400;
+    attrs[length(attrs)-1]:='objectclass';
+    Session.Search(FFilter, FBase, FSearchLevel, attrs, false, FEntries, CallbackProc);
   finally
+    FListView.Columns.EndUpdate;
+    FListView.Items.EndUpdate;
     Session.DereferenceAliases := sdref;
   end;
-  {ldap_set_option(Session.pld, LDAP_OPT_DEREF, @fDerefAliases);
-  Session.Search(FFilter, FBase, FSearchLevel, attrs, false, FEntries, CallbackProc);}
   FListView.Items.Count:=FEntries.Count;
   fStatusBar.SimpleText := Format(stCntObjects, [FEntries.Count]);
 end;
@@ -502,7 +505,7 @@ begin
   begin
     s := '';
     if edName.Text <> '' then
-      s := Format('(|(uid=*%s*)(displayName=*%s*))', [edName.Text, edName.Text]);
+      s := Format('(|(uid=*%s*)(displayName=*%0:s*)(cn=*%0:s*)(sn=*%0:s*))', [edName.Text]);
     if edEmail.Text <> '' then
       s := Format('%s(mail=*%s*)', [s, edEMail.Text]);
     if s = '' then
@@ -530,22 +533,64 @@ begin
 end;
 
 procedure TSearchFrm.ActSaveExecute(Sender: TObject);
-var
-  ldif: TLdifFile;
-  i: Integer;
-begin
-  with ResultPages, ActivePage do
-  if Assigned(ActivePage) and (Entries.Count > 0) and SaveDialog.Execute then
+
+  procedure ToLdif;
+  var
+    ldif: TLdifFile;
+    i: Integer;
   begin
     ldif := TLDIFFile.Create(SaveDialog.FileName, fmWrite);
     ldif.UnixWrite := SaveDialog.FilterIndex = 2;
-    try
+    with ResultPages.ActivePage do try
       for i := 0 to Entries.Count - 1 do
         ldif.WriteRecord(Entries[i]);
     finally
       ldif.Free;
     end;
   end;
+
+  procedure ToCSV;
+  var
+    i: Integer;
+    csvList: TStringList;
+    s: string;
+  begin
+    csvList := TStringList.Create;
+    with ResultPages.ActivePage.ListView do
+    try
+      for i := 0 to Items.Count - 1 do with Items[i] do
+      begin
+        s := '"' + Caption + '"';
+        if SubItems.Count > 0 then
+          s := s + ',' + SubItems.CommaText;
+        csvList.Add(s);
+      end;
+      csvList.SaveToFile(SaveDialog.FileName);
+    finally
+      csvList.Free;
+    end;
+  end;
+
+  procedure ToXml;
+  var
+    DsmlTree: TDsmlTree;
+  begin
+    DsmlTree := TDsmlTree.Create(ResultPages.ActivePage.Entries);
+    try
+      DsmlTree.SaveToFile(SaveDialog.FileName);
+    finally
+      DsmlTree.Free;
+    end;
+  end;
+
+begin
+  with ResultPages, ActivePage do
+    if Assigned(ActivePage) and (Entries.Count > 0) and SaveDialog.Execute then
+      case SaveDialog.FilterIndex of
+        1, 2: ToLdif;
+        3:    ToCSV;
+        4:    ToXml;
+      end;
 end;
 
 procedure TSearchFrm.ActEditExecute(Sender: TObject);
@@ -593,6 +638,65 @@ begin
   begin
     ShowModal;
     cbAttributes.Text := Attributes;
+  end;
+end;
+
+procedure TSearchFrm.SaveFilterBtnClick(Sender: TObject);
+var
+  idx: Integer;
+begin
+  with cbFilters do begin
+    if Text = '' then Exit;
+    idx := Items.IndexOf(Text);
+    if idx = - 1 then
+      Items.Add(Text);
+    AccountConfig.WriteString(rSearchFilters + Text, Memo1.Text);
+  end;
+end;
+
+procedure TSearchFrm.cbFiltersChange(Sender: TObject);
+var
+  idx: Integer;
+begin
+  with cbFilters do begin
+    SaveFilterBtn.Enabled := Text <> '';
+    DeleteFilterBtn.Enabled := SaveFilterBtn.Enabled;
+    idx := Items.IndexOf(Text);
+    if idx <> -1 then
+      Memo1.Text := AccountConfig.ReadString(rSearchFilters + Text);
+  end;
+end;
+
+procedure TSearchFrm.DeleteFilterBtnClick(Sender: TObject);
+var
+  idx: Integer;
+begin
+  with cbFilters do begin
+    idx := Items.IndexOf(Text);
+    if idx <> -1 then
+    begin
+      AccountConfig.Delete(AccountConfig.RootPath + '\' + rSearchFilters + Text);
+      Items.Delete(idx);
+    end;
+  end;
+end;
+
+procedure TSearchFrm.cbFiltersDropDown(Sender: TObject);
+var
+  FilterNames: TStrings;
+  i: Integer;
+begin
+  if cbFilters.Tag = 0 then
+  begin
+    FilterNames := TStringList.Create;
+    try
+      AccountConfig.GetValueNames(rSearchFilters, FilterNames);
+      for i := 0 to FilterNames.Count - 1 do
+        cbFilters.Items.Add(FilterNames[i]);
+    finally
+      FilterNames.Free;
+    end;
+    cbFilters.Tag := 1;
   end;
 end;
 

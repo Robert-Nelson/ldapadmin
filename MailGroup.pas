@@ -1,7 +1,8 @@
   {      LDAPAdmin - MailGroup.pas
   *      Copyright (C) 2003 Tihomir Karlovic
   *
-  *      Author: Simon Zsolt
+  *      Author:                 Simon Zsolt
+  *      Updated:  07.06.2005    Tihomir Karlovic
   *
   *
   * This file is free software; you can redistribute it and/or modify

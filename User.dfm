@@ -13,7 +13,7 @@ object UserDlg: TUserDlg
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poDesktopCenter
+  Position = poMainFormCenter
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnDestroy = FormDestroy
@@ -782,7 +782,7 @@ object UserDlg: TUserDlg
         TabOrder = 3
         OnChange = EditChange
       end
-      object Panel2: TPanel
+      object ImagePanel: TPanel
         Left = 224
         Top = 160
         Width = 145

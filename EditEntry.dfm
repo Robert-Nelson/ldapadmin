@@ -942,6 +942,12 @@ object EditEntryFrm: TEditEntryFrm
     object mbSaveToFile1: TMenuItem
       Action = ActSaveFile
     end
+    object N6: TMenuItem
+      Caption = '-'
+    end
+    object pbFindInSchema: TMenuItem
+      Action = ActFindInSchema
+    end
     object N9: TMenuItem
       Caption = '-'
     end
@@ -1040,6 +1046,11 @@ object EditEntryFrm: TEditEntryFrm
       Checked = True
       ImageIndex = 10
       OnExecute = ActSchemaCheckExecute
+    end
+    object ActFindInSchema: TAction
+      Category = 'Edit'
+      Caption = '&Find in schema...'
+      OnExecute = ActFindInSchemaExecute
     end
   end
   object TemplatePopupMenu: TPopupMenu

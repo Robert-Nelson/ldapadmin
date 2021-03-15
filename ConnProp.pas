@@ -1,5 +1,5 @@
   {      LDAPAdmin - Connprop.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -24,7 +24,7 @@ unit ConnProp;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-     Buttons, ExtCtrls, Config, ComCtrls;
+     Buttons, ExtCtrls, Config, ComCtrls, LDAPClasses;
 
 type
   TConnPropDlg = class(TForm)
@@ -37,13 +37,12 @@ type
     UserEd:       TEdit;
     Label5:       TLabel;
     PasswordEd:   TEdit;
-    AnonimousCbx: TCheckBox;
+    cbAnonymous: TCheckBox;
     ConnectionBox: TGroupBox;
     Label2:       TLabel;
     ServerEd:     TEdit;
     Label3:       TLabel;
     PortEd:       TEdit;
-    cbSSL:        TCheckBox;
     VersionCombo: TComboBox;
     Label7:       TLabel;
     Label6:       TLabel;
@@ -71,14 +70,28 @@ type
     edReferralHops: TEdit;
     Label8: TLabel;
     cbDerefAliases: TComboBox;
-    procedure     cbSSLClick(Sender: TObject);
-    procedure     AnonimousCbxClick(Sender: TObject);
+    TabSheet3: TTabSheet;
+    cbxShowAttrs: TCheckBox;
+    lbxAttributes: TListBox;
+    btnAdd: TButton;
+    btnRemove: TButton;
+    rbSimpleAuth: TRadioButton;
+    rbGssApi: TRadioButton;
+    cbSSL: TCheckBox;
+    cbSASL: TCheckBox;
+    procedure     MethodChange(Sender: TObject);
+    procedure     cbAnonymousClick(Sender: TObject);
     procedure     FetchDnBtnClick(Sender: TObject);
     procedure     VersionComboChange(Sender: TObject);
     procedure     TestBtnClick(Sender: TObject);
     procedure     ValidateInput(Sender: TObject);
-    procedure cbxPagedSearchClick(Sender: TObject);
-    procedure cbReferralsClick(Sender: TObject);
+    procedure     cbxPagedSearchClick(Sender: TObject);
+    procedure     cbReferralsClick(Sender: TObject);
+    procedure     cbxShowAttrsClick(Sender: TObject);
+    procedure     btnAddClick(Sender: TObject);
+    procedure     btnRemoveClick(Sender: TObject);
+    procedure     cbSSLClick(Sender: TObject);
+    procedure cbSASLClick(Sender: TObject);
   private
     FUser:        string;
     FPass:        string;
@@ -87,6 +100,8 @@ type
     procedure     SetBase(const Value: string);
     function      GetLdapVersion: integer;
     procedure     SetLdapVersion(const Value: integer);
+    function      GetAuthMethod: TLdapAuthMethod;
+    procedure     SetAuthMethod(const Value: TLdapAuthMethod);
     function      GetUser: string;
     procedure     SetUser(const Value: string);
     function      GetPassword: string;
@@ -112,6 +127,8 @@ type
     procedure     SetReferrals(const Value: boolean);
     function      GetReferralHops: Integer;
     procedure     SetReferralHops(const Value: Integer);
+    function      GetOperationalAttrs: string;
+    procedure     SetOperationalAttrs(const Value: string);
     procedure     SetConnectionName(const Value: string);
     procedure     SetPassEnable(const Value: boolean);
   protected
@@ -122,6 +139,7 @@ type
     property      SSL: boolean read GetSSL write SetSSL;
     property      Port: integer read GetPort write SetPort;
     property      LdapVersion: integer read GetLdapVersion write SetLdapVersion;
+    property      AuthMethod: TLdapAuthMethod read GetAuthMethod write SetAuthMethod;
     property      User: string read GetUser write SetUser;
     property      Server: string read GetServer write SetServer;
     property      Base: string read GetBase write SetBase;
@@ -134,6 +152,7 @@ type
     property      DereferenceAliases: Integer read GetDerefAliases write SetDerefAliases;
     property      ChaseReferrals: Boolean read GetReferrals write SetReferrals;
     property      ReferralHops: Integer read GetReferralHops write SetReferralHops;
+    property      OperationalAttrs: string read GetOperationalAttrs write SetOperationalAttrs;
   end;
 
 var
@@ -141,7 +160,7 @@ var
 
 implementation
 
-uses WinLDAP, Constant, LDAPClasses, Math, Dialogs;
+uses WinLDAP, Constant, Math, Dialogs;
 
 {$R *.DFM}
 
@@ -161,8 +180,9 @@ end;
 
 procedure TConnPropDlg.DoShow;
 begin
-  AnonimousCbx.Checked:=(UserEd.Text='');
+  cbAnonymous.Checked:=(UserEd.Text='');
   FetchDnBtn.Enabled:=VersionCombo.Text='3';
+  cbxShowAttrs.Checked := OperationalAttrs <> '';
   inherited;
 end;
 
@@ -226,6 +246,32 @@ begin
   VersionCombo.ItemIndex := Value - 2;
 end;
 
+function TConnPropDlg.GetAuthMethod: TLdapAuthMethod;
+begin
+  if rbSimpleAuth.Checked then
+    Result := AUTH_SIMPLE
+  else
+  if cbSASL.Checked then
+    Result := AUTH_GSS_SASL
+  else
+    Result := AUTH_GSS;
+end;
+
+procedure TConnPropDlg.SetAuthMethod(const Value: TLdapAuthMethod);
+begin
+  rbSimpleAuth.Checked := Value = AUTH_SIMPLE;
+  rbGssApi.Checked := not rbSimpleAuth.Checked;
+
+  if Value = AUTH_SIMPLE then
+    rbSimpleAuth.Checked := true
+  else begin
+    rbSimpleAuth.Checked := false;
+    if Value = AUTH_GSS_SASL then
+      cbSASL.Checked := true
+  end;
+  MethodChange(nil);
+end;
+
 function TConnPropDlg.GetPort: integer;
 begin
   result:=StrToInt(PortEd.Text);
@@ -238,7 +284,7 @@ end;
 
 function TConnPropDlg.GetSSL: boolean;
 begin
-  result:=cbSSL.Checked;
+  result:= cbSSL.Checked;
 end;
 
 procedure TConnPropDlg.SetSSL(const Value: boolean);
@@ -320,25 +366,44 @@ begin
   edReferralHops.Text := IntToStr(Value);
 end;
 
+function TConnPropDlg.GetOperationalAttrs: string;
+begin
+  Result := lbxAttributes.Items.CommaText;
+end;
+
+procedure TConnPropDlg.SetOperationalAttrs(const Value: string);
+begin
+  lbxAttributes.Items.CommaText := Value;
+end;
+
 procedure TConnPropDlg.ValidateInput(Sender: TObject);
 begin
   StrToInt((Sender as TEdit).Text);
 end;
 
-procedure TConnPropDlg.cbSSLClick(Sender: TObject);
+procedure TConnPropDlg.MethodChange(Sender: TObject);
 begin
-  if cbSSL.Checked then PortEd.Text := IntToStr(LDAP_SSL_PORT)
-  else PortEd.Text := IntToStr(LDAP_PORT)
+  if AuthMethod = AUTH_SIMPLE then
+  begin
+    cbSASL.Checked := false;
+    cbSASL.Enabled := false;
+    //cbSASL.Color := clBtnFace;
+    cbAnonymous.Caption := cAnonymousConn;
+  end
+  else begin
+    cbSASL.Enabled := true;
+    cbAnonymous.Caption := cSASLCurrUser;
+  end;
 end;
 
-procedure TConnPropDlg.AnonimousCbxClick(Sender: TObject);
+procedure TConnPropDlg.cbAnonymousClick(Sender: TObject);
 begin
-  UserEd.Enabled:=not AnonimousCbx.Checked;
-  PasswordEd.Enabled:=not AnonimousCbx.Checked;
-  Label4.Enabled:=not AnonimousCbx.Checked;
-  Label5.Enabled:=not AnonimousCbx.Checked;
+  UserEd.Enabled:=not cbAnonymous.Checked;
+  PasswordEd.Enabled:=not cbAnonymous.Checked;
+  Label4.Enabled:=not cbAnonymous.Checked;
+  Label5.Enabled:=not cbAnonymous.Checked;
 
-  if AnonimousCbx.Checked then begin
+  if cbAnonymous.Checked then begin
     FUser:=UserEd.Text;
     FPass:=PasswordEd.Text;
     UserEd.Text:='';
@@ -361,7 +426,8 @@ begin
   AList:=TLdapEntryList.Create;
   BaseEd.Items.Clear;
   Asession.Server:=ServerEd.Text;
-  Asession.SSL:=SSl;
+  Asession.SSL:=SSL;
+  ASession.AuthMethod:=AuthMethod;
   ASession.Port:= Port;
   ASession.Version:=3;
 
@@ -397,12 +463,14 @@ var
 begin
   Asession:=TLDAPSession.Create;
   try
-    ASession.Server   := self.Server;
-    ASession.Port     := self.Port;
-    ASession.Version  := self.LdapVersion;
-    ASession.Base     := self.Base;
-    ASession.User     := self.User;
-    ASession.Password := self.Password;
+    ASession.Server     := self.Server;
+    ASession.Port       := self.Port;
+    ASession.Version    := self.LdapVersion;
+    ASession.Base       := self.Base;
+    ASession.User       := self.User;
+    ASession.Password   := self.Password;
+    ASession.AuthMethod := self.AuthMethod;
+    ASession.SSL        := Self.SSL;
 
     Screen.Cursor:=crHourGlass;
     Asession.Connect;
@@ -446,6 +514,70 @@ begin
     edReferralHops.Enabled := false;
     edReferralHops.Color := clBtnFace;
   end;
+end;
+
+procedure TConnPropDlg.cbxShowAttrsClick(Sender: TObject);
+begin
+  if cbxShowAttrs.Checked then
+  begin
+    lbxAttributes.Enabled := true;
+    lbxAttributes.Color := clWindow;
+    btnAdd.Enabled := true;
+    btnRemove.Enabled := true;
+    if lbxAttributes.Items.Count = 0 then
+      lbxAttributes.Items.CommaText := StandardOperationalAttributes;
+  end
+  else begin
+    lbxAttributes.Enabled := false;
+    lbxAttributes.Color := clBtnFace;
+    btnAdd.Enabled := false;
+    btnRemove.Enabled := false;
+    lbxAttributes.Clear;
+  end;
+end;
+
+procedure TConnPropDlg.btnAddClick(Sender: TObject);
+var
+  s: string;
+begin
+  s := InputBox(cAddAttribute, cAttributeName, '');
+  if s <> '' then
+  begin
+    lbxAttributes.Items.Add(s);
+    btnRemove.Enabled := true;
+  end;
+end;
+
+procedure TConnPropDlg.btnRemoveClick(Sender: TObject);
+var
+  i: Integer;
+begin
+  i := lbxAttributes.ItemIndex;
+  if i <> -1 then
+  begin
+    lbxAttributes.Items.Delete(i);
+    if i = lbxAttributes.Items.Count then
+      dec(i);
+    lbxAttributes.ItemIndex := i;
+    btnRemove.Enabled := lbxAttributes.ItemIndex <> -1;
+  end;
+end;
+
+procedure TConnPropDlg.cbSSLClick(Sender: TObject);
+begin
+  if SSL then
+  begin
+    PortEd.Text := IntToStr(LDAP_SSL_PORT);
+    cbSASL.Checked := false;
+  end
+  else
+    PortEd.Text := IntToStr(LDAP_PORT);
+end;
+
+procedure TConnPropDlg.cbSASLClick(Sender: TObject);
+begin
+  if cbSASL.Checked then
+    cbSSL.Checked := false
 end;
 
 end.

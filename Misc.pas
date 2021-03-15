@@ -54,22 +54,91 @@ type
     property        OnSort: TLVSorterOnSort read FOnSort write FOnSort;
   end;
 
+{ String conversion routines }
+function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
+function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
+{ Time conversion routines }
+function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
+function  UnixTimeToDateTime(const AValue: Int64): TDateTime;
+function  LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
+{ URL handling routines }
+procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer);
+{ Some handy dialogs }
+function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
+function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
+function  ExtraButtonMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; ReplaceCaption: string; Event: TNotifyEvent = nil): TModalResult;
+{ everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 function  FormatMemoInput(const Text: string): string;
 function  FormatMemoOutput(const Text: string): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
-function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
-function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
 procedure LockControl(c: TWinControl; bLock: Boolean);
 function  PeekKey: Integer;
 procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
 function  SupportedPropertyObjects(const Index: Integer): Boolean;
-procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer);
 
+const
+  mrCustom   = 1000;
 
 implementation
 
 uses SysUtils, CommCtrl, StdCtrls, Messages, Constant;
+
+{ String conversion routines }
+
+{ Note: these functions ignore conversion errors }
+function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
+var
+  l: Integer;
+begin
+  SetLength(Result, Len);
+  l := MultiByteToWideChar( CP_UTF8, 0, src, Len, PWChar(Result), Len*SizeOf(WideChar));
+  SetLength(Result, l);
+end;
+
+function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
+var
+  bsiz: Integer;
+  Temp: string;
+begin
+  bsiz := Len * 3;
+  SetLength(Temp, bsiz);
+  if bsiz > 0 then
+  begin
+    StringToWideChar(src, PWideChar(Temp), bsiz);
+    SetLength(Result, bsiz);
+    bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), Len, PChar(Result), bsiz, nil, nil);
+    SetLength(Result, bsiz);
+  end;
+end;
+
+{ Time conversion routines }
+
+function DateTimeToUnixTime(const AValue: TDateTime): Int64;
+begin
+  Result := Round((AValue - 25569.0) * 86400)
+end;
+
+function UnixTimeToDateTime(const AValue: Int64): TDateTime;
+begin
+  Result := AValue / 86400 + 25569.0;
+end;
+
+function LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
+var
+  tzi: TTimeZoneInformation;
+  err: DWORD;
+  Bias: Integer;
+begin
+  fillchar(tzi, 0, SizeOf(tzi));
+  err := GetTimeZoneInformation(tzi);
+  if (err = TIME_ZONE_ID_UNKNOWN) or (err = TIME_ZONE_ID_INVALID) then
+    raise Exception.Create('Invalid time zone!');
+  Bias := tzi.Bias;
+  if err = TIME_ZONE_ID_DAYLIGHT then
+    inc(Bias, tzi.DayLightBias);
+  Result := DateTime + Bias * 60 / 86400;
+end;
 
 { URL handling routines }
 
@@ -497,6 +566,37 @@ begin
     ActiveControl := Combo;
     Result := ShowModal;
     Text := Combo.Text;
+  finally
+    Form.Free;
+  end;
+end;
+{ Uses Help button to display it with ReplaceCaption, returns mrCustom on click}
+function ExtraButtonMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; ReplaceCaption: string; Event: TNotifyEvent): TModalResult;
+var
+  Form: TForm;
+  i: Integer;
+begin
+  if ReplaceCaption <> '' then
+    Buttons := Buttons + [mbHelp];
+  Form:=CreateMessageDialog(Msg, DlgType, Buttons);
+  with Form do
+  try
+    if ReplaceCaption <> '' then
+    for i:=0 to ComponentCount-1 do begin
+      if (Components[i] is TButton) then with TButton(Components[i]) do
+      begin
+        if ModalResult = mrNone then
+        begin
+          Caption := ReplaceCaption;
+          if Assigned(Event) then
+            OnClick := Event
+          else
+            ModalResult := mrCustom;
+          Break;
+        end;
+      end;
+    end;
+    Result := ShowModal;
   finally
     Form.Free;
   end;

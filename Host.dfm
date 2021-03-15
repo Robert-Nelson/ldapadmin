@@ -12,7 +12,7 @@ object HostDlg: THostDlg
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poScreenCenter
+  Position = poMainFormCenter
   OnClose = FormClose
   OnDestroy = FormDestroy
   PixelsPerInch = 96

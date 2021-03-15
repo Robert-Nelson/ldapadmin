@@ -28,16 +28,18 @@ uses PropertyObject, LDAPClasses, Winldap, Classes;
 const
     eCn                  = 0;
     eUniqueMember        = 1;
-    eDescription         = 2;
-    eBusinessCategory    = 3;
-    eOrganizationName    = 4;
-    eOuName              = 5;
-    eOwner               = 6;
-    eSeeAlso             = 7;
+    eMember              = 2;
+    eDescription         = 3;
+    eBusinessCategory    = 4;
+    eOrganizationName    = 5;
+    eOuName              = 6;
+    eOwner               = 7;
+    eSeeAlso             = 8;
 
   PropAttrNames: array[eCn..eSeeAlso] of string = (
     'cn',
     'uniqueMember',
+    'member',
     'description',
     'businessCategory',
     'o',
@@ -48,6 +50,9 @@ const
 
 type
   TGroupOfUniqueNames = class(TPropertyObject)
+  protected
+    function  GetMember(Index: Integer): string; virtual;
+    function  GetMemberCount: integer; virtual;
   public
     constructor Create(const Entry: TLdapEntry); override;
     procedure AddMember(const AMember: string); virtual;
@@ -60,14 +65,36 @@ type
     property OuName: string index eOuName read GetString write SetString;
     property Owner: string index eOwner read GetString write SetString;
     property SeeAlso: string index eSeeAlso read GetString write SetString;
-    property Members[Index: Integer]: string index eUniqueMember read GetMultiString;
-    property MembersCount: Integer index eUniqueMember read GetMultiStringCount;
+    property Members[Index: Integer]: string read GetMember;
+    property MembersCount: Integer read GetMemberCount;
+  end;
+
+  TGroupOfNames = class(TGroupOfUniqueNames)
+  protected
+    function GetMember(Index: Integer): string; override;
+    function GetMemberCount: Integer; override;
+  public
+    constructor Create(const Entry: TLdapEntry); override;
+    procedure AddMember(const AMember: string); override;
+    procedure RemoveMember(const AMember: string); override;
+    property Members[Index: Integer]: string read GetMember;
+    property MembersCount: Integer read GetMemberCount;
   end;
 
 implementation
 
 
 { TGroupOfUniqueNames }
+
+function TGroupOfUniqueNames.GetMember(Index: Integer): string;
+begin
+  Result := GetMultiString(Index, eUniqueMember);
+end;
+
+function TGroupOfUniqueNames.GetMemberCount: Integer;
+begin
+  Result := GetMultiStringCount(eUniqueMember);
+end;
 
 constructor TGroupOfUniqueNames.Create(const Entry: TLdapEntry);
 begin
@@ -88,6 +115,33 @@ procedure TGroupOfUniqueNames.New;
 begin
   inherited;
   AddObjectClass(['top']);
+end;
+
+{ TGroupOfNames }
+
+function TGroupOfNames.GetMember(Index: Integer): string;
+begin
+  Result := GetMultiString(Index, eMember);
+end;
+
+function TGroupOfNames.GetMemberCount: Integer;
+begin
+  Result := GetMultiStringCount(eMember);
+end;
+
+constructor TGroupOfNames.Create(const Entry: TLdapEntry);
+begin
+  inherited Create(Entry, 'groupOfNames', @PropAttrNames);
+end;
+
+procedure TGroupOfNames.AddMember(const AMember: string);
+begin
+  AddToMultiString(eMember, AMember);
+end;
+
+procedure TGroupOfNames.RemoveMember(const AMember: string);
+begin
+  RemoveFromMultiString(eMember, AMember);
 end;
 
 end.

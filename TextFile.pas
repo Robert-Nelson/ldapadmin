@@ -36,11 +36,13 @@ type
     fNumRead: Integer;
     fUnixWrite: Boolean;
     function IsEof: Boolean;
+    function GetPos: Integer;
   public
     function  ReadLn: string;
     procedure WriteLn(Value: string);
     property Eof: Boolean read IsEof;
     property UnixWrite: Boolean read fUnixWrite write fUnixWrite;
+    property Pos: Integer read GetPos;
   end;
 
 implementation
@@ -50,6 +52,11 @@ uses Constant;
 function TTextFile.IsEof: Boolean;
 begin
   Result := (Position = Size) and (fPos = fNumRead);
+end;
+
+function TTextFile.GetPos: Integer;
+begin
+  Result := Position + BUF_SIZE - fPos;
 end;
 
 function TTextFile.ReadLn: string;

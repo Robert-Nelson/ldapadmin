@@ -30,11 +30,10 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Posix, Shadow,
   InetOrg, Postfix, Samba, PropertyObject, Constant, ExtDlgs, TemplateCtrl,
-  CheckLst;
+  CheckLst, ShellApi;
 
 
 const
-
   GRP_ADD           =  1;
   GRP_DEL           = -1;
 
@@ -139,7 +138,7 @@ type
     Label38: TLabel;
     Label39: TLabel;
     Label40: TLabel;
-    Panel2: TPanel;
+    ImagePanel: TPanel;
     OpenPictureBtn: TButton;
     Label41: TLabel;
     Image1: TImage;
@@ -204,6 +203,9 @@ type
     PageSetup: Boolean;
     DomList: TDomainList;
     AsTop: Integer;
+    originalPanelWindowProc : TWndMethod;
+    procedure PanelWindowProc (var Msg : TMessage) ;
+    procedure PanelImageDrop (var Msg : TWMDROPFILES) ;
     function FormatString(const Src : string) : string;
     procedure SetCheckbox(Cbx: TCheckBox; Check: Boolean);
     procedure LoadControls(Parent: TWinControl);
@@ -237,9 +239,51 @@ uses AdvSamba, Pickup, Input, Misc, Jpeg, Main, Templates, Config;
 
 { TUsrDlg }
 
+procedure TUserDlg.PanelWindowProc(var Msg: TMessage) ;
+begin
+   if Msg.Msg = WM_DROPFILES then
+     PanelImageDrop(TWMDROPFILES(Msg))
+   else
+     originalPanelWindowProc(Msg) ;
+end;
+
+procedure TUserDlg.PanelImageDrop(var Msg: TWMDROPFILES) ;
+var
+   buffer : array[0..MAX_PATH] of char;
+begin
+   DragQueryFile(Msg.Drop, 0, @buffer, sizeof(buffer)) ;
+   Image1.Picture.LoadFromFile(buffer) ;
+   InetOrgPerson.JPegPhoto := Image1.Picture.Graphic as TJpegImage;
+   DeleteJpegBtn.Enabled := true;
+   ImagePanel.Caption := '';
+end;
+
 function TUserDlg.FormatString(const Src : string) : string;
 var
   p, p1: PChar;
+
+  function CheckRange(var p1: PChar; src: string): string;
+  var
+    p: PChar;
+    rg: string;
+  begin
+    p1 := CharNext(p1);
+    if p1^ = '[' then
+    begin
+      p := CharNext(p1);
+      p1 := p;
+      while p1^ <> ']' do begin
+        if p1 = #0 then
+          raise Exception.Create(stUnclosedParam);
+        p1 := CharNext(p1);
+      end;
+      SetString(rg, p, p1 - p);
+      Result := Copy(src, 1, StrToInt(rg));
+    end
+    else
+      Result := src;
+  end;
+
 begin
   Result := '';
   p := PChar(Src);
@@ -249,9 +293,9 @@ begin
     begin
       case p1^ of
         'u': Result := Result + Uid.Text;
-        'f': Result := Result + GivenName.Text;
+        'f': Result := Result + CheckRange(p1, GivenName.Text);
         'F': Result := Result + GivenName.Text[1];
-        'l': Result := Result + Sn.Text;
+        'l': Result := Result + CheckRange(p1, Sn.Text);
         'L': Result := Result + Sn.Text[1];
         'n': Result := Result + AccountConfig.ReadString(rsambaNetbiosName, '');
       else
@@ -329,6 +373,7 @@ begin
 
   LoadControls(AccountSheet);
   LoadControls(OfficeSheet);
+  mail.Items.CommaText := InetOrgPerson.Mail;
   LoadControls(PrivateSheet);
 
   if sn.Modified then
@@ -484,7 +529,7 @@ end;
 procedure TUserDlg.GetShadowTime;
 begin
   try with ShadowAccount do
-    if ShadowExpire = SHADOW_EXPIRE then
+    if IsNull(eShadowExpire) or (ShadowExpire = SHADOW_EXPIRE) then
       DateTimePicker.DateTime := Date
     else begin
       DateTimePicker.DateTime := 25569 + ShadowExpire;
@@ -653,6 +698,9 @@ begin
         end;
     end;
   end;
+  originalPanelWindowProc := ImagePanel.WindowProc;
+  ImagePanel.WindowProc := PanelWindowProc;
+  DragAcceptFiles(ImagePanel.Handle,true) ;
 end;
 
 procedure TUserDlg.AddMailBtnClick(Sender: TObject);
@@ -709,7 +757,7 @@ begin
 
   EntryList := TLdapEntryList.Create;
   try
-    Session.Search(Format(sMY_GROUP,[uid.Text]), Session.Base, LDAP_SCOPE_SUBTREE,
+    Session.Search(Format(sMY_GROUP,[uid.Text, ParentDn]), Session.Base, LDAP_SCOPE_SUBTREE,
                    ['cn', 'description'], false, EntryList);
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
@@ -751,7 +799,7 @@ begin
       if Assigned(Image1.Picture.Graphic) then
       begin
         DeleteJpegBtn.Enabled := true;
-        Panel2.Caption := '';
+        ImagePanel.Caption := '';
       end;
     end;
   end
@@ -1188,7 +1236,7 @@ begin
     Image1.Picture.LoadFromFile(OpenPictureDialog.fileName);
     InetOrgPerson.JPegPhoto := Image1.Picture.Graphic as TJpegImage;
     DeleteJpegBtn.Enabled := true;
-    Panel2.Caption := '';
+    ImagePanel.Caption := '';
   end;
 end;
 
@@ -1245,20 +1293,20 @@ begin
   { CheckListBox holds pointers to Templates or TabSheets in its Object array:
     Checked[i] = FALSE:  Objects[i] = Pointer(Template)
     Checked[i] = TRUE:   Objects[i] = Pointer(TTabSheet)
-    TabSheet holds in its Tag filed pointer to Template.
+    TabSheet holds in its Tag filed pointer to TemplatePanel.
   }
   with CheckListBox do begin
     Tag := Integer(Sender);
     if State[ItemIndex] <> cbChecked then
     begin
       TabSheet := TTabSheet(Items.Objects[ItemIndex]);
-      Items.Objects[ItemIndex] := Pointer(TabSheet.Tag);
-      TabSheet.Free;
+      TemplatePanel := TTemplatePanel(TabSheet.Tag);
+      Items.Objects[ItemIndex] := Pointer(TemplatePanel.Template);
       { Handle removing of the template - remove only attributes and
         objectclasses which are not used by builtin registers }
-      Template := TTemplate(Items.Objects[ItemIndex]);
-      for i := 0 to Template.AttributeCount - 1 do with Template[i] do
+      for i := 0 to TemplatePanel.Attributes.Count - 1 do with TemplatePanel.Attributes[i] do
       begin
+        Template := TemplatePanel.Template;
         if (lowercase(Name) = 'objectclass') then
         begin
           with Entry.AttributesByName['objectclass'] do
@@ -1285,24 +1333,24 @@ begin
         if SafeDelete(Name) then
           Entry.AttributesByName[Name].Delete;
       end;
+      TabSheet.Free;
       Exit;
     end;
     Template := TTemplate(Items.Objects[ItemIndex]);
     TabSheet := TTabSheet.Create(Self);
     TabSheet.Caption := Template.Name;
-    TabSheet.Tag := Integer(Template);
+
+    TabSheet.PageControl := PageControl;
+    TemplatePanel := TTemplatePanel.Create(Self);
+    TemplatePanel.Parent := TabSheet;
+    TemplatePanel.Align := alClient;
+    TemplatePanel.LdapEntry := Entry;
+    TemplatePanel.Template := Template;
+    TemplatePanel.EventHandler := EventHandler;
+
+    TabSheet.Tag := Integer(TemplatePanel);
     Items.Objects[ItemIndex] := TabSheet;
   end;
-  TabSheet.PageControl := PageControl;
-  TemplatePanel := TTemplatePanel.Create(Self);
-  TemplatePanel.Parent := TabSheet;
-  TemplatePanel.Align := alClient;
-  TemplatePanel.LdapEntry := Entry;
-  TemplatePanel.Template := Template;
-  TemplatePanel.EventHandler := EventHandler;
-  with Entry.AttributesByName['objectclass'] do
-    for i := 0 to Template.ObjectclassCount - 1 do
-      AddValue(Template.Objectclasses[i]);
 end;
 
 procedure TUserDlg.CheckListBoxClick(Sender: TObject);

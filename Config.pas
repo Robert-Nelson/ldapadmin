@@ -23,7 +23,7 @@ unit Config;
 
 interface
 
-uses Registry, IniFiles, Windows, Classes, Contnrs, SysUtils, Xml;
+uses Registry, IniFiles, Windows, Classes, Contnrs, SysUtils, LdapClasses, Xml;
 
 type
   TConfigStorage=class;
@@ -96,6 +96,8 @@ type
     function      GetServer: string; virtual;
     function      GetUser: string; virtual;
     function      GetSSL: boolean; virtual;
+    procedure     SetAuthMethod(const Value: TLdapAuthMethod);
+    function      GetAuthMethod: TLdapAuthMethod;
     function      GetTimeLimit: Integer;
     procedure     SetTimeLimit(const Value: Integer);
     function      GetSizeLimit: Integer;
@@ -110,6 +112,8 @@ type
     procedure     SetReferrals(const Value: boolean);
     function      GetReferralHops: Integer;
     procedure     SetReferralHops(const Value: Integer);
+    function      GetOperationalAttributes: string;
+    procedure     SetOperationalAttributes(const Value: string);
     procedure     ReadCredentials; virtual;
     procedure     WriteCredentials; virtual;
   public
@@ -131,6 +135,8 @@ type
     property      DereferenceAliases: Integer read GetDerefAliases write SetDerefAliases;
     property      ChaseReferrals: Boolean read GetReferrals write SetReferrals;
     property      ReferralHops: Integer read GetReferralHops write SetReferralHops;
+    property      OperationalAttrs: string read GetOperationalAttributes write SetOperationalAttributes;
+    property      AuthMethod: TLdapAuthMethod read GetAuthMethod write SetAuthMethod;
   end;
 
   TFakeAccount=class(TAccount)
@@ -290,23 +296,24 @@ var
   AccountConfig: TAccount;
 
 const
-  ACCOUNTS_PREFIX         = 'Accounts';
-  CONFIG_PREFIX           = 'Config';
-  CONNECT_PREFIX          = 'Connection\';
-  CONNECT_SERVER          = CONNECT_PREFIX + 'Server';
-  CONNECT_BASE            = CONNECT_PREFIX + 'Base';
-  CONNECT_CREDIT          = CONNECT_PREFIX + 'Credentials';
-  CONNECT_PORT            = CONNECT_PREFIX + 'Port';
-  CONNECT_VERSION         = CONNECT_PREFIX + 'Version';
-  CONNECT_SSL             = CONNECT_PREFIX + 'SSL';
-  CONNECT_TIME_LIMIT      = CONNECT_PREFIX + 'TimeLimit';
-  CONNECT_SIZE_LIMIT      = CONNECT_PREFIX + 'SizeLimit';
-  CONNECT_PAGED_SEARCH    = CONNECT_PREFIX + 'PagedSearch';
-  CONNECT_PAGE_SIZE       = CONNECT_PREFIX + 'PageSize';
-  CONNECT_DEREF_ALIASES   = CONNECT_PREFIX + 'DereferenceAliases';
-  CONNECT_CHASE_REFFERALS = CONNECT_PREFIX + 'ChaseReferrals';
-  CONNECT_REFFERAL_HOPS   = CONNECT_PREFIX + 'ReferralHops';
-
+  ACCOUNTS_PREFIX              = 'Accounts';
+  CONFIG_PREFIX                = 'Config';
+  CONNECT_PREFIX               = 'Connection\';
+  CONNECT_SERVER               = CONNECT_PREFIX + 'Server';
+  CONNECT_BASE                 = CONNECT_PREFIX + 'Base';
+  CONNECT_CREDIT               = CONNECT_PREFIX + 'Credentials';
+  CONNECT_PORT                 = CONNECT_PREFIX + 'Port';
+  CONNECT_VERSION              = CONNECT_PREFIX + 'Version';
+  CONNECT_SSL                  = CONNECT_PREFIX + 'SSL';
+  CONNECT_AUTH_METHOD          = CONNECT_PREFIX + 'AuthMethod';
+  CONNECT_TIME_LIMIT           = CONNECT_PREFIX + 'TimeLimit';
+  CONNECT_SIZE_LIMIT           = CONNECT_PREFIX + 'SizeLimit';
+  CONNECT_PAGED_SEARCH         = CONNECT_PREFIX + 'PagedSearch';
+  CONNECT_PAGE_SIZE            = CONNECT_PREFIX + 'PageSize';
+  CONNECT_DEREF_ALIASES        = CONNECT_PREFIX + 'DereferenceAliases';
+  CONNECT_CHASE_REFFERALS      = CONNECT_PREFIX + 'ChaseReferrals';
+  CONNECT_REFFERAL_HOPS        = CONNECT_PREFIX + 'ReferralHops';
+  CONNECT_OPERATIONAL_ATTRS    = CONNECT_PREFIX + 'OperationalAttributes';
 
 
   LAC_ROOTNAME    = 'LDAPAccounts';
@@ -318,7 +325,7 @@ procedure RegProtocol(Ext: string);
 implementation
 
 uses Constant, WinLdap, Dialogs, Forms, StdCtrls, Controls, ComObj, Base64,
-     Math, LdapClasses;
+     Math;
 
 var
   FakeAccount: TAccount;
@@ -654,6 +661,16 @@ begin
   WriteBool(CONNECT_SSL, Value);
 end;
 
+procedure TAccount.SetAuthMethod(const Value: TLdapAuthMethod);
+begin
+  WriteInteger(CONNECT_AUTH_METHOD, Value);
+end;
+
+function TAccount.GetAuthMethod: TLdapAuthMethod;
+begin
+  result:=ReadInteger(CONNECT_AUTH_METHOD, AUTH_SIMPLE);
+end;
+
 function TAccount.GetTimeLimit: Integer;
 begin
   result:=ReadInteger(CONNECT_TIME_LIMIT, SESS_TIMEOUT);
@@ -722,6 +739,16 @@ end;
 procedure TAccount.SetReferralHops(const Value: Integer);
 begin
   WriteInteger(CONNECT_REFFERAL_HOPS, Value);
+end;
+
+function TAccount.GetOperationalAttributes: string;
+begin
+  result:=ReadString(CONNECT_OPERATIONAL_ATTRS, '');
+end;
+
+procedure TAccount.SetOperationalAttributes(const Value: string);
+begin
+  WriteString(CONNECT_OPERATIONAL_ATTRS, Value);
 end;
 
 procedure TAccount.ReadCredentials;
@@ -1386,7 +1413,8 @@ begin
       if FXml.Root.Name<>LAC_ROOTNAME then raise Exception.Create(format(LAC_NOTLAC, [FFileName]));
       LoadAccounts;
     except
-      raise Exception.Create(format(LAC_NOTLAC, [FFileName]));
+      on E: Exception do
+        raise Exception.Create(format(E.Message, [FFileName]));
     end
   end
   else begin

@@ -61,6 +61,7 @@ const
   ADVAPI32    = 'advapi32.dll';
   CRYPT32     = 'crypt32.dll';
   SOFTPUB     = 'softpub.dll';
+  CRYPTUI     = 'cryptui.dll';
 {$IFDEF NT5}
   ADVAPI32NT5 = 'advapi32.dll';
 {$ENDIF}
@@ -6555,7 +6556,8 @@ function CertOIDToAlgId(pszObjId :LPCSTR):DWORD ; stdcall;
 //--------------------------------------------------------------------------
 function CertFindExtension(pszObjId :LPCSTR;
                            cExtensions :DWORD;
-                           rgExtensions :array of CERT_EXTENSION):PCERT_EXTENSION ; stdcall;
+                           //rgExtensions :array of CERT_EXTENSION):PCERT_EXTENSION ; stdcall;
+                           rgExtensions : PCERT_EXTENSION):PCERT_EXTENSION ; stdcall;
 //+-------------------------------------------------------------------------
 //  Find the first attribute identified by its Object Identifier.
 //
@@ -7524,6 +7526,32 @@ function FindCertsByIssuer(pCertChains :PCERT_CHAIN;
                            ):HRESULT ; stdcall;
 
 // Added T.Karlovic 3.6.2005
+
+type
+  //PBOOL = ^BOOL;
+  PCCRYPTUI_VIEWCERTIFICATE_STRUCT = ^CRYPTUI_VIEWCERTIFICATE_STRUCT;
+  CRYPTUI_VIEWCERTIFICATE_STRUCT = record
+    dwSize: DWORD;
+    hwndParent: HWND;
+    dwFlags: DWORD;
+    szTitle: LPCTSTR;
+    pCertContext: PCCERT_CONTEXT;
+    rgszPurposes: Pointer; //LPCSTR*
+    cPurposes: DWORD;
+    //union {    CRYPT_PROVIDER_DATA* pCryptProviderData;
+    hWVTStateData: Pointer;//HANDLE
+    fpCryptProviderDataTrustedUsage: BOOL;
+    idxSigner: DWORD;
+    idxCert: DWORD;
+    fCounterSigner: BOOL;
+    idxCounterSigner: DWORD;
+    cStores: DWORD;
+    rghStores: PHCERTSTORE;
+    cPropSheetPages: DWORD;
+    rgPropSheetPages: Pointer; //LPCPROPSHEETPAGE
+    nStartPage: DWORD;
+   end;
+
 function CertAddStoreToCollection(
                                   hCollectionStore: HCERTSTORE;
                                   hSiblingStore: HCERTSTORE;
@@ -7537,6 +7565,11 @@ function CertGetNameString(
                            pvTypePara: Pointer;
                            pszNameString: LPTSTR;
                            cchNameString: DWORD): DWORD; stdcall;
+
+{function CryptUIDlgViewCertificate(
+                           pViewCertificateInfo: PCCRYPTUI_VIEWCERTIFICATE_STRUCT;
+                           pfPropertiesChanged: PBOOL
+                           ): DWORD; stdcall;}
 
 
 
@@ -7889,4 +7922,10 @@ function CertGetNameString; external CRYPT32 name 'CertGetNameStringW';
 {$ELSE}
 function CertGetNameString; external CRYPT32 name 'CertGetNameStringA';
 {$ENDIF} // !UNICODE
+(*{$IFDEF UNICODE}
+function CryptUIDlgViewCertificate; external CRYPTUI name 'CryptUIDlgViewCertificateW';
+{$ELSE}
+function CryptUIDlgViewCertificate; external CRYPTUI name 'CryptUIDlgViewCertificateA';
+{$ENDIF} // !UNICODE*)
 end.
+

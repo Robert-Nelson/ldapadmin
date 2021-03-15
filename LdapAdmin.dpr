@@ -55,7 +55,10 @@ uses
   uAccountCopyDlg in 'uAccountCopyDlg.pas' {AccountCopyDlg},
   LAControls in 'LAControls.pas',
   Events in 'Events.pas',
-  Core in '\\SRV-K-SVC01\tihomir.karlovic\Eigene Dateien\Projects\LdapAdminOS\Core.pas';
+  Core in 'Core.pas',
+  Cert in 'Cert.pas',
+  Dsml in 'Dsml.pas',
+  Gss in 'Gss.pas';
 
 {$R *.RES}
 

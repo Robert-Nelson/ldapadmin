@@ -12,7 +12,7 @@ object LocalityDlg: TLocalityDlg
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = False
-  Position = poScreenCenter
+  Position = poOwnerFormCenter
   OnClose = FormClose
   OnDestroy = FormDestroy
   PixelsPerInch = 96

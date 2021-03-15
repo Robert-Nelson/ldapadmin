@@ -1,5 +1,5 @@
   {      LDAPAdmin - Samba.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -117,6 +117,7 @@ type
   private
     pDomainData: PDomainRec;
     fPosixAccount: TPosixAccount;
+    fNew: Boolean;
     procedure SetSid(Value: Integer);
     procedure SetUidNumber(Value: Integer);
     function  GetUidNumber: Integer;
@@ -195,7 +196,7 @@ type
 
 implementation
 
-uses md4, smbdes, Sysutils;
+uses md4, smbdes, Sysutils, Misc;
 
 { This function is ported from mkntpwd.c written by Anton Roeckseisen (anton@genua.de) }
 
@@ -289,7 +290,8 @@ end;
 procedure TSamba3Account.SetDomainRec(pdr: PDomainRec);
 begin
   pDomainData := pdr;
-  if Assigned(pDomaindata) then
+  //if Assigned(pDomaindata) then
+  if fNew and Assigned(pDomaindata) then
   begin
     SetString(eSambaDomainName, pDomainData^.DomainName);
     if not fPosixAccount.IsNull(eUidNumber) then
@@ -409,7 +411,7 @@ begin
   { Get Lanman Password }
   SetString(eSambaLMPassword, HashToHex(PByteArray(e_p16(UpperCase(Password))), 16));
   { Set changetime attribute }
-  SetAsUnixTime(eSambaPwdLastSet, Now);
+  SetAsUnixTime(eSambaPwdLastSet, LocalDateTimeToUTC(Now));
 end;
 
 constructor TSamba3Account.Create(const Entry: TLdapEntry);
@@ -423,6 +425,7 @@ begin
   AddObjectClass(['sambaSamAccount']);
   SetString(eSambaAcctFlags, '[]');
   SetSid(UidNumber);
+  fNew := true;
 end;
 
 procedure TSamba3Account.Remove;

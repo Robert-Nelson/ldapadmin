@@ -1,5 +1,5 @@
   {      LDAPAdmin - Prefs.pas
-  *      Copyright (C) 2003 Tihomir Karlovic
+  *      Copyright (C) 2003-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -78,11 +78,13 @@ type
     Label16: TLabel;
     Label17: TLabel;
     BtnWizard: TButton;
-    cbxPosixGroupOfUniqueNames: TCheckBox;
+    cbxExtendGroups: TCheckBox;
+    cbExtendGroups: TComboBox;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure SetBtnClick(Sender: TObject);
     procedure PageControl1Change(Sender: TObject);
     procedure BtnWizardClick(Sender: TObject);
+    procedure cbxExtendGroupsClick(Sender: TObject);
   private
     Session: TLDAPSession;
     DomList: TDomainList;
@@ -100,6 +102,8 @@ uses Pickup, WinLdap, PrefWiz, Main, Config;
 {$R *.DFM}
 
 constructor TPrefDlg.Create(AOwner: TComponent; lSession: TLDAPSession);
+var
+  idx: Integer;
 begin
   inherited Create(AOwner);
   Session := lSession;
@@ -122,7 +126,14 @@ begin
     edProfilePath.Text  := ReadString(rsambaProfilePath, '');
     edMailAddress.Text  := ReadString(rpostfixMailAddress, '');
     edMaildrop.Text     := ReadString(rpostfixMaildrop, '');
-    cbxPosixGroupOfUniqueNames.Checked := ReadBool(rPosixGroupOfUnames, false);
+    idx := ReadInteger(rPosixGroupOfUnames, 0) - 1;
+    if idx >= 0 then
+    begin
+      cbxExtendGroups.Checked := true;
+      cbExtendGroups.ItemIndex := idx;
+    end
+    else
+      cbxExtendGroupsClick(nil);
   end;
 end;
 
@@ -147,7 +158,7 @@ begin
     WriteString (rsambaProfilePath,   edProfilePath.Text);
     WriteString (rpostfixMailAddress, edMailAddress.Text);
     WriteString (rpostfixMaildrop,    edMaildrop.Text);
-    WriteBool   (rPosixGroupOfUnames, cbxPosixGroupOfUniqueNames.Checked);
+    WriteInteger(rPosixGroupOfUnames, cbExtendGroups.ItemIndex + 1);
   end;
 end;
 
@@ -192,6 +203,22 @@ procedure TPrefDlg.BtnWizardClick(Sender: TObject);
 begin
   PageControl1Change(nil); // Get domain list
   TPrefWizDlg.Create(Self).ShowModal;
+end;
+
+procedure TPrefDlg.cbxExtendGroupsClick(Sender: TObject);
+begin
+  with cbExtendGroups do
+  if cbxExtendGroups.Checked then
+  begin
+    Enabled := true;
+    Color := clWindow;
+    ItemIndex := 0;
+  end
+  else begin
+    Enabled := false;
+    Color := clBtnFace;
+    ItemIndex := -1;
+  end;
 end;
 
 end.

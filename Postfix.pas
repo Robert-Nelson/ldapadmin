@@ -1,8 +1,7 @@
-  {      LDAPAdmin - MailGroup.pas
+  {      LDAPAdmin - Postfix.pas
   *      Copyright (C) 2003-2005 Tihomir Karlovic
   *
-  *      Author:                 Simon Zsolt
-  *      Updated:  07.06.2005    Tihomir Karlovic
+  *      Author: Tihomir Karlovic
   *
   *
   * This file is free software; you can redistribute it and/or modify

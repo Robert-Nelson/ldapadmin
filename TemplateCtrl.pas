@@ -28,7 +28,7 @@ uses Classes, Forms, Controls, ComCtrls, StdCtrls, ExtCtrls, Templates, LdapClas
 
 const
   CT_LEFT_BORDER     = 8;
-  CT_RIGHT_BORDER    = 24;
+  CT_RIGHT_BORDER    = 8;
   CT_FIX_TOP         = 8;
   CT_GROUP_SPACING   = 2;
   CT_SPACING         = 8;
@@ -39,14 +39,16 @@ type
   public
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure SetEvent(const AName: string; AControl: TTemplateControl);
-    procedure RemoveEvent(const AName: string; AControl: TTemplateControl);
+    procedure SetEvents(AControl: TTemplateControl);
+    procedure RemoveEvents(AControl: TTemplateControl);
     procedure HandleEvent(Attribute: TLdapAttribute; Event: TEventType);
   end;
 
   TTemplatePanel = class(TScrollBox)
   private
-    fControls: TObjectList;
+    fPanel: TTemplateCtrlPanel;
+    fControls: TTemplateControlList;
+    fAttributes: TTemplateAttributeList;
     fEntry: TLdapEntry;
     fTemplate: TTemplate;
     fEventHandler: TEventHandler;
@@ -71,6 +73,7 @@ type
     procedure AdjustControls;
     procedure RefreshData;
     property LdapEntry: TLdapEntry read fEntry write SetEntry;
+    property Attributes: TTemplateAttributeList read fAttributes;
     property EventHandler: TEventHandler read fEventHandler write SetEventHandler;
     property Template: TTemplate read fTemplate write SetTemplate;
     property LeftBorder: Integer read fLeftBorder write fLeftBorder;
@@ -91,7 +94,6 @@ type
     procedure   MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
   public
     constructor Create(AOwner: TComponent); override;
-    //destructor  Destroy; override;
     procedure   Paint; override;
     procedure   AdjustHeight;
     property    CaptionHeight: integer read FCaptionHeight write SetCaptionHeight;
@@ -136,7 +138,7 @@ type
   private
     fEntry: TLdapEntry;
     fEventHandler: TEventHandler;
-    fTemplates: TTemplateList;
+    fTemplatePanels: TList;
     fRdn: string;
     procedure OKBtnClick(Sender: TObject);
     procedure CancelBtnClick(Sender: TObject);
@@ -146,7 +148,7 @@ type
     destructor  Destroy; override;
     procedure   AddTemplate(ATemplate: TTemplate);
     procedure   LoadMatching;
-    property    Templates: TTemplateList read fTemplates;
+    property    TemplatePanels: TList read fTemplatePanels;
   end;
 
 implementation
@@ -170,19 +172,22 @@ begin
   inherited;
 end;
 
-procedure TEventHandler.SetEvent(const AName: string; AControl: TTemplateControl);
+procedure TEventHandler.SetEvents(AControl: TTemplateControl);
 var
-  idx: Integer;
+  i, idx: Integer;
 begin
-  idx := fEvents.IndexOf(AName);
-  if idx = -1 then
-    idx := fEvents.AddObject(AName, TList.Create);
-  TList(fEvents.Objects[idx]).Add(Pointer(AControl));
+  for i := 0 to AControl.Params.Count - 1 do
+  begin
+    idx := fEvents.IndexOf(AControl.Params[i]);
+    if idx = -1 then
+      idx := fEvents.AddObject(AControl.Params[i], TList.Create);
+    TList(fEvents.Objects[idx]).Add(Pointer(AControl));
+  end;
 end;
 
-procedure TEventHandler.RemoveEvent(const AName: string; AControl: TTemplateControl);
+procedure TEventHandler.RemoveEvents(AControl: TTemplateControl);
 var
-  i: Integer;
+  i, j: Integer;
 
   procedure Remove(idx: Integer);
   var
@@ -201,16 +206,9 @@ var
   end;
 
 begin
-  if AName <> '' then
-  begin
-    i := fEvents.IndexOf(AName);
-    if i <> -1 then
-      Remove(i);
-  end
-  else begin
-    for i := fEvents.Count - 1 downto 0 do
-      Remove(i);
-  end;
+  for i := 0 to AControl.Params.Count - 1 do
+    for j := fEvents.Count - 1 downto 0 do
+      Remove(j);
 end;
 
 procedure TEventHandler.HandleEvent(Attribute: TLdapAttribute; Event: TEventType);
@@ -243,6 +241,7 @@ begin
   LockControl(Self, true);
   try
     fControls.Clear;
+    fAttributes.Clear;
     fTemplate := Template;
     LoadTemplate;
   finally
@@ -268,29 +267,14 @@ procedure TTemplatePanel.InstallHandlers;
 var
   i: Integer;
 
-  function ParseParameters(Line: string; Control: TTemplateControl): Boolean;
-  var
-    p: PChar;
-    Param: string;
-  begin
-    Result := false;
-    p := PChar(Line);
-    Param := GetParameter(p);
-    while Param <> '' do begin
-      Result := true;
-      fEventHandler.SetEvent(Param, Control);
-      Param := GetParameter(p);
-    end;
-  end;
-
 begin
 
   if fHandlerInstalled or not (Assigned(fEventHandler) and Assigned(fTemplate)) then Exit;
 
-  for i := 0 to fControls.Count - 1 do with TTemplateControl(fControls[i]) do
+  for i := 0 to fControls.Count - 1 do with fControls[i] do
   begin
     { Set hooks }
-    ParseParameters(DefaultValue, TTemplateControl(fControls[i]));
+    fEventHandler.SetEvents(fControls[i]);
     { Set event handlers }
     OnChange := OnControlChange;
     OnExit := OnControlExit;
@@ -314,89 +298,94 @@ begin
   if fHandlerInstalled then
   begin
     for i := 0 to fControls.Count - 1 do
-      fEventHandler.RemoveEvent('', TTemplateControl(Controls[i]));
+      fEventHandler.RemoveEvents(fControls[i]);
     fHandlerInstalled := false;
   end;
 end;
 
 procedure TTemplatePanel.LoadTemplate;
 var
-  Attribute: TLdapAttribute;
-  L: TLabel;
-  i, j, YPos, vCnt: Integer;
-  TemplateControl: TTemplateControl;
   Oc: TLdapAttribute;
   Active: Boolean;
-begin
-  if not (Assigned(fTemplate) and Assigned(fEntry)) then
-    Exit;
+  i: Integer;
+  NotParented: Boolean;
 
-  yPos := fFixTop;
-  
-  { If template matches existing objectclasses of the entry we set the flag to
-  { avoid setting default values to attributes which are deliberatly left empty }
-  Oc := fEntry.AttributesByName['objectclass'];
-  Active := Assigned(OC) and Template.Matches(OC);
-  for i := 0 to Template.AttributeCount-1 do with Template.Attributes[i] do
+  { Connect controls to data sources }
+  procedure HandleElements(Elements: TObjectList);
+  var
+    i, j: Integer;
+    Element: TObject;
+    TemplateControl: TTemplateControl;
+    Attribute: TLdapAttribute;
   begin
-    Attribute := fEntry.AttributesByName[Name];
-    vCnt := Attribute.ValueCount;
-    for j := 0 to ControlCount - 1 do
+    for i := 0 to Elements.Count - 1 do
     begin
-
-      TemplateControl := CreateControl(ControlTemplates[j]);
-      fControls.Add(TemplateControl);
-
-      if not Assigned(TemplateControl) then Continue;
-
-      { Set values }
-      if j < vCnt then
-        TemplateControl.LdapValue := Attribute.Values[j]
+      Element := Elements[i];
+      if Element is TTemplateAttribute then with TTemplateAttribute(Element) do
+      begin
+        fAttributes.Add(Element);
+        Attribute := fEntry.AttributesByName[Name];
+        for j := 0 to Controls.Count - 1 do
+        begin
+          TemplateControl := Controls[j];
+          { Set values }
+          TemplateControl.UseDefaults := not Active;
+          TemplateControl.LdapAttribute := Attribute;
+        end;
+        HandleElements(Controls);
+      end
       else
+      if Element is TTemplateControl then
       begin
-        TemplateControl.LdapValue := Attribute.AddValue;
-        if not Active and (j < ValuesCount) then
-        begin
-          TemplateControl.DefaultValue := Values[j].AsString;
-          if not IsParametrized(Values[j].AsString) then
-            TemplateControl.SetValue(Values[j]);
-        end;
-      end;
-
-      { Position the control }
-      with TemplateControl do
-      begin
-        if Template.AutoarrangeControls then
-        begin
-          L := TLabel.Create(Self);
-          if Control is TWinControl then
-            L.FocusControl := TWinControl(Control);
-          if Description <> '' then
-            L.Caption := Description
-          else
-            L.Caption := Name;
-          L.Caption := L.Caption + ':';
-
-          L.Left := fLeftBorder;
-          L.Top := yPos;
-          L.Width := Width - fLeftBorder - fRightBorder;
-          inc(yPos, L.Height + fGroupSpacing);
-          Control.Left := fLeftBorder;
-          Control.Top := yPos;
-          if Control is TImage then
-            (Control as TImage).AutoSize := true
-          else
-            Control.Width := L.Width;
-          inc(yPos, Control.Height + fSpacing);
-          L.Parent := Self;
-        end;
-        Control.Parent := Self;
+        fControls.Add(Element);
+        HandleElements(TTemplateControl(Element).Elements);
       end;
     end;
   end;
 
-  InstallHandlers;
+begin
+  if not (Assigned(fTemplate) and Assigned(fEntry)) then
+    Exit;
 
+  fControls.Clear;
+  fAttributes.Clear;
+
+  { Some VCL Controls require visible parents on property access!!! ( like
+    TComboBox for access to Items or ItemIndex properties! )               }
+  NotParented := not Assigned(Parent);
+  if NotParented then
+  begin
+    Visible := false;
+    Parent := Application.MainForm;
+  end;
+  try
+    fPanel.Load(Template.XmlTree.Root);
+    Self.Height := fPanel.Control.Height;
+    Self.Width := fPanel.Control.Width;
+
+    { If template matches existing objectclasses of the entry we set the flag to
+    { avoid setting default values to attributes which are deliberatly left empty }
+    Oc := fEntry.AttributesByName['objectclass'];
+    Active := Assigned(OC) and Template.Matches(OC);
+    { Always add objectclasses }
+    with OC do
+      for i := 0 to Template.ObjectclassCount - 1 do
+        AddValue(Template.Objectclasses[i]);
+
+    HandleElements(fPanel.Elements);
+
+    fPanel.ArrangeControls;
+    AdjustControls;
+
+    if not Active then InstallHandlers;
+
+  finally
+    if NotParented then
+    begin
+      Parent := nil;
+      Visible := true;
+    end;
+  end;
 end;
 
 procedure TTemplatePanel.Resize;
@@ -408,7 +397,14 @@ end;
 constructor TTemplatePanel.Create(AOwner: TComponent);
 begin
   inherited;
-  fControls := TObjectList.Create;
+  fPanel := TTemplateCtrlPanel.Create(nil);
+  TPanel(fPanel.Control).BevelInner := bvNone;
+  TPanel(fPanel.Control).BevelOuter := bvNone;
+  TPanel(fPanel.Control).Parent := Self;
+  fControls := TTemplateControlList.Create;
+  fControls.OwnsObjects := false;
+  fAttributes := TTemplateAttributeList.Create;
+  fAttributes.OwnsObjects := false;
   fLeftBorder := CT_LEFT_BORDER;
   fRightBorder := CT_RIGHT_BORDER;
   fFixTop := CT_FIX_TOP;
@@ -418,6 +414,8 @@ end;
 
 destructor TTemplatePanel.Destroy;
 begin
+  fPanel.Free;
+  fAttributes.Free;
   fControls.Free;
   inherited;
 end;
@@ -429,32 +427,18 @@ begin
 end;
 
 procedure TTemplatePanel.AdjustControls;
-var
-  i: Integer;
-  C: TControl;
 begin
-  for i := 0 to ControlCount - 1 do
-  begin
-    C := Controls[i];
-    { Adjust width }
-    if Template.AutoarrangeControls then
-    begin
-      C.Left := fLeftBorder;
-      C.Width := Width - fLeftBorder - fRightBorder;
-    end;
-  end;
+  fPanel.Control.Width := ClientWidth;
+  fPanel.AdjustSizes;
 end;
 
 procedure TTemplatePanel.RefreshData;
 var
-  i, j: Integer;
+  i: Integer;
 begin
   if Assigned(fTemplate) then
-  begin
-    for i := 0 to Template.AttributeCount-1 do with Template.Attributes[i] do
-    for j := 0 to ControlCount - 1 do with Controls[j] do
-      Read;
-  end;
+    for i := 0 to fControls.Count - 1 do
+      fControls[i].Read;
 end;
 
 { THeaderPanel }
@@ -469,11 +453,6 @@ begin
   Canvas.Font.Size:=9;
   Canvas.Pen.Color := Canvas.Font.Color;
 end;
-
-{destructor THeaderPanel.Destroy;
-begin
-  inherited;
-end;}
 
 procedure THeaderPanel.SetCaptionHeight(const Value: integer);
 begin
@@ -704,32 +683,22 @@ end;
 
 procedure TTemplateForm.OKBtnClick(Sender: TObject);
 var
-  i, j, k: Integer;
+  i: Integer;
   S: TStringList;
   ardn, aval: string;
-  LdapAttr: TLdapAttribute;
 begin
   if esNew in fEntry.State then
   begin
     S := TStringList.Create;
     try
-      for i := 0 to fTemplates.Count - 1 do with fTemplates[i] do
+      for i := 0 to fTemplatePanels.Count - 1 do with TTemplatePanel(fTemplatePanels[i]) do
       begin
-        { Set values of hidden attributes (those without controls) }
-        for j := 0 to AttributeCount - 1 do with Attributes[j] do
-        if ControlCount = 0 then
-        begin
-          LdapAttr := fEntry.AttributesByName[Name];
-          for k := 0 to ValuesCount - 1 do
-            LdapAttr.AddValue(FormatValue(Values[k].AsString, fEntry));
-        end;
-
         { designated rdn }
-        if Rdn <> '' then
+        if Template.Rdn <> '' then
         begin
-          aval := fEntry.AttributesByName[Rdn].AsString;
+          aval := fEntry.AttributesByName[Template.Rdn].AsString;
           if aval <> '' then
-            S.Add(Rdn + '=' + aval);
+            S.Add(Template.Rdn + '=' + aval);
         end;
       end;
       if S.Count = 1 then
@@ -765,7 +734,7 @@ begin
   inherited CreateNew(AOwner);
 
   fEventHandler := TEventHandler.Create;
-  fTemplates := TTemplateList.Create;
+  fTemplatePanels := TList.Create;
   fRdn := adn;
   fEntry := TLdapEntry.Create(ASession, adn);
   if Mode = EM_MODIFY then
@@ -819,7 +788,7 @@ begin
   while PageControl.PageCount > 0 do
     PageControl.Pages[0].Free;
   fEventHandler.Free;
-  fTemplates.Free;
+  fTemplatePanels.Free;
 
   try
     GlobalConfig.WriteInteger(rTemplateFormHeight, Height);
@@ -843,7 +812,7 @@ begin
   TabSheet.PageControl := PageControl;
   Panel.Parent := TabSheet;
   Panel.Align := alClient;
-  fTemplates.Add(ATemplate);
+  fTemplatePanels.Add(Panel);
   if TabSheet.TabIndex = 0 then
     ActiveControl := Panel.FindNextControl(nil, true, true, true);
 end;

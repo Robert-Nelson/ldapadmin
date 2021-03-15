@@ -171,7 +171,7 @@ object SearchFrm: TSearchFrm
           Width = 83
           Height = 25
           Action = ActSave
-          Caption = '&Save'
+          Caption = 'S&ave'
           TabOrder = 2
           Glyph.Data = {
             36040000424D3604000000000000360000002800000010000000100000000100
@@ -440,7 +440,7 @@ object SearchFrm: TSearchFrm
               Left = 48
               Top = 8
               Width = 449
-              Height = 89
+              Height = 65
               Anchors = [akLeft, akTop, akRight]
               Font.Charset = DEFAULT_CHARSET
               Font.Color = clWindowText
@@ -449,6 +449,39 @@ object SearchFrm: TSearchFrm
               Font.Style = []
               ParentFont = False
               TabOrder = 0
+            end
+            object cbFilters: TComboBox
+              Left = 48
+              Top = 80
+              Width = 305
+              Height = 21
+              Anchors = [akLeft, akTop, akRight]
+              ItemHeight = 13
+              TabOrder = 1
+              OnChange = cbFiltersChange
+              OnDropDown = cbFiltersDropDown
+            end
+            object SaveFilterBtn: TButton
+              Left = 364
+              Top = 79
+              Width = 65
+              Height = 23
+              Anchors = [akTop, akRight]
+              Caption = 'Sa&ve'
+              Enabled = False
+              TabOrder = 2
+              OnClick = SaveFilterBtnClick
+            end
+            object DeleteFilterBtn: TButton
+              Left = 436
+              Top = 79
+              Width = 65
+              Height = 23
+              Anchors = [akTop, akRight]
+              Caption = '&Delete'
+              Enabled = False
+              TabOrder = 3
+              OnClick = DeleteFilterBtnClick
             end
           end
           object Panel4: TPanel
@@ -565,8 +598,9 @@ object SearchFrm: TSearchFrm
   object SaveDialog: TSaveDialog
     DefaultExt = '*.ldif'
     Filter = 
-      'Ldif file, Windows format (CR/LF)|*.ldif|Ldif file, Unix format ' +
-      '(LF only)|*.ldif'
+      'Ldif file, Windows format (CR/LF) (*.ldif)|*.ldif|Ldif file, Uni' +
+      'x format (LF only) (*.ldif)|*.ldif|CSV (Comma-separated) (*.csv)' +
+      '|*.csv|XML (*.xml)|*.xml'
     Options = [ofOverwritePrompt, ofHideReadOnly, ofEnableSizing]
     Left = 72
     Top = 448

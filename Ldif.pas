@@ -1,5 +1,5 @@
   {      LDAPAdmin - Ldif.pas
-  *      Copyright (C) 2004-2005 Tihomir Karlovic
+  *      Copyright (C) 2004-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -31,6 +31,8 @@ const
 
 type
   TLdifMode = (fmRead, fmWrite, fmAppend);
+  TAttributeOpMode = (amAdd, amModify, amDelete);
+  TValueOpMode     = (vmSep, vmAdd, vmReplace, vmDelete);
 
 { TLDIF
   Uses ReadRecord to fetch and parse one record. Property RecordLines contains
@@ -70,7 +72,7 @@ type
   TLDIFFile = class(TLDIF)
   private
     F: TTextFile;
-    fNumRead: Integer;
+    function  GetNumRead: Integer;
     function  GetUnixWrite: Boolean;
     procedure SetUnixWrite(AValue: Boolean);
   protected
@@ -79,7 +81,7 @@ type
   public
     constructor Create(const FileName: string; const Mode: TLdifMode); reintroduce; overload;
     destructor Destroy; override;
-    property NumRead: Integer read fNumRead;
+    property NumRead: Integer read GetNumRead;
     property UnixWrite: Boolean read GetUnixWrite write SetUnixWrite;
   end;
 
@@ -141,13 +143,21 @@ end;
 procedure TLDIF.ParseRecord(Entry: TLdapEntry);
 var
   i, po, vLen: Integer;
-  Line, s: string;
-  Name, Value: string;
-  Attr: TLdapAttribute;
+  Line, s, url: string;
+  atName, atValue: string;
+  ChangeType: TAttributeOpMode;
+  OpType: TValueOpMode;
+
+function GetNextLine: Boolean;
 begin
-  i := 0;
-  while i < fRecord.Count do
-  begin
+    if i >= fRecord.Count then
+    begin
+      Result := false;
+      Exit;
+    end
+    else
+      Result := true;
+
     { Get line to parse }
     Line := fRecord.Strings[i];
     inc(i);
@@ -158,6 +168,12 @@ begin
     end;
 
     { Parse the line }
+    if Line = '-' then
+    begin
+      atName := '-';
+      Exit;
+    end;
+
     if Line[1] = ' ' then
         raise Exception.Create(Format(stLdifEFold, [Integer(fRecord.Objects[i])]));
 
@@ -165,43 +181,131 @@ begin
     if po = 0 then
       raise Exception.Create(Format(stLdifENoCol, [Integer(fRecord.Objects[i])]));
 
-    Name := lowercase(TrimRight(Copy(Line, 1, po - 1)));
-    Attr := Entry.AttributesByName[name];
+    atName := lowercase(TrimRight(Copy(Line, 1, po - 1)));
+    url := '';
     if po = Length(Line) - 1 then
-      Value := ''
+      atValue := ''
     else
     if Line[po + 1] = ':' then
     begin
       s := TrimLeft(Copy(Line, po + 2, MaxInt));
       vLen := Length(s);
-      SetLength(Value, Base64decSize(vLen));
-      vLen := Base64Decode(s[1], vLen, Value[1]);
-      SetLength(Value, vLen);
+      SetLength(atValue, Base64decSize(vLen));
+      vLen := Base64Decode(s[1], vLen, atValue[1]);
+      SetLength(atValue, vLen);
     end
     else
     if Line[po + 1] = '<' then
-      ReadFromUrl(TrimLeft(Copy(Line, po + 2, MaxInt)), Attr.AddValue)
+      url := TrimLeft(Copy(Line, po + 2, MaxInt))
     else
-      Value := TrimLeft(Copy(Line, po + 1, MaxInt));
+      atValue := TrimLeft(Copy(Line, po + 1, MaxInt));
+end;
+
+procedure AddAttrValue;
+var
+  Attr: TLdapAttribute;
+begin
+  Attr := Entry.AttributesByName[atName];
+  if url <> '' then
+    ReadFromUrl(url, Attr.AddValue)
+  else
+    Attr.AddValue(Pointer(@atValue[1]), Length(atValue));
+end;
+
+begin
+  i := 0;
+  ChangeType := amAdd;
+  while GetNextLine do
+  begin
 
     if Entry.dn = '' then
     begin
       // it has to be dn or version atribute
-      if Name = 'dn' then
-        Entry.dn := Value
+      if atName = 'dn' then
+        Entry.dn := atValue
       else
-      if Name = 'version' then
+      if atName = 'version' then
       try
-        fVersion := StrToInt(Value)
+        fVersion := StrToInt(atValue)
       except
         on E: Exception do
-          raise Exception.Create(Format(stLdifEVer, [Value]));
+          raise Exception.Create(Format(stLdifEVer, [atValue]));
       end
       else
-        raise Exception.Create(Format(stLdifENoDn, [Integer(fRecord.Objects[i]), Name]));
+        raise Exception.Create(Format(stLdifENoDn, [Integer(fRecord.Objects[i]), atName]));
     end
     else
-      Attr.AddValue(Pointer(@Value[1]), Length(Value));
+    if atName = 'changetype' then
+    begin
+      if atValue = 'add' then
+        ChangeType := amAdd
+      else
+      if atValue = 'modify' then
+        ChangeType := amModify
+      else
+      if atValue = 'delete' then
+      begin
+        Entry.Delete;
+      end
+      else
+        raise Exception.Create(Format(stLdifInvChType, [Integer(fRecord.Objects[i]), atValue]));
+    end
+    else begin
+      case ChangeType of
+        amAdd:    AddAttrValue;
+        amModify: begin
+                    if not (esBrowse in Entry.State) then
+                      Entry.Read;
+                    OpType := vmSep;
+                    repeat
+                      case OpType of
+                        vmSep:     if atName = 'add' then
+                                     OpType := vmAdd
+                                   else
+                                   if atName = 'replace' then
+                                     OpType := vmReplace
+                                   else
+                                   if atName = 'delete' then
+                                     OpType := vmDelete
+                                   else
+                                     raise Exception.Create(Format(stLdifInvOp, [Integer(fRecord.Objects[i]), atName]));
+                        vmAdd:     begin
+                                     while GetNextLine and (atName <> '-') do
+                                       AddAttrValue;
+                                     OpType := vmSep;
+                                   end;
+                        vmReplace: begin
+                                     s := lowercase(atValue);
+                                     Entry.AttributesByName[atValue].Delete;
+                                     while GetNextLine and (atName <> '-') do begin
+                                       if lowercase(atName) <> s then
+                                         raise Exception.Create(Format(stLdifNotExpected, [Integer(fRecord.Objects[i]), s, atName]));
+                                       AddAttrValue;
+                                     end;
+                                     OpType := vmSep;
+                                   end;
+                        vmDelete: begin
+                                    s := lowercase(atValue);
+                                    GetNextLine;
+                                    with Entry.AttributesByName[atValue] do
+                                    begin
+                                      if atName = '-' then
+                                        Delete
+                                      else
+                                      repeat
+                                        if lowercase(atName) = s then
+                                          DeleteValue(atValue)
+                                        else
+                                          raise Exception.Create(Format(stLdifInvAttrName, [Integer(fRecord.Objects[i]), s, Name]));
+                                      until not GetNextLine or (atName = '-');
+                                    end;
+                                    OpType := vmSep;
+                                  end;
+                      end;
+                      until OpType = vmSep;
+                  end;
+      end;
+    end;
   end;
 end;
 
@@ -211,11 +315,15 @@ var
   fs: TFileStream;
 begin
   i := Pos('://', url);
-  if i = 0 then
+  if (i = 0) or (i + 3 >= Length(url)) then
     raise Exception.Create(stLdifInvalidUrl);
   if AnsiStrLIComp(PChar(url), 'file', i - 1) <> 0 then
     raise Exception.Create(stLdifUrlNotSupp);
-  fs := TFileStream.Create(Copy(url, i + 3, MaxInt), fmOpenRead);
+  if url[i + 3] = '/' then
+    inc(i, 3)
+  else
+    inc(i);
+  fs := TFileStream.Create(Copy(url, i{ + 3}, MaxInt), fmOpenRead);
   try
     Value.LoadFromStream(fs);
   finally
@@ -314,6 +422,11 @@ end;
 
 { TLDIFFile }
 
+function TLDIFFile.GetNumRead: Integer;
+begin
+  Result := F.Pos;
+end;
+
 function TLDIFFile.GetUnixWrite: Boolean;
 begin
   Result := F.UnixWrite;
@@ -328,7 +441,6 @@ function TLDIFFile.ReadLine: string;
 begin
   Result := F.ReadLn;
   fEof := F.Eof;
-  fNumRead := fNumRead + Length(Result) + 1;
 end;
 
 procedure TLDIFFile.WriteLine(const Line: string);

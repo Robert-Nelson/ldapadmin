@@ -185,13 +185,26 @@ object PrefDlg: TPrefDlg
           Height = 21
           TabOrder = 0
         end
-        object cbxPosixGroupOfUniqueNames: TCheckBox
+        object cbxExtendGroups: TCheckBox
           Left = 120
           Top = 184
-          Width = 353
+          Width = 140
           Height = 17
-          Caption = 'Extend Posix groups with GroupOfUniqueNames'
+          Caption = 'Extend Posix groups with:'
           TabOrder = 6
+          OnClick = cbxExtendGroupsClick
+        end
+        object cbExtendGroups: TComboBox
+          Left = 264
+          Top = 182
+          Width = 145
+          Height = 21
+          Style = csDropDownList
+          ItemHeight = 13
+          TabOrder = 7
+          Items.Strings = (
+            'GroupOfUniqueNames'
+            'GroupOfNames')
         end
       end
     end
@@ -325,7 +338,7 @@ object PrefDlg: TPrefDlg
           Width = 353
           Height = 21
           Style = csDropDownList
-          ItemHeight = 13
+          ItemHeight = 0
           TabOrder = 1
         end
       end

@@ -20,6 +20,8 @@
 
     @Version 2006/03/18  v1.0.0. Initial revision.
     @Version 2006/09/13  v1.1.0. Added TXmlNode.CoptTo function
+    @Version 2007/06/29  v1.2.0. Added Utf8 write support, T.Karlovic
+    @Version 2007/07/02  v1.2.1. Added callback write support, T.Karlovic
   }
 
 unit Xml;
@@ -59,9 +61,12 @@ type
     property    CaseSensitive: boolean read GetCaseSens;
    end;
 
+   TStreamCallback = procedure (Node: TXmlNode) of object;
+
   TXmlTree=class
   private
     FRoot:      TXmlNode;
+    FUtf8:      Boolean; { Node: only does UTF8 write currently }
     function    GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
     procedure   ParseAttributes(S: string; Attributes: TStringList);
     function    ClearContent(S: string): string;
@@ -73,16 +78,20 @@ type
     constructor Create; reintroduce;
     destructor  Destroy; override;
     property    Root: TXmlNode read FRoot;
-    procedure   LoadFromStream(const Stream: TStream);
-    procedure   SaveToStream(const Stream: TStream);
+    procedure   LoadFromStream(const Stream: TStream); virtual;
+    procedure   SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil); virtual;
     procedure   LoadFromFile(const FileName: string);
-    procedure   SaveToFile(const FileName: string);
+    procedure   SaveToFile(const FileName: string; StreamCallback: TStreamCallback = nil);
     function    ByPath(const APath: string): TXmlNode;
     function    Exist(const Path: string): boolean;
     property    CaseSensitive: boolean read GetCaseSens write SetCaseSens;
+    property    Utf8: Boolean read fUtf8 write fUtf8;
   end;
 
+
 implementation
+
+uses Misc;
 
 const
   BAD_XML_DOCUMENT='Not well formed XML.';
@@ -369,10 +378,22 @@ begin
   result:=copy(S, b, e-b+1);
 end;
 
-procedure TXmlTree.SaveToStream(const Stream: TStream);
-  procedure WriteString(Value: string);
+procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil);
+  {procedure WriteString(Value: string);
   begin
     Stream.WriteBuffer(Value[1], length(Value));
+  end;}
+  procedure WriteString(Value: string);
+  var
+    s: string;
+  begin
+    if fUtf8 then
+    begin
+      s := StringToUTF8Len(PChar(Value), length(Value));
+      Stream.WriteBuffer(s[1], Length(s));
+    end
+    else
+      Stream.WriteBuffer(Value[1], length(Value));
   end;
 
   procedure WriteNode(Node: TXmlNode; Indent: string; IsFirst: boolean=false);
@@ -382,12 +403,13 @@ procedure TXmlTree.SaveToStream(const Stream: TStream);
     if not IsFirst then WriteString(CRLF);
     if pos(' ', Node.Name)>0 then WriteString(Indent+'<"'+Node.Name+'"')
     else WriteString(Indent+'<'+Node.Name);
-    
+
     for i:=0 to Node.Attributes.Count-1 do
       WriteString(' '+Node.Attributes.Names[i]+'='''+Node.Attributes.Values[Node.Attributes.Names[i]]+'''');
 
     if (Node.Count=0) and (Node.Content='') then begin
       WriteString('/>');
+      if Assigned(StreamCallback) then StreamCallback(Node);
       exit;
     end;
 
@@ -398,6 +420,7 @@ procedure TXmlTree.SaveToStream(const Stream: TStream);
     if Node.Count>0 then WriteString(CRLF+Indent);
     if pos(' ', Node.Name)>0 then WriteString('</"'+Node.Name+'">')
     else WriteString('</'+Node.Name+'>');
+    if Assigned(StreamCallback) then StreamCallback(Node);
   end;
 
 begin
@@ -417,13 +440,13 @@ begin
   end;
 end;
 
-procedure TXmlTree.SaveToFile(const FileName: string);
+procedure TXmlTree.SaveToFile(const FileName: string; StreamCallback: TStreamCallback = nil);
 var
   FStream: TFileStream;
 begin
   FStream:=TFileStream.Create(FileName, fmCreate);
   try
-    SaveToStream(FStream);
+    SaveToStream(FStream, StreamCallback);
   finally
     FStream.Free;
   end;

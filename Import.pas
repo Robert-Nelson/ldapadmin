@@ -1,5 +1,5 @@
   {      LDAPAdmin - Import.pas
-  *      Copyright (C) 2004-2005 Tihomir Karlovic
+  *      Copyright (C) 2004-2007 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -137,12 +137,11 @@ begin
       try
         ReadRecord(Entry);
         ProgressBar.Position := NumRead;
-        if esModified in Entry.State then
-        begin
-          ImportingLabel.Caption := Entry.dn;
+        ImportingLabel.Caption := Entry.dn;
+        //Label3.Caption := IntToStr(Trunc((NumRead / ProgressBar.Max) * 100)) + '%';
+        if not (esDeleted in Entry.State) then
           Entry.Write;
-          inc(ObjCount);
-        end;
+        inc(ObjCount);
         Application.ProcessMessages;
       except
         on E: Exception do

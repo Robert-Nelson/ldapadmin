@@ -91,7 +91,7 @@ const
   rTemplateProperties = 'TemplateProperites';
   rStartupSession     = 'StartupSession';
   rQuickSearchFilter  = 'QuickSearchFilter';
-
+  rSmartDelete        = 'SmartDelete';
   rEditorSchemaHelp   = 'General\EdSchemaHelp';
   rPosixFirstUID      = 'Posix\FirstUID';
   rPosixLastUID       = 'Posix\LastUID';
@@ -114,6 +114,7 @@ const
   rSearchBase         = 'Search\Base';
   rSearchAttributes   = 'Search\Attributes';
   rSearchScope        = 'Search\Scope';
+  rSearchFilters      = 'Search\Filters\';
   rSearchDerefAliases = 'Search\DereferenceAliases';
   rTemplateFormHeight = 'TemplateForm\Height';
   rTemplateFormWidth  = 'TemplateForm\Width';
@@ -127,8 +128,17 @@ const
   sGROUPS           = '(objectclass=posixGroup)';
   sCOMPUTERS        = '(&'+sPOSIXACCNT+'(uid=*$))';
   sMAILGROUPS       = '(objectclass=mailGroup)';
-  sMY_GROUP         = '(&(objectclass=posixGroup)(memberUid=%s))';
+  {sMY_GROUP         = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
+                        '(&(objectclass=groupOfNames)(member=%1:s))' +
+                        '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';}
+  sMY_GROUP         = '(&(objectclass=posixGroup)(|(memberUid=%s)(member=%s)(uniqueMember=%1:s)))';
+  sMY_POSIX_GROUP   = '(&(objectclass=posixGroup)(memberUid=%s))';
   sMY_MAILGROUP     = '(&(objectclass=mailGroup)(member=%s))';
+  sMY_GROUPS        = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
+                        '(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%1:s))' +
+                        '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';
+  sMY_DN_GROUPS     = '(|(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%0:s))' +
+                        '(&(objectclass=groupOfUniqueNames)(uniqueMember=%0:s)))';
   sGROUPBYGID       = '(&(objectclass=posixGroup)(gidNumber=%d))';
   sACCNTBYUID       = '(&(objectclass=posixAccount)(uid=%s))';
   sDEFQUICKSRCH     = '(|(cn=*%s*)(uid=*%s*)(displayName=*%s*))';
@@ -136,6 +146,8 @@ const
 // Captions
 
   cAppName          = 'LDAP Admin';
+  cAnonymousConn    = 'Anonymous connection';
+  cSASLCurrUSer     = 'Use current user credentials';
   cDescription      = 'Description';
   cPickGroups       = 'Choose Groups';
   cPickAccounts     = 'Choose Accounts';
@@ -159,6 +171,7 @@ const
   cRename           = 'Rename';
   cNewName          = 'New name:';
   cDeleting         = 'Deleting:';
+  cPreparing        = 'Preparing...';
   cCopyTo           = 'Copy %s to...';
   cMoveTo           = 'Move %s to...';
   cMoving           = 'Moving...';
@@ -175,7 +188,9 @@ const
   cNewValue         = '<<new>>';
   cSetPassword      = 'Set password...';
   cRegistryCfgName  = 'Private';
-  sConnectSuccess   = 'Connection is successful.'; 
+  sConnectSuccess   = 'Connection is successful.';
+  cAddAttribute     = 'Add attribute...';
+  cAttributeName    = 'Attribute name:';
   
 // Messages
   stOverwrite       = 'Do you want to overwrite?';
@@ -208,6 +223,10 @@ const
   stLdifEFold       = 'Line %d: Empty line may not be folded!';
   stLdifENoCol      = 'Line %d: Missing ":".';
   stLdifENoDn       = 'Line %d: dn expected but %s found!';
+  stLdifInvChType   = 'Line %d: Invalid changetype "%s"!';
+  stLdifInvOp       = 'Line %d: Invalid operation "%s"!';
+  stLdifNotExpected = 'Line %d: Expected "%s" but found "%s"!';
+  stLdifInvAttrName = 'Line %d: Invalid attribute name, expected "%s" but found "%s"!';
   stLdifSuccess     = '%d Object(s) succesfully imported!';
   stLdifFailure     = '%d Object(s) could not be imported!';
   stLdifEof         = 'End of file reached!';
@@ -233,7 +252,8 @@ const
   stSorting         = 'Sorting...';
   stCntObjects      = '%d object(s) retrieved.';
   stCntSubentries   = '%d subentries';
-
+  stUnclosedParam   = 'Invalid (Unclosed) parameter!';
+  stIdentIsnotValid = '"%s" is not a valid %s!';
   stDuplicateEntry  = 'EntryList does not allow duplicates';
   stCantStorPass    = 'This storage does not allow to keep the password';
   stAccntExist      = 'Account with this name already exists.' + #10#13 + stOverwrite;
