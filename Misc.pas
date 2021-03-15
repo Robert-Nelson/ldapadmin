@@ -29,9 +29,11 @@ type
   TStreamProcedure = procedure(Stream: TStream) of object;
 
 { String conversion routines }
-function  UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
-function  StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
+function  UTF8ToStringLen(const src: PAnsiChar; const Len: Integer): widestring;
+function  StringToUTF8Len(const src: PChar; const Len: Integer): AnsiString;
+{$IFNDEF UNICODE}
 function  StringToWide(const S: string): WideString;
+{$ENDIF}
 function  CStrToString(cstr: String): String;
 { Time conversion routines }
 function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
@@ -52,10 +54,10 @@ function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TM
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
 function  MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
 { LDAP helper routines }
-function  GetUid(Session: TLdapSession): Integer;
-function  GetGid(Session: TLdapSession): Integer;
-procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-function  SupportedPropertyObjects(const Index: Integer): Boolean;
+{function  GetUid(Session: TLdapSession): Integer;
+function  GetGid(Session: TLdapSession): Integer;}
+{procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
+function  SupportedPropertyObjects(const Index: Integer): Boolean;}
 { everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
@@ -75,6 +77,7 @@ uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF};
 { String conversion routines }
 
 { Note: these functions ignore conversion errors }
+{$IFNDEF UNICODE}
 function StringToWide(const S: string): WideString;
 var
   DestLen: Integer;
@@ -84,8 +87,8 @@ begin
   MultiByteToWideChar(0, 0, PChar(S), Length(S), PWideChar(Result), DestLen);
   Result[DestLen] := #0;
 end;
-
-function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
+{$ENDIF}
+function UTF8ToStringLen(const src: PAnsiChar; const Len: Integer): widestring;
 var
   l: Integer;
 begin
@@ -93,11 +96,12 @@ begin
   if Len > 0 then
   begin
     l := MultiByteToWideChar( CP_UTF8, 0, src, Len, PWChar(Result), Len*SizeOf(WideChar));
-    SetLength(Result, l);
+    if l <> Len then
+      SetLength(Result, l);
   end;
 end;
 
-function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
+function StringToUTF8Len(const src: PChar; const Len: Integer): AnsiString;
 var
   bsiz: Integer;
   Temp: string;
@@ -108,7 +112,7 @@ begin
   begin
     StringToWideChar(src, PWideChar(Temp), bsiz);
     SetLength(Result, bsiz);
-    bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), -1, PChar(Result), bsiz, nil, nil);
+    bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), -1, PAnsiChar(Result), bsiz, nil, nil);
     if bsiz > 0 then dec(bsiz);
     SetLength(Result, bsiz);
   end;
@@ -560,31 +564,7 @@ begin
     Result := 0;
 end;
 
-function GetUid(Session: TLdapSession): Integer;
-var
-  IdType: Integer;
-begin
-  Result := -1;
-  idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
-  if idType <> POSIX_ID_NONE then
-    Result := Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
-                                       AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
-                                       IdType = POSIX_ID_SEQUENTIAL);
-end;
-
-function GetGid(Session: TLdapSession): Integer;
-var
-  IdType: Integer;
-begin
-  Result := -1;
-  idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
-  if idType <> POSIX_ID_NONE then
-    Result := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, FIRST_GID),
-                                       AccountConfig.ReadInteger(rposixLastGID, LAST_GID),
-                                       IdType = POSIX_ID_SEQUENTIAL);
-end;
-
-procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
+{procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
 var
   Attr: TLdapAttribute;
   j: integer;
@@ -696,7 +676,7 @@ begin
   else
     Result := false;
   end;
-end;
+end;}
 
 function CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 var

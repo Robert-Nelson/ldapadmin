@@ -271,7 +271,7 @@ function TXmlTree.GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: s
 type
   TState=(tsContent, tsScriptContent, tsTag, tsScriptTag, tsAttrs, tsEnd, tsSkip, tsComment);
 var
-  c: char;
+  c: AnsiChar;
   State: TState;
   quota: boolean;
   CommentState: byte;

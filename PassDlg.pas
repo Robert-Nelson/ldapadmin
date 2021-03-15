@@ -59,13 +59,13 @@ implementation
 
 {$R *.DFM}
 
-uses Config, Constant;
+uses Config, Constant, Connection;
 
 constructor TPasswordDlg.Create(AOwner: TComponent; Entry: TLdapEntry; const AttributeName: string = sUserPassword);
 begin
   inherited Create(AOwner);
   fPasswordAttribute := AttributeName;
-  fDefaultHashType := AccountConfig.ReadInteger(rPosixPwdHashType, Integer(chSha1));
+  fDefaultHashType := (Entry.Session as TConnection).Account.ReadInteger(rPosixPwdHashType, Integer(chSha1));
   if (fDefaultHashType < 0) or (fDefaultHashType >= cbMethod.Items.Count) then
     fDefaultHashType := Integer(chSha1);
   cbMethod.ItemIndex := fDefaultHashType;
@@ -90,7 +90,7 @@ begin
     begin
       fSamba := TSamba3Account.Create(fEntry);
       try
-        if AccountConfig.ReadBool(rSambaLMPasswords) then
+        if (fEntry.Session as TConnection).Account.ReadBool(rSambaLMPasswords) then
           fSamba.LMPasswords := true;
         fSamba.SetUserPassword(Password.Text);
       finally
@@ -100,7 +100,7 @@ begin
     if cbPosixPassword.Checked then
       fEntry.AttributesByName[fPasswordAttribute].AsString := GetPasswordString(THashType(cbMethod.ItemIndex), Password.Text);
     if fDefaultHashType <> cbMethod.ItemIndex then
-      AccountConfig.WriteInteger(rPosixPwdHashType, cbMethod.ItemIndex);
+      (fEntry.Session as TConnection).Account.WriteInteger(rPosixPwdHashType, cbMethod.ItemIndex);
   end;
 end;
 

@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, StdCtrls, LDAPClasses, Menus, ExtCtrls, Sorter, WinLdap, ToolWin,
-  ImgList, ActnList, Buttons, Schema, Contnrs;
+  ImgList, ActnList, Buttons, Schema, Contnrs, Connection;
 
 const
   MODPANEL_HEIGHT         = 65;
@@ -88,7 +88,7 @@ type
   protected
     procedure     Resize; override;
   public
-    constructor   Create(AOwner: TComponent; ASession: TLdapSession); reintroduce;
+    constructor   Create(AOwner: TComponent; AConnection: TConnection); reintroduce;
     destructor    Destroy; override;
     procedure     New;
     procedure     Run;
@@ -209,14 +209,14 @@ type
     procedure btnSearchModifyClick(Sender: TObject);
     procedure ActClearAllExecute(Sender: TObject);
   private
-    Session: TLDAPSession;
+    Connection: TConnection;
     ResultPages: TResultPageControl;
     ModifyBox: TModifyBox;
     fSearchFilter: string;
     procedure Search(const Filter: string);
     procedure Modify(const Filter: string);
   public
-    constructor Create(AOwner: TComponent; const dn: string; const Session: TLDAPSession); reintroduce;
+    constructor Create(AOwner: TComponent; const dn: string; AConnection: TConnection); reintroduce;
     procedure   SessionDisconnect(Sender: TObject);
     procedure   ShowModify;
   end;
@@ -274,6 +274,7 @@ end;
 procedure TSearchList.SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
 begin
   fStatusBar.Panels[1].Text := Format(stRetrieving, [Sender.Count]);
+  fStatusBar.Repaint;
   if PeekKey = VK_ESCAPE then
     AbortSearch := true;
 end;
@@ -544,13 +545,13 @@ begin
   fMemo.Lines.SaveToFile(FileName);
 end;
 
-constructor TModifyBox.Create(AOwner: TComponent; ASession: TLdapSession);
+constructor TModifyBox.Create(AOwner: TComponent; AConnection: TConnection);
 var
   L: TLabel;
 begin
   inherited Create(AOwner);
   fOpList := TObjectList.Create;
-  fSchema := LdapSchema(ASession);
+  fSchema := AConnection.Schema;
   fTimer := TTimer.Create(Self);
   fTimer.Enabled := false;
   fTimer.Interval := 50;
@@ -708,15 +709,17 @@ var
   i: integer;
   ImgIndex: integer;
   Container: boolean;
+  Entry: TLdapEntry;
 begin
   with SearchList do begin
-    ClassifyLdapEntry(Entries[Item.Index], Container, ImgIndex);
+    Entry := Entries[Item.Index];
+    (Entry.Session as TConnection).DI.ClassifyLdapEntry(Entry, Container, ImgIndex);
     Item.ImageIndex:=ImgIndex;
 
-    Item.Caption:=Entries[Item.Index].dn;
+    Item.Caption:=Entry.dn;
 
     for i:=0 to Attributes.Count-1 do begin
-      Item.SubItems.Add(Entries[Item.Index].AttributesByName[Attributes[i]].AsString);
+      Item.SubItems.Add(Entry.AttributesByName[Attributes[i]].AsString);
     end;
   end;
 end;
@@ -771,7 +774,7 @@ begin
   ResultPages.ActivePage := Page;
   Screen.Cursor := crHourGlass;
   try
-    Page.SearchList := TSearchList.Create(Session, cbBasePath.Text,                                          Filter, cbAttributes.Text,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    Page.Caption := Filter;    Page.ListView.PopupMenu := PopupMenu1;
+    Page.SearchList := TSearchList.Create(Connection, cbBasePath.Text,                                          Filter, cbAttributes.Text,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    Page.Caption := Filter;    Page.ListView.PopupMenu := PopupMenu1;
     Page.ListView.OnDblClick := ListViewDblClick;
   finally
     Screen.Cursor := crDefault;
@@ -814,42 +817,42 @@ begin
       ExtractParams(attrs, PChar(TEdit(Ctrls[3]).Text));
     end;
     ModifyBox.SearchList.Free;
-    ModifyBox.SearchList := TSearchList.Create(Session, cbBasePath.Text,                                          Filter, attrs,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    ModifyBox.Run;  finally
+    ModifyBox.SearchList := TSearchList.Create(Connection, cbBasePath.Text,                                          Filter, attrs,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    ModifyBox.Run;  finally
     Screen.Cursor := crDefault;
   end;
 end;
 
-constructor TSearchFrm.Create(AOwner: TComponent; const dn: string; const Session: TLDAPSession);
+constructor TSearchFrm.Create(AOwner: TComponent; const dn: string; AConnection: TConnection);
 begin
   inherited Create(AOwner);
-  Self.Session := Session;
+  Connection := AConnection;
   if dn <> '' then
     cbBasePath.Text := dn
   else
-    cbBasePath.Text := Session.Base;
+    cbBasePath.Text := Connection.Base;
   ResultPages := TResultPageControl.Create(self);
   ResultPages.Align := alClient;
   ResultPages.Parent := ResultPanel;
   ResultPages.AddPage;
   ResultPages.ActivePage.Caption := cSearchResults;
   fSearchFilter := GlobalConfig.ReadString(rSearchFilter, sDEFSRCH);
-  with AccountConfig do begin
+  with Connection.Account do begin
     cbBasePath.Items.CommaText := ReadString(rSearchBase, '');
     cbAttributes.Items.CommaText := ReadString(rSearchAttributes, '');
     cbSearchLevel.ItemIndex := ReadInteger(rSearchScope, 2);
     cbDerefAliases.ItemIndex := ReadInteger(rSearchDerefAliases, 0);
   end;
-  Self.Session.OnDisconnect.Add(SessionDisconnect);
-  StatusBar.Panels[0].Text := Format(cServer, [Session.Server]);
+  AConnection.OnDisconnect.Add(SessionDisconnect);
+  StatusBar.Panels[0].Text := Format(cServer, [AConnection.Server]);
   StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(StatusBar.Panels[0].Text) + 16;
   ToolBar1.DisabledImages := MainFrm.DisabledImages;
 end;
 
 procedure TSearchFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  Session.OnDisconnect.Delete(SessionDisconnect);
+  Connection.OnDisconnect.Delete(SessionDisconnect);
   Action := caFree;
-  with AccountConfig do begin
+  with Connection.Account do begin
     WriteString(rSearchBase, cbBasePath.Items.CommaText);
     WriteString(rSearchAttributes, cbAttributes.Items.CommaText);
     WriteInteger(rSearchScope, cbSearchLevel.ItemIndex);
@@ -1032,7 +1035,7 @@ procedure TSearchFrm.ActEditExecute(Sender: TObject);
 begin
   with ResultPages, ActiveList do
   if Assigned(ActiveList) and Assigned(Selected) then
-    TEditEntryFrm.Create(Self, Selected.Caption, Session, EM_MODIFY).ShowModal;
+    TEditEntryFrm.Create(Self, Selected.Caption, Connection, EM_MODIFY).ShowModal;
 end;
 
 procedure TSearchFrm.ActCloseExecute(Sender: TObject);
@@ -1051,7 +1054,7 @@ begin
   Enbl := Enbl and ActStart.Enabled and Assigned(ResultPages.ActiveList.Selected);
   ActGoto.Enabled := Enbl;
   ActEdit.Enabled := Enbl;
-  ActProperties.Enabled := Enbl and SupportedPropertyObjects(ResultPages.ActiveList.Selected.ImageIndex);
+  ActProperties.Enabled := Enbl and Connection.DI.SupportedPropertyObjects(ResultPages.ActiveList.Selected.ImageIndex);
 end;
 
 procedure TSearchFrm.FormKeyPress(Sender: TObject; var Key: Char);
@@ -1070,7 +1073,7 @@ end;
 
 procedure TSearchFrm.edAttrBtnClick(Sender: TObject);
 begin
-  with TPickAttributesDlg.Create(Self, LdapSchema(Session), cbAttributes.Text) do
+  with TPickAttributesDlg.Create(Self, Connection.Schema, cbAttributes.Text) do
   begin
     ShowModal;
     cbAttributes.Text := Attributes;
@@ -1086,7 +1089,7 @@ begin
     idx := Items.IndexOf(Text);
     if idx = - 1 then
       Items.Add(Text);
-    AccountConfig.WriteString(rSearchCustFilters + Text, Memo1.Text);
+    Connection.Account.WriteString(rSearchCustFilters + Text, Memo1.Text);
   end;
 end;
 
@@ -1099,7 +1102,7 @@ begin
     DeleteFilterBtn.Enabled := SaveFilterBtn.Enabled;
     idx := Items.IndexOf(Text);
     if idx <> -1 then
-      Memo1.Text := AccountConfig.ReadString(rSearchCustFilters + Text);
+      Memo1.Text := Connection.Account.ReadString(rSearchCustFilters + Text);
   end;
 end;
 
@@ -1111,7 +1114,7 @@ begin
     idx := Items.IndexOf(Text);
     if idx <> -1 then
     begin
-      AccountConfig.Delete(AccountConfig.RootPath + '\' + rSearchCustFilters + Text);
+      Connection.Account.Delete(Connection.Account.RootPath + '\' + rSearchCustFilters + Text);
       Items.Delete(idx);
     end;
   end;
@@ -1126,7 +1129,7 @@ begin
   begin
     FilterNames := TStringList.Create;
     try
-      AccountConfig.GetValueNames(rSearchCustFilters, FilterNames);
+      Connection.Account.GetValueNames(rSearchCustFilters, FilterNames);
       for i := 0 to FilterNames.Count - 1 do
         cbFilters.Items.Add(FilterNames[i]);
     finally
@@ -1158,7 +1161,7 @@ begin
   else begin
     if not Assigned(ModifyBox) then
     begin
-      ModifyBox := TModifyBox.Create(Self, Session);
+      ModifyBox := TModifyBox.Create(Self, Connection);
       ModifyBox.Align := alClient;
       ModifyBox.Parent := Self;
       ModifyBox.New;

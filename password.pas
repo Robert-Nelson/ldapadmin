@@ -41,7 +41,7 @@ implementation
 
 uses Sysutils, Unixpass, md5crypt, ShaCrypt, base64;
 
-function GetSalt(Len: Integer): string;
+function GetSalt(Len: Integer): AnsiString;
 const
   SaltChars: array[0..63] of AnsiChar =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./';

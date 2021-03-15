@@ -25,7 +25,7 @@ interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, ComCtrls, CommCtrl, LDAPClasses, WinLDAP, LAControls,
-  ImgList;
+  ImgList, Connection;
 
 type
 
@@ -45,6 +45,7 @@ type
     procedure edNameChange(Sender: TObject);
     procedure cbConnectionsDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
+    procedure TreeViewDeletion(Sender: TObject; Node: TTreeNode);
   private
     cbConnections: TLAComboBox;
     RdnAttribute: string;
@@ -59,7 +60,7 @@ type
   public
     constructor Create(AOwner: TComponent;
                        dn: string;
-                       Session: TLDAPSession;
+                       Connection: TConnection;
                        ImageList: TImageList;
                        ExpandNode: TExpandNodeProc;
                        SortProc: TTVCompare); reintroduce;
@@ -90,7 +91,7 @@ end;
 
 function TCopyDlg.GetTgtDn: string;
 begin
-  Result := PChar(TreeView.Selected.Data);
+  Result := TLdapEntry(TreeView.Selected.Data).dn;
 end;
 
 function TCopyDlg.GetTgtRdn: string;
@@ -109,7 +110,7 @@ end;
 
 constructor TCopyDlg.Create(AOwner: TComponent;
                             dn: string;
-                            Session: TLDAPSession;
+                            Connection: TConnection;
                             ImageList: TImageList;
                             ExpandNode: TExpandNodeProc;
                             SortProc: TTVCompare);
@@ -143,10 +144,10 @@ begin
 
   SplitRdn(GetRdnFromDn(dn), RdnAttribute, v);
   edName.Text := v;
-  MainSessionIdx := cbConnections.Items.IndexOf(AccountConfig.Name);
+  MainSessionIdx := cbConnections.Items.IndexOf(Connection.Account.Name);
   if MainSessionIdx = -1 then
     raise Exception.Create('Session error: could not locate active session!');
-  cbConnections.Items.Objects[MainSessionIdx] := Session;
+  cbConnections.Items.Objects[MainSessionIdx] := Connection;
   fExpandNode := ExpandNode;
   fSortProc := SortProc;
   TreeView.Images := ImageList;
@@ -184,7 +185,7 @@ begin
     end;
   end;
   ddRoot := TreeView.Items.Add(nil, Format('%s [%s]', [Session.Base, Session.Server]));
-  ddRoot.Data := Pointer(StrNew(PChar(Session.Base)));
+  ddRoot.Data := TLdapEntry.Create(Session, Session.Base);
   fExpandNode(ddRoot, Session);
   ddRoot.ImageIndex := bmRoot;
   ddRoot.SelectedIndex := bmRoot;
@@ -250,6 +251,12 @@ begin
     s := Items[Index];
     DrawText(Canvas.Handle, PChar(s), Length(s), Rect, DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
   end;
+end;
+
+procedure TCopyDlg.TreeViewDeletion(Sender: TObject; Node: TTreeNode);
+begin
+  if (Node.Data <> nil) and (Integer(Node.Data) <> ncDummyNode) then
+    TLdapEntry(Node.Data).Free;
 end;
 
 end.

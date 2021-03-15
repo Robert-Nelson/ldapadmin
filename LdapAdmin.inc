@@ -1,26 +1,18 @@
-// Delphi 3 *************************************
-{$IFDEF VER100}
-
-{$ENDIF}
-
-// Delphi 4 *************************************
-{$IFDEF VER120}
-
-{$ENDIF}
-
 // Delphi 5 *************************************
 {$IFDEF VER130}
+        {$DEFINE SCRIPTLET_CAST_FIX}
+{$ELSE}
+       // Delphi 6 *************************************
+       {$IF CompilerVersion >= 14}
+            {$DEFINE VARIANTS}
+       {$IFEND}
 
+       // Delphi 7 *************************************
+       {$IF CompilerVersion >= 15}
+            {$DEFINE XPSTYLE}
+       {$IFEND}
+
+       {$IF CompilerVersion < 23} // Which Delphi versions exactly?
+            {$DEFINE SCRIPTLET_CAST_FIX}
+       {$IFEND}
 {$ENDIF}
-
-// Delphi 6 *************************************
-{$IFDEF VER140}
-  {$DEFINE VARIANTS}
-{$ENDIF}
-
-// Delphi 7 *************************************
-{$IFDEF VER150}
-  {$DEFINE VARIANTS}
-  {$DEFINE XPSTYLE}
-{$ENDIF}
-

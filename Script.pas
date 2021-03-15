@@ -285,7 +285,8 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses {$IFDEF VARIANTS} variants, {$ENDIF} LdapClasses, Misc, Dialogs, Constant;
+uses {$IFDEF VARIANTS} variants, {$ENDIF} LdapClasses, Misc, Dialogs, Constant,
+     Connection;
 
 var
   lastScriptExceptionMessage: string;
@@ -435,8 +436,12 @@ function TScriptletEventHandler.GetDispID: Integer;
 var
   ws: WideString;
 begin
+  {$IFDEF UNICODE}
+  ws := ProcName;
+  {$ELSE}
   ws := StringToWide(ProcName);
-  if fDispatch.GetIDsOfNames(GUID_NULL, @PChar(ws), 1, GetThreadLocale, @Result) <> S_OK then
+  {$ENDIF}
+  if fDispatch.GetIDsOfNames(GUID_NULL, @PAnsiChar(ws), 1, GetThreadLocale, @Result) <> S_OK then
     raise EIntScriptException.Create(DISP_E_MEMBERNOTFOUND, Format(stScriptNoProc, [ProcName]));
 end;
 
@@ -731,19 +736,31 @@ end;
 
 function TPropertyList.GetScriptlet(Index: Integer): IScriptlet;
 begin
+{$IFDEF SCRIPTLET_CAST_FIX}
   Result := IScriptlet(Pointer(Objects[Index]));
+{$ELSE}
+  Result := (Objects[Index] as TScriptlet) as IScriptlet;
+{$ENDIF}
 end;
 
 procedure TPropertyList.PutScriptlet(Index: Integer; const Scriptlet: IScriptlet);
 begin
+  {$IFDEF SCRIPTLET_CAST_FIX}
   Objects[Index] :=  TObject(IUnknown(Scriptlet));
+  {$ELSE}
+  Objects[Index] :=  Scriptlet as TObject;
+  {$ENDIF}
   Scriptlet._AddRef;
 end;
 
 procedure TPropertyList.Delete(Index: Integer);
 begin
   if Assigned(Objects[Index]) then
+  {$IFDEF SCRIPTLET_CAST_FIX}
     Iscriptlet(Pointer(Objects[Index]))._Release;
+  {$ELSE}
+    ((Objects[Index] as TScriptlet) as IScriptlet)._Release;
+  {$ENDIF}
   inherited;
 end;
 
@@ -753,7 +770,11 @@ var
 begin
   for I := 0 to Count - 1 do
     if Assigned(Objects[I]) then
+    {$IFDEF SCRIPTLET_CAST_FIX}
       Iscriptlet(Pointer(Objects[I]))._Release;
+    {$ELSE}
+      ((Objects[I] as TScriptlet) as IScriptlet)._Release;
+    {$ENDIF}
   inherited;
 end;
 
@@ -768,10 +789,10 @@ end;
 function ArgParam(const Args: TArgList; Index: Integer): OleVariant;
 begin
   if Index >= Args.Count then
-    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, 'Invalid argument count!');
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stTooManyArgs);
   Result := OleVariant(Args.Arguments[Args.Count - Index - 1]);
   if VarIsEmpty(Result) then
-    raise EIntScriptException.Create(DISP_E_PARAMNOTOPTIONAL, 'Empty argument!');
+    raise EIntScriptException.Create(DISP_E_PARAMNOTOPTIONAL, stEmptyArg);
 end;
 
 type
@@ -1020,8 +1041,13 @@ var
   Result: HResult;
 begin
   Parse := FScript as IActiveScriptParseProcedure2;
+  {$IFDEF UNICODE}
+  Result := Parse.ParseProcedureText(PWideChar(EventCode), '',
+            PWideChar(EventName), '', nil, '', 0, 0, 0, Dispatch);
+  {$ELSE}
   Result := Parse.ParseProcedureText(PWideChar(StringToWide(EventCode)), '',
             PWideChar(StringToWide(EventName)), '', nil, '', 0, 0, 0, Dispatch);
+  {$ENDIF}
   {if Result <> 0 then
     raise EScriptException.Create(Result, 'Error parsing ' + EventName + ' event procedure!');}
   if Result = S_OK then
@@ -1318,6 +1344,7 @@ type
   TObjectScriptlet = class(TScriptlet, IObjectScriptlet)
   private
     FObject: TObject;
+    FOwnsObject: Boolean;
   protected
     function PropertySearch(const PropName: string): Boolean; override;
     function OnGetProperty(PropIndex: Integer; const Args: TArgList): OleVariant; override;
@@ -1330,12 +1357,21 @@ type
     property _Object: TObject read FObject;
   public
     constructor Create(Script: TCustomScript; AObject: TObject); reintroduce;
+    destructor  Destroy; override;
+    property    OwnsObject: Boolean read FOwnsObject write FOwnsObject;
   end;
 
 constructor TObjectScriptlet.Create(Script: TCustomScript; AObject: TObject);
 begin
   FObject := AObject;
   inherited Create(Script);
+end;
+
+destructor TObjectScriptlet.Destroy;
+begin
+  if FOwnsObject then
+    FObject.Free;
+  inherited;
 end;
 
 function TObjectScriptlet.PropertySearch(const PropName: string): Boolean;
@@ -1651,24 +1687,104 @@ begin
   Methods.Add('IndexOfName');
 end;
 
+{ TLdapEntryListScriptlet }
+
+type
+  TLdapEntryListScriptlet = class(TObjectScriptlet, IObjectScriptlet)
+  protected
+    function PropertySearch(const PropName: string): Boolean; override;
+    function GetProperty(PropIndex: Integer; const Args: TArgList): OleVariant; override;
+    procedure OnSetProperty(PropIndex: Integer; const Args: TArgList; const Value: OleVariant); override;
+  end;
+
+function TLdapEntryListScriptlet.PropertySearch(const PropName: string): Boolean;
+begin
+  Result := (PropName = 'COUNT') or IsNumber(PropName);
+end;
+
+function TLdapEntryListScriptlet.GetProperty(PropIndex: Integer; const Args: TArgList): OleVariant;
+var
+  PropName: string;
+begin
+  PropName := Properties[PropIndex];
+
+  if PropName = 'COUNT' then
+    Result := TLdapEntryList(_Object).Count
+  else
+  if IsNumber(PropName) then
+    Result := AddPropertyScriptlet(CreateScriptlet(FScript, TLdapEntryList(_Object)[StrToInt(PropName)], PropName), PropIndex)
+end;
+
+procedure TLdapEntryListScriptlet.OnSetProperty(PropIndex: Integer; const Args: TArgList; const Value: OleVariant);
+begin
+  raise EIntScriptException.Create(DISP_E_EXCEPTION, stWritePropRO);
+end;
+
 { TLdapSessionScriptlet }
 
 type
   TLdapSessionScriptlet = class(TObjectScriptlet, IObjectScriptlet)
   private
     FSession: TLdapSession;
+  function Search(const Args: TArgList): IScriptlet;
+  function Lookup(const Args: TArgList): string;
   protected
     function  OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant; override;
   public
     constructor Create(Script: TCustomScript; Session: TLdapSession);
   end;
 
+function TLdapSessionScriptlet.Search(const Args: TArgList): IScriptlet;
+var
+  Entries: TLdapEntryList;
+  es: TLdapEntryListScriptlet;
+  attrs: PCharArray;
+  sl: TStringList;
+  len: Integer;
+begin
+  if Args.Count < 5 then
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
+
+  sl := TStringList.Create;
+  try
+    sl.CommaText := ArgParam(Args, 3);
+    attrs := nil;
+    len := sl.Count;
+    if Len > 0 then
+    begin
+      SetLength(attrs, len + 1);
+      attrs[len] := nil;
+      repeat
+        dec(len);
+        attrs[len] := PChar(sl[len]);
+      until len = 0;
+    end;
+    Entries := TLdapEntryList.Create;
+    FSession.Search(string(ArgParam(Args, 0)), string(ArgParam(Args, 1)), Integer(ArgParam(Args, 2)), attrs, false, Entries);
+    es := TLdapEntryListScriptlet.Create(FScript, Entries);
+    es.OwnsObject := true;
+    Result := es as IScriptlet;
+    Result.Name := 'Search';
+  finally
+    sl.Free;
+  end;
+end;
+
+function TLdapSessionScriptlet.Lookup(const Args: TArgList): string;
+begin
+  if Args.Count < 4 then
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
+  Result := FSession.Lookup(string(ArgParam(Args, 0)), string(ArgParam(Args, 1)), string(ArgParam(Args, 2)), Integer(ArgParam(Args, 3)));
+end;
+
 function TLdapSessionScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
 begin
   VarClear(Result);
   case MethodIndex of
-    0: Result := GetUid(FSession);
-    1: Result := GetGid(FSession);
+    0: Result := (FSession as TConnection).GetUid;
+    1: Result := (FSession as TConnection).GetGid;
+    2: Result := Search(Args);
+    3: Result := Lookup(Args);
   end;
 end;
 
@@ -1678,6 +1794,8 @@ begin
   FSession := Session;
   Methods.Add('GetUid');
   Methods.Add('GetGid');
+  Methods.Add('Search');
+  Methods.Add('Lookup');
 end;
 
 { TLdapAttributeScriptlet }
@@ -1764,7 +1882,7 @@ end;
 
 procedure TLdapAttributeListScriptlet.OnSetProperty(PropIndex: Integer; const Args: TArgList; const Value: OleVariant);
 begin
-  raise EIntScriptException.Create(DISP_E_EXCEPTION, 'Can not write to read only property!');
+  raise EIntScriptException.Create(DISP_E_EXCEPTION, stWritePropRO);
 end;
 
 function CreateLdapAttributeListScriptlet(Script: TCustomScript; Entry: TLdapEntry; const Name: string): IScriptlet;

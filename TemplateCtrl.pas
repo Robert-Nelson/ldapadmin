@@ -147,6 +147,7 @@ type
     destructor  Destroy; override;
     procedure   AddTemplate(ATemplate: TTemplate);
     procedure   LoadMatching;
+    class function  HasMatchingTemplates(Entry: TLDapEntry): Boolean;
     property    TemplatePanels: TList read fTemplatePanels;
   end;
 
@@ -751,35 +752,39 @@ end;
 
 procedure TTemplateForm.OKBtnClick(Sender: TObject);
 var
-  i: Integer;
+  i, j: Integer;
   S: TStringList;
   ardn, aval: string;
 begin
-  if esNew in fEntry.State then
-  begin
-    S := TStringList.Create;
-    try
-      for i := 0 to fTemplatePanels.Count - 1 do with TTemplatePanel(fTemplatePanels[i]) do
-      begin
-        { designated rdn }
-        if Template.Rdn <> '' then
-        begin
-          aval := fEntry.AttributesByName[Template.Rdn].AsString;
-          if aval <> '' then
-            S.Add(Template.Rdn + '=' + aval);
-        end;
-      end;
-      if S.Count = 1 then
-        ardn := S[0]
-      else
-        if ComboMessageDlg('Enter rdn:', S.CommaText, ardn) <> mrOk then
-          Abort;
-      fEntry.Dn := ardn + ',' + fRdn;
-    finally
-      S.Free;
-    end;
-  end;
   try
+    if esNew in fEntry.State then
+    begin
+      S := TStringList.Create;
+      try
+        for i := 0 to fTemplatePanels.Count - 1 do with TTemplatePanel(fTemplatePanels[i]) do
+        begin
+          { check required }
+          for j := 0 to Attributes.Count - 1 do
+            if Attributes[j].Required and fEntry.AttributesByName[Attributes[j].Name].Empty then
+              raise Exception.Create(Format(stRequired, [Attributes[j].Name]));
+          { designated rdn }
+          if Template.Rdn <> '' then
+          begin
+            aval := fEntry.AttributesByName[Template.Rdn].AsString;
+            if aval <> '' then
+              S.Add(Template.Rdn + '=' + aval);
+          end;
+        end;
+        if S.Count = 1 then
+          ardn := S[0]
+        else
+          if ComboMessageDlg('Enter rdn:', S.CommaText, ardn) <> mrOk then
+            Abort;
+        fEntry.Dn := ardn + ',' + fRdn;
+      finally
+        S.Free;
+      end;
+    end;
     fEntry.Write;
   except
     ModalResult := mrNone;
@@ -914,6 +919,23 @@ begin
     if Assigned(Oc) and Template.Matches(Oc) then
       AddTemplate(Template);
   end;
+end;
+
+class function TTemplateForm.HasMatchingTemplates(Entry: TLdapEntry): Boolean;
+var
+  Oc: TLdapAttribute;
+  i: Integer;
+begin
+  //if esNew in fEntry.State then Exit;
+  Result := false;
+  Oc := Entry.AttributesByName['objectclass'];
+  if not Assigned(Oc) then exit;
+  for i := 0 to TemplateParser.Count - 1 do
+    if TemplateParser.Templates[i].Matches(Oc) then
+    begin
+      Result := true;
+      break;
+    end;
 end;
 
 end.

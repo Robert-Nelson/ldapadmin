@@ -223,10 +223,10 @@ object AboutDlg: TAboutDlg
     object Label7: TLabel
       Left = 72
       Top = 72
-      Width = 156
+      Width = 124
       Height = 13
       Cursor = crHandPoint
-      Caption = 'http://ldapadmin.sourceforge.net'
+      Caption = 'http://www.ldapadmin.org'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clBlue
       Font.Height = -11
@@ -244,9 +244,9 @@ object AboutDlg: TAboutDlg
     end
   end
   object BtnClose: TButton
-    Left = 76
+    Left = 92
     Top = 216
-    Width = 113
+    Width = 85
     Height = 25
     Caption = '&Close'
     ModalResult = 1

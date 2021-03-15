@@ -11,6 +11,8 @@ const
   bmPosixUserSel       =  4;
   bmSamba3User         =  5;
   bmSamba3UserSel      =  5;
+  bmADUser             =  5;
+  bmADUserSel          =  5;
   bmGroup              =  6;
   bmGroupSel           =  6;
   bmComputer           =  7;
@@ -44,6 +46,17 @@ const
   bmGrOfUnqNames       = 35;
   bmGrOfUnqNamesSel    = 35;
   bmSambaGroup         = 39;
+  bmSambaGroupSel      = 39;
+  bmADGroup            = 39;
+  bmADGroupSel         = 39;
+  bmClassSchema        = 40;
+  bmClassSchemaSel     = 40;
+  bmAttributeSchema    = 41;
+  bmAttributeSchemaSel = 41;
+  bmConfiguration      = 42;
+  bmConfigurationSel   = 42;
+  bmContainer          = 43;
+  bmContainerSel       = 43;
 
   ncDummyNode          = -1;
 
@@ -96,6 +109,7 @@ const
   rSearchFilter       = 'SearchFilter';
   rQuickSearchFilter  = 'QuickSearchFilter';
   rSmartDelete        = 'SmartDelete';
+  rUseTemplateImages  = 'UseTemplateImages';
   rEditorSchemaHelp   = 'General\EdSchemaHelp';
   rLastMemberOf       = 'General\LastMemberOf';
   rPosixIDType        = 'Posix\IdType';
@@ -127,6 +141,7 @@ const
   rTemplateFormHeight = 'TemplateForm\Height';
   rTemplateFormWidth  = 'TemplateForm\Width';
   rLocalTransTable    = 'TranscodeTable';
+  rDirectoryType      = 'Connection\DirectoryType';
 
 // Search filters
 
@@ -217,6 +232,13 @@ const
   cAttributeName    = 'Attribute name:';
   cProgress         = 'Progress:';
   cBrowse           = 'Browse...';
+  cBinary           = 'Binary';
+  cImage            = 'Image';
+  cText             = 'Text';
+  cCert             = 'Certificate';
+  cUnknown          = 'Unknown';
+  cViewPic          = 'View picture: ';
+  cSaveToLdap       = 'Save to LDAP';
 
 // Messages
   stUserBreak       = 'User break!';
@@ -306,6 +328,11 @@ const
   stScriptNoProc    = 'Procedure "%s" could not be located.';
   stScriptParamType = 'Unsupported parameter type!';
   stScriptSetErr    = 'Could not convert set to integer!';
+  stWritePropRO     = 'Can not write to read only property!';
+  stNotEnoughArgs   = 'Not enough arguments!';
+  stTooManyArgs     = 'Too many arguments!';
+  stEmptyArg        = 'Empty argument!';
+  stRequired        = '%s is required!';
 
 implementation
 

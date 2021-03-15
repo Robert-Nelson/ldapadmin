@@ -1,5 +1,5 @@
   {      LDAPAdmin - Group.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ComCtrls, ExtCtrls, Samba, Posix, LDAPClasses, Core, TemplateCtrl,
-  Constant;
+  Constant, Connection;
 
 type
   TGroupDlg = class(TForm)
@@ -71,7 +71,7 @@ type
     procedure FormDestroy(Sender: TObject);
   private
     ParentDn: string;
-    Session: TLDAPSession;
+    Connection: TConnection;
     Entry: TLdapEntry;
     PosixGroup: TPosixGroup;
     SambaGroup: TSamba3Group;
@@ -88,7 +88,7 @@ type
     function GetGroupType: Integer;
     procedure TemplateCbxClick(Sender: TObject);
   public
-    constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0); reintroduce;
+    constructor Create(AOwner: TComponent; dn: string; Connection: TConnection; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0); reintroduce;
   end;
 
 var
@@ -154,14 +154,14 @@ begin
     begin
       ListItem := UserList.Items.Add;
       ListItem.Caption := PosixGroup.Members[i];
-      ListItem.Data := StrNew(PChar(Session.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
+      ListItem.Data := StrNew(PChar(Connection.GetDN(Format(sACCNTBYUID, [PosixGroup.Members[i]]))));
       ListItem.SubItems.Add(CanonicalName(GetDirFromDN(PChar(ListItem.Data))));
     end;
   if UserList.Items.Count > 0 then
     RemoveUserBtn.Enabled := true;
 end;
 
-constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0);
+constructor TGroupDlg.Create(AOwner: TComponent; dn: string; Connection: TConnection; Mode: TEditMode; APosixGroup: Boolean = true; AGroupOfUniqueNames: Integer = 0);
 var
   n: Integer;
   TemplateList: TTemplateList;
@@ -170,8 +170,8 @@ var
 begin
   inherited Create(AOwner);
   ParentDn := dn;
-  Self.Session := Session;
-  Entry := TLdapEntry.Create(Session, dn);
+  Self.Connection := Connection;
+  Entry := TLdapEntry.Create(Connection, dn);
   if Mode = EM_MODIFY then
   begin
     Load;
@@ -329,7 +329,6 @@ end;
 
 procedure TGroupDlg.Save;
 var
-  //idType: Integer;
   gidNr: Integer;
 begin
   if edName.Text = '' then
@@ -338,13 +337,7 @@ begin
     raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
   if Assigned(PosixGroup) and (esNew in Entry.State) then
   begin
-    {idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
-    if idType <> POSIX_ID_NONE then
-    begin
-      PosixGroup.GidNumber := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, FIRST_GID),
-                                                       AccountConfig.ReadInteger(rposixLastGID, LAST_GID),
-                                                       IdType = POSIX_ID_SEQUENTIAL);}
-    gidNr := GetGid(Session);
+    gidNr := Connection.GetGid;
     if gidNr <> -1 then
     begin
       PosixGroup.GidNumber := gidNr;
@@ -375,7 +368,7 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickAccounts;
     ColumnNames := 'Name,DN';
-    Populate(Session, sUSERS, ['uid', PSEUDOATTR_PATH]);
+    Populate(Connection, sUSERS, ['uid', PSEUDOATTR_PATH]);
     ShowModal;
 
     for i:=0 to SelCount-1 do  begin
@@ -424,7 +417,7 @@ end;
 procedure TGroupDlg.UserListDeletion(Sender: TObject; Item: TListItem);
 begin
   if Assigned(Item.Data) then
-    StrDispose(Item.Data);
+    StrDispose(PChar(Item.Data));
 end;
 
 procedure TGroupDlg.ListViewColumnClick(Sender: TObject; Column: TListColumn);
@@ -466,7 +459,7 @@ var
 begin
   if not Assigned(DomList) then
   try
-    DomList := TDomainList.Create(Session);
+    DomList := TDomainList.Create(Connection);
     with cbSambaDomain do
     begin
       if Assigned(SambaGroup) and not (esNew in Entry.State) then
@@ -491,7 +484,7 @@ begin
         cbSambaGroup.Enabled := DomList.Count > 0;
         for i := 0 to DomList.Count - 1 do
           Items.Add(DomList.Items[i].DomainName);
-        ItemIndex := Items.IndexOf(AccountConfig.ReadString(rSambaDomainName));
+        ItemIndex := Items.IndexOf(Connection.Account.ReadString(rSambaDomainName));
       end;
     end;
   except

@@ -66,7 +66,7 @@ type
   TLdapEntry         = class;
   TLdapEntryList     = class;
 
-  TDataType = (dtUnknown, dtText, dtBinary);
+  TDataType = (dtUnknown, dtText, dtBinary, dtJpeg, dtCert);
   TLdapAttributeStates = set of (asNew, asBrowse, asModified, asDeleted);
   TLdapEntryStates = set of (esNew, esBrowse, esReading, esWriting, esModified, esDeleted);
   TLdapAttributeSortType = (AT_Attribute, AT_DN, AT_RDN, AT_Path);
@@ -87,7 +87,7 @@ type
     fAttribute: TLdapAttribute;
     fEntry: TLdapEntry;
     fModOp: Cardinal;
-    fType: TDataType;
+    //fType: TDataType; there is no need to determine this on per value basis
     fUtf8: Boolean;
     function GetType: TDataType;
     function GetString: string;
@@ -116,10 +116,13 @@ type
     fValues: TList;
     fOwnerList: TLdapAttributeList;
     fEntry: TLdapEntry;
+    fDataType: TDataType;
     function GetCount: Integer;
     function GetValue(Index: Integer): TLdapAttributeData;
     function GetString: string;
     procedure SetString(AValue: string);
+    function GetDataType: TDataType;
+    function GetEmpty: Boolean;
   public
     constructor Create(const AName: string; OwnerList: TLdapAttributeList); virtual;
     destructor Destroy; override;
@@ -137,6 +140,8 @@ type
     property ValueCount: Integer read GetCount;
     property AsString: string read GetString write SetString;
     property Entry: TLdapEntry read fEntry;
+    property DataType: TDataType read GetDataType;
+    property Empty: Boolean read GetEmpty;
   end;
 
   TLdapAttributeList = class
@@ -277,10 +282,11 @@ type
   TLdapEntryList = class
   private
     fList:        TList;
+    fOwnsEntries: Boolean;
     function      GetCount: Integer;
     function      GetNode(Index: Integer): TLdapEntry;
   public
-    constructor   Create;
+    constructor   Create(AOwnsObjects: Boolean = true);
     destructor    Destroy; override;
     procedure     Add(Entry: TLdapEntry);
     procedure     Clear;
@@ -288,6 +294,7 @@ type
     property      Count: Integer read GetCount;
     procedure     Sort(const Attributes: array of string; const Asc: boolean); overload;
     procedure     Sort(const Compare: TCompareLdapEntry; const Asc: boolean; const Data: pointer=nil); overload;
+    property      OwnsEntries: Boolean read fOwnsEntries write fOwnsEntries;
   end;
 
 { Name handling routines }
@@ -495,9 +502,9 @@ procedure TLDAPSession.Search(const Filter, Base: string; const Scope: Cardinal;
 var
   plmSearch: PLDAPMessage;
   Err: Integer;
-  ServerControls: PLDAPControlA;
-  ClientControls: PLDAPControlA;
-  SortKeys: PLDAPSortKeyA;
+  ServerControls: PLDAPControl;
+  ClientControls: PLDAPControl;
+  SortKeys: PLDAPSortKey;
   HSrch: PLDAPSearch;
   TotalCount: Cardinal;
   Timeout: LDAP_TIMEVAL;
@@ -754,7 +761,7 @@ begin
   LdapCheck(ldap_delete_s(pld, PChar(adn)));
 end;
 
-{ Get random free uidNumber from the pool of available numbers, return -1 if
+{ Get random free number from the pool of available numbers, return -1 if
   no more free numbers are available }
 function TLDAPSession.GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
 var
@@ -780,7 +787,7 @@ begin
   Result := -1;
 end;
 
-{ Get sequential free uidNumber from the pool of available numbers, return -1 if
+{ Get sequential free number from the pool of available numbers, return -1 if
   no more free numbers are available }
 function TLDAPSession.GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
 var
@@ -1127,7 +1134,11 @@ begin
                        ident.DomainLength := 0;
                        ident.Password := PChar(ldapPassword);
                        ident.PasswordLength := Length(Password);
+                       {$IFDEF UNICODE}
+                       ident.Flags := SEC_WINNT_AUTH_IDENTITY_UNICODE;
+                       {$ELSE}
                        ident.Flags := SEC_WINNT_AUTH_IDENTITY_ANSI;
+                       {$ENDIF}
                        if ldapAuthMethod = AUTH_GSS_SASL then
                          LdapCheck(ldap_set_option(pld,LDAP_OPT_ENCRYPT, LDAP_OPT_ON));
                        res := ldap_bind_s(ldappld, nil, @ident, LDAP_AUTH_NEGOTIATE);
@@ -1180,17 +1191,38 @@ end;
 
 function TLDapAttributeData.GetType: TDataType;
 var
-  l: Integer;
-begin
-  if (fType = dtUnknown) and (DataSize > 0) then
-  begin
-    l := MultiByteToWideChar( CP_UTF8, 8{MB_ERR_INVALID_CHARS}, PChar(Data), DataSize, nil, 0);
-    if l <> 0 then
-      fType := dtText
-    else
-      fType := dtBinary;
+  w: Word;
+
+  function LengthAsStr(P: Pointer; Length: Integer): Cardinal; assembler;
+  asm
+        PUSH    EDI
+        MOV     EDI,EAX
+        MOV     ECX,EDX
+        SUB     EAX,EAX
+        REPNE   SCASB
+        MOV     EAX,EDX
+        SUB     EAX,ECX
+        POP     EDI
   end;
-  Result := fType;
+
+begin
+  if (Attribute.fDataType = dtUnknown) and (DataSize > 0) then
+  begin
+    if (LengthAsStr(Data, DataSize) >= DataSize) and
+       (MultiByteToWideChar( CP_UTF8, 8{MB_ERR_INVALID_CHARS}, PAnsiChar(Data), DataSize, nil, 0) <> 0) then
+      Attribute.fDataType := dtText
+    else begin
+      w := PWord(Data)^;
+      if w = $8230 then   // DER Sequence '30 82'
+        Attribute.fDataType := dtCert
+      else
+      if w = $D8FF then // Exif header 'FF D8'
+        Attribute.fDataType := dtJpeg
+      else
+        Attribute.fDataType := dtBinary;
+    end;
+  end;
+  Result := Attribute.fDataType;
 end;
 
 function TLDapAttributeData.GetString: string;
@@ -1198,9 +1230,9 @@ begin
   if Assigned(Self) and (ModOp <> LdapOpNoop) and (ModOp <> LdapOpDelete) then
   begin
     if fUtf8 then
-      Result := UTF8ToStringLen(PChar(Data), DataSize)
+      Result := UTF8ToStringLen(PAnsiChar(Data), DataSize)
     else
-      System.SetString(Result, PChar(Data), DataSize);
+      System.SetString(Result, PAnsiChar(Data), DataSize);
   end
   else
     Result := '';
@@ -1208,7 +1240,7 @@ end;
 
 procedure TLDapAttributeData.SetString(AValue: string);
 var
-  s: string;
+  s: AnsiString;
 begin
   if fUtf8 then
     s := StringToUtf8Len(PChar(AValue), Length(AValue))
@@ -1248,7 +1280,7 @@ constructor TLDapAttributeData.Create(Attribute: TLdapAttribute);
 begin
   fAttribute := Attribute;
   fEntry := Attribute.fEntry;
-  fType := dtUnknown;
+  //fType := dtUnknown;
   if not (Assigned(fEntry) and Assigned(fEntry.Session) and (fEntry.Session.Version < LDAP_VERSION3)) then
     fUtf8 := true;
   inherited Create;
@@ -1274,7 +1306,7 @@ asm
 @@3:    POP     ESI
 end;
 
-procedure TLDapAttributeData.SetData(AData: Pointer; ADataSize: Cardinal);
+procedure TLdapAttributeData.SetData(AData: Pointer; ADataSize: Cardinal);
 var
   i: Integer;
 begin
@@ -1285,7 +1317,7 @@ begin
     fAttribute.fState := fAttribute.fState - [asDeleted];
     if not CompareData(AData, ADataSize) then
     begin
-      fType := dtUnknown;
+      //fType := dtUnknown;
       fBerval.Bv_Len := ADataSize;
       SetLength(fBerval.Bv_Val, ADataSize);
       Move(AData^, Pointer(fBerval.Bv_Val)^, ADataSize);
@@ -1436,12 +1468,39 @@ begin
     TLdapAttributeData(fValues[0]).AsString := PChar(AValue);
 end;
 
+function TLdapAttribute.GetDataType: TDataType;
+var
+  i: Integer;
+begin
+  if fDataType = dtUnknown then
+    for i := 0 to fValues.Count - 1 do
+      if TLDapAttributeData(fValues[i]).DataType <> dtUnknown then
+        break;
+  Result := fDataType;
+end;
+
+function TLdapAttribute.GetEmpty: Boolean;
+var
+  i: Integer;
+begin
+  Result := false;
+  for i := 0 to ValueCount - 1 do
+    with Values[i] do
+    if (ModOp <> LdapOpNoop) and (ModOp <> LdapOpDelete) and (DataSize <> 0) then
+    begin
+      Result := true;
+      break;
+    end;
+  Result := not Result;
+end;
+
 constructor TLdapAttribute.Create(const AName: string; OwnerList: TLdapAttributeList);
 begin
   fName := AName;
   fOwnerList := OwnerList;
   fEntry := OwnerList.fEntry;
   fValues := TList.Create;
+  fDataType := dtUnknown;
 end;
 
 destructor TLdapAttribute.Destroy;
@@ -1625,6 +1684,7 @@ end;
 procedure TLDAPEntry.Read;
 begin
   fAttributes.Clear;
+  fOperationalAttributes.Clear;
   fState := [esReading];
   try
     fSession.ReadEntry(Self);
@@ -1683,17 +1743,19 @@ begin
   Result := TLdapEntry(fList[Index]);
 end;
 
-constructor TLdapEntryList.Create;
+constructor TLdapEntryList.Create(AOwnsObjects: Boolean = true);
 begin
   fList := TList.Create;
+  fOwnsEntries := AOwnsObjects;
 end;
 
 destructor TLdapEntryList.Destroy;
 var
   i: Integer;
 begin
-  for i := 0 to fList.Count - 1 do
-    TLdapEntry(fList[i]).Free;
+  if fOwnsEntries then
+    for i := 0 to fList.Count - 1 do
+      TLdapEntry(fList[i]).Free;
   fList.Free;
   inherited Destroy;
 end;
@@ -1707,8 +1769,9 @@ procedure TLdapEntryList.Clear;
 var
   i: Integer;
 begin
-  for i := 0 to fList.Count - 1 do
-    TLdapEntry(fList[i]).Free;
+  if fOwnsEntries then
+    for i := 0 to fList.Count - 1 do
+      TLdapEntry(fList[i]).Free;
   fList.Clear;
 end;
 

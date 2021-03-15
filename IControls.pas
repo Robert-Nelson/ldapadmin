@@ -267,7 +267,7 @@ begin
     fCanComplete := true;
   if not fCanComplete then Exit;
 
-  i := Perform(CB_FINDSTRING, -1, Cardinal(PChar(Text)));
+  i := Perform(CB_FINDSTRING, 0, Cardinal(PChar(Text)));
   if i > CB_Err then
   begin
     l := Length(Text);
@@ -351,7 +351,7 @@ end;
 
 procedure TInplaceMemo.DisplayControl(const ACol, ARow: Integer);
 begin
-  if Assigned(fValue) and (fValue.DataType <> dtBinary) then
+  if Assigned(fValue) and ((fValue.DataType = dtText) or (fValue.DataType = dtUnknown)) then
     inherited;
 end;
 

@@ -389,6 +389,7 @@ type
     fColumns:     array of string;
     fColNames:    array of string;
     fReturns:     string;
+    fBase: string;
     procedure     ButtonClick(Sender: TObject);
   protected
     procedure     LoadProc(XmlNode: TXmlNode); override;
@@ -656,13 +657,15 @@ begin
     Result := TTemplateNoCtrl;
 end;
 
-function CheckStrToInt(Value, Tag: string): Integer;
+function CheckStrToInt(const Value, Tag: string): Integer;
 begin
   try
     Result := StrToInt(Value);
   except
     on E:EConvertError do
-      raise Exception.Create(Format(stInvalidTagValue, [Value, Tag]));
+      raise Exception.Create(Format(stInvalidTagValue, [Value, Tag]))
+    else
+      raise;
   end;
 end;
 
@@ -932,14 +935,12 @@ var
   AControl: TTemplateControl;
   Node: TXmlNode;
 
-  function GetColor(const Value: string): TColor;
+  function GetColor(const Value, Tag: string): TColor;
   var
-    i: Integer;
     c: Cardinal;
-    s: string;
   begin
     // convert html style hex numbers to pascal hex
-    s := Value;
+    {s := Value;
     i := Pos('#', s);
     if i > 0 then
       s[i] := '$';
@@ -950,7 +951,8 @@ var
         raise Exception.Create(Format(stIdentIsNotValid, [Value, stInteger]))
       else
         raise;
-    end;
+    end;}
+    c := CheckStrToInt(Value, Tag);
     //Reorder bytes to BGR as expected by TColor
     Result := (c shr 16 + c and $00FF00 + c shl 16) and $00FFFFFF;
   end;
@@ -1020,10 +1022,10 @@ begin
       end
       else
       if Name = 'color' then
-        TLabel(fControl).Color := GetColor(Content)
+        TLabel(fControl).Color := GetColor(Content, Name)
       else
       if Name = 'fontcolor' then
-        TLabel(fControl).Font.Color := GetColor(Content)
+        TLabel(fControl).Font.Color := GetColor(Content, Name)
       else
       if Name = 'fontstyle' then
         ParseStyle(Content)
@@ -1043,8 +1045,9 @@ begin
       if Name = 'datacontrol' then
         fDataControlName := Content
       else
-      if Pos(Uppercase(Name), EVENT_NAMES) > 0 then
-        fElements.Add(TTemplateScriptEvent.Create(Self, XmlNode[i]));
+      if Name = 'event' then
+        if Pos(Uppercase(Attributes.Values['type']), EVENT_NAMES) > 0 then
+          fElements.Add(TTemplateScriptEvent.Create(Self, XmlNode[i]));
      end;
 
     NotParented:=(fControl.Parent=nil);
@@ -2487,7 +2490,7 @@ begin
     for i := 0 to High(fColNames) do
       s := s + '"' + fColNames[i] + '"' + ',';
     ColumnNames := s;
-    Populate(fLdapAttribute.Entry.Session, fFilter, fColumns);
+    Populate(fLdapAttribute.Entry.Session, fFilter, fColumns, fBase);
     if (ShowModal = mrOK) and Assigned(fDataControl) then
     begin
       Value := TTemplateAttributeValue.Create(nil);
@@ -2584,7 +2587,10 @@ begin
     end
     else
     if Name = 'column' then
-      SetColumnValues(XmlNode[i]);
+      SetColumnValues(XmlNode[i])
+    else
+    if Name = 'base' then
+      fBase := Content;
   end;
   if fReturns <> '' then
   begin
@@ -2773,7 +2779,7 @@ end;
 
 function TTemplateScriptEvent.GetEventName: string;
 begin
-  Result := fNode.Name;
+  Result := fNode.Attributes.Values['type'];
 end;
 
 function TTemplateScriptEvent.GetCode: string;
@@ -2901,7 +2907,7 @@ var
     if Name = 'bitmap' then
       Bitmap := Content
     else
-    if Name = 'filename' then
+    if Name = 'file' then
       FileName := Content
     else
     if Name = 'transparentcolor' then
@@ -3078,6 +3084,12 @@ begin
       AValue.Base64:=(Attributes.Values['encode']='base64');
       AValue.Value:=Content;
       FValues.Add(AValue)
+    end
+    else
+    if Name='required' then
+    begin
+      if Content <> 'false' then
+        FRequired := true;
     end;
   end;
 

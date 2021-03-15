@@ -225,7 +225,7 @@ end;
 procedure TMailGroupDlg.UserListDeletion(Sender: TObject; Item: TListItem);
 begin
   if Assigned(Item.Data) then
-    StrDispose(Item.Data);
+    StrDispose(PChar(Item.Data));
 end;
 
 procedure TMailGroupDlg.edNameChange(Sender: TObject);

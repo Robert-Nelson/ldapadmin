@@ -60,6 +60,7 @@ type
     Label3: TLabel;
     edSearch: TEdit;
     Label4: TLabel;
+    cbTemplateIcons: TCheckBox;
     procedure btnAddClick(Sender: TObject);
     procedure btnDelClick(Sender: TObject);
     procedure cbConnectClick(Sender: TObject);
@@ -117,6 +118,7 @@ begin
     cbTemplateAutoload.Checked := ReadBool(rTemplateAutoload, true);
     cbTemplateProperties.Checked := ReadBool(rTemplateProperties, true);
     cbSmartDelete.Checked := ReadBool(rSmartDelete, true);
+    cbTemplateIcons.Checked := ReadBool(rUseTemplateImages, false);
     CheckAssocCbk.Checked:= not ReadBool(rDontCheckProto, false);
 
     s := ReadString(rStartupSession);
@@ -207,6 +209,7 @@ begin
     WriteBool(rTemplateAutoload, cbTemplateAutoload.Checked);
     WriteBool(rTemplateProperties, cbTemplateProperties.Checked);
     WriteBool(rSmartDelete, cbSmartDelete.Checked);
+    WriteBool(rUseTemplateImages, cbTemplateIcons.Checked);
     WriteString(rTemplateDir, TemplateList.Items.CommaText);
     WriteBool(rDontCheckProto, not CheckAssocCbk.Checked);
     with cbStartupConnection do

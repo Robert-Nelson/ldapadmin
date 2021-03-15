@@ -1,5 +1,5 @@
   {      LDAPAdmin - User.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -30,7 +30,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Posix, Shadow,
   InetOrg, Postfix, Samba, PropertyObject, Constant, ExtDlgs, TemplateCtrl,
-  CheckLst, ShellApi;
+  CheckLst, ShellApi, Connection;
 
 
 const
@@ -198,7 +198,7 @@ type
     SambaAccount: TSamba3Account;
     MailAccount: TMailUser;
     InetOrgPerson: TInetOrgPerson;
-    Session: TLDAPSession;
+    Connection: TConnection;
     origGroups: TStringList;
     ColumnToSort: Integer;
     Descending: Boolean;
@@ -229,7 +229,7 @@ type
     procedure SaveGroups;
     procedure SetText(Edit: TCustomEdit; Value: string);
   public
-    constructor Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; Mode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; adn: string; AConnection: TConnection; Mode: TEditMode); reintroduce;
   end;
 
 var
@@ -301,7 +301,7 @@ begin
         'F': Result := Result + GivenName.Text[1];
         'l': Result := Result + CheckRange(p1, Sn.Text);
         'L': Result := Result + Sn.Text[1];
-        'n': Result := Result + AccountConfig.ReadString(rsambaNetbiosName, '');
+        'n': Result := Result + Connection.Account.ReadString(rsambaNetbiosName, '');
       else
         Result := Result + p^ + p1^;
       end;
@@ -393,8 +393,8 @@ begin
   begin
     if givenName.Text <> '' then
     begin
-      s := AnsiLowercase(FormatString(AccountConfig.ReadString(rposixUserName, '')));
-      SetText(displayName, FormatString(AccountConfig.ReadString(rinetDisplayName, '')));
+      s := AnsiLowercase(FormatString(Connection.Account.ReadString(rposixUserName, '')));
+      SetText(displayName, FormatString(Connection.Account.ReadString(rinetDisplayName, '')));
     end
     else begin
       s := AnsiLowercase(sn.Text);
@@ -403,7 +403,7 @@ begin
     if uid.Text = '' then
     begin
       SetText(uid, Transcode(s));
-      SetText(homeDirectory, FormatString(AccountConfig.ReadString(rposixHomeDir)));
+      SetText(homeDirectory, FormatString(Connection.Account.ReadString(rposixHomeDir)));
       SambaPreset;
     end;
   end;
@@ -428,7 +428,7 @@ begin
   if not Assigned(DomList) then // first time, initialize domain list
   begin
     cbDomain.Items.Clear;
-    DomList := TDomainList.Create(Session);
+    DomList := TDomainList.Create(Connection);
     for i := 0 to DomList.Count - 1 do
       cbDomain.Items.Add(DomList.Items[i].DomainName);
   end;
@@ -438,19 +438,19 @@ begin
   begin
     LoadControls(SambaSheet);
     SetSambaTime;
-    cbDomain.ItemIndex := cbDomain.Items.IndexOf(AccountConfig.ReadString(rSambaDomainName));
+    cbDomain.ItemIndex := cbDomain.Items.IndexOf(Connection.Account.ReadString(rSambaDomainName));
     cbDomain.Enabled := true;
     if (uid.Text <> '') then
     begin
-       if (AccountConfig.ReadString(rsambaNetbiosName) <> '') or (Pos('%n', AccountConfig.ReadString(rsambaHomeShare)) = 0) then
-        SetText(sambaHomePath, FormatString(AccountConfig.ReadString(rsambaHomeShare)));
-      if (AccountConfig.ReadString(rsambaNetbiosName) <> '') or (Pos('%n', AccountConfig.ReadString(rsambaProfilePath)) = 0) then
-        SetText(sambaProfilePath, FormatString(AccountConfig.ReadString(rsambaProfilePath)));
-      SetText(sambaLogonScript, FormatString(AccountConfig.ReadString(rsambaScript)));
+       if (Connection.Account.ReadString(rsambaNetbiosName) <> '') or (Pos('%n', Connection.Account.ReadString(rsambaHomeShare)) = 0) then
+        SetText(sambaHomePath, FormatString(Connection.Account.ReadString(rsambaHomeShare)));
+      if (Connection.Account.ReadString(rsambaNetbiosName) <> '') or (Pos('%n', Connection.Account.ReadString(rsambaProfilePath)) = 0) then
+        SetText(sambaProfilePath, FormatString(Connection.Account.ReadString(rsambaProfilePath)));
+      SetText(sambaLogonScript, FormatString(Connection.Account.ReadString(rsambaScript)));
       if sambaHomeDrive.ItemIndex = -1 then
       begin
-        sambaHomeDrive.ItemIndex := sambaHomeDrive.Items.IndexOf(AccountConfig.ReadString(rsambaHomeDrive));
-        SambaAccount.HomeDrive := AccountConfig.ReadString(rsambaHomeDrive);
+        sambaHomeDrive.ItemIndex := sambaHomeDrive.Items.IndexOf(Connection.Account.ReadString(rsambaHomeDrive));
+        SambaAccount.HomeDrive := Connection.Account.ReadString(rsambaHomeDrive);
       end;
     end;
    end
@@ -494,11 +494,11 @@ begin
     MailAccount.New;
     if uid.Text <> '' then
     begin
-      if (maildrop.Text = '') and (AccountConfig.ReadString(rpostfixMaildrop) <> '') then
-        SetText(maildrop, FormatString(AccountConfig.ReadString(rpostfixMaildrop)));
-      if AccountConfig.ReadString(rpostfixMailAddress) <> '' then
+      if (maildrop.Text = '') and (Connection.Account.ReadString(rpostfixMaildrop) <> '') then
+        SetText(maildrop, FormatString(Connection.Account.ReadString(rpostfixMaildrop)));
+      if Connection.Account.ReadString(rpostfixMailAddress) <> '' then
       begin
-        s := FormatString(AccountConfig.ReadString(rpostfixMailAddress));
+        s := FormatString(Connection.Account.ReadString(rpostfixMailAddress));
         if mail.Items.IndexOf(s) = -1 then
         begin
           mail.Items.Add(s);
@@ -604,7 +604,7 @@ begin
         PosixAccount.Cn := InetOrgPerson.DisplayName
       else
         PosixAccount.Cn := PosixAccount.Uid;
-      uidnr := GetUid(Session);
+      uidnr := Connection.GetUid;
       if uidnr <> -1 then
       begin
         if cbSamba.Checked then
@@ -628,7 +628,7 @@ begin
     if GroupList.Tag = 1 then
       SaveGroups;
   end;
-  AccountConfig.WriteInteger(rLastMemberOf, cbxGroups.ItemIndex);
+  Connection.Account.WriteInteger(rLastMemberOf, cbxGroups.ItemIndex);
 end;
 
 procedure TUserDlg.MailButtons(Enable: Boolean);
@@ -638,7 +638,7 @@ begin
   EditMailBtn.Enabled := Enable;
 end;
 
-constructor TUserDlg.Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; Mode: TEditMode);
+constructor TUserDlg.Create(AOwner: TComponent; adn: string; AConnection: TConnection; Mode: TEditMode);
 var
   i: Integer;
   Oc: TLdapAttribute;
@@ -648,13 +648,14 @@ begin
 
   AsTop := AccountSheet.Top;
 
-  Session := ASession;
+  //Session := ASession;
+  Connection := AConnection;
   ParentDn := adn;
 
   TranscodeList := TStringList.Create;
   Split(GlobalConfig.ReadString(rLocalTransTable, 'ä'#$1F'ae'#$1E'ö'#$1F'oe'#$1E'ü'#$1F'ue'#$1E), TranscodeList, #$1E);
 
-  Entry := TLdapEntry.Create(ASession, adn);
+  Entry := TLdapEntry.Create(AConnection, adn);
 
   PosixAccount := TPosixAccount.Create(Entry);
   InetOrgPerson := TInetOrgPerson.Create(Entry);
@@ -684,8 +685,8 @@ begin
   begin
     PosixAccount.New;
     InetOrgPerson.New;
-    PosixAccount.GidNumber := AccountConfig.ReadInteger(rposixGroup);
-    SetText(loginShell, AccountConfig.ReadString(rposixLoginShell));
+    PosixAccount.GidNumber := Connection.Account.ReadInteger(rposixGroup);
+    SetText(loginShell, Connection.Account.ReadString(rposixLoginShell));
     DateTimePicker.Date := Date;
   end
   else begin
@@ -718,7 +719,7 @@ begin
     end;
   end;
   GroupList.SmallImages := MainFrm.ImageList;
-  cbxGroups.ItemIndex := AccountConfig.ReadInteger(rLastMemberOf, 0);
+  cbxGroups.ItemIndex := Connection.Account.ReadInteger(rLastMemberOf, 0);
   originalPanelWindowProc := ImagePanel.WindowProc;
   ImagePanel.WindowProc := PanelWindowProc;
   DragAcceptFiles(ImagePanel.Handle,true) ;
@@ -728,8 +729,8 @@ procedure TUserDlg.AddMailBtnClick(Sender: TObject);
 var
   s: string;
 begin
-  if (uid.Text <> '') and (AccountConfig.ReadString(rpostfixMailAddress) <> '') then
-    s := FormatString(AccountConfig.ReadString(rpostfixMailAddress))
+  if (uid.Text <> '') and (Connection.Account.ReadString(rpostfixMailAddress) <> '') then
+    s := FormatString(Connection.Account.ReadString(rpostfixMailAddress))
   else
     s := '';
   if InputDlg(cAddAddress, cSmtpAddress, s) then
@@ -804,8 +805,8 @@ begin
   try
     GroupList.Items.BeginUpdate;
     GroupList.Items.Clear;
-    Session.Search(GetGroupQuery, Session.Base, LDAP_SCOPE_SUBTREE,
-                   ['cn', 'description', 'objectclass'], false, EntryList);
+    Connection.Search(GetGroupQuery, Connection.Base, LDAP_SCOPE_SUBTREE,
+                      ['cn', 'description', 'objectclass'], false, EntryList);
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
       ListItem := GroupList.Items.Add;
@@ -813,7 +814,7 @@ begin
       ListItem.Data := StrNew(PChar(Dn));
       if Attributes.Count > 1 then
         ListItem.SubItems.Add(AttributesByName['description'].AsString);
-      ClassifyLdapEntry(EntryList[i], c, ImageIndex);
+      Connection.DI.ClassifyLdapEntry(EntryList[i], c, ImageIndex);
       ListItem.ImageIndex := ImageIndex;
     end;
     GroupList.AlphaSort;
@@ -832,7 +833,7 @@ begin
   begin
     if GroupSheet.Tag = 0 then  // Tag = 0: list not yet populated
     begin
-      edGidNumber.Text := Session.GetDN(Format(sGROUPBYGID, [PosixAccount.GidNumber]));
+      edGidNumber.Text := Connection.GetDN(Format(sGROUPBYGID, [PosixAccount.GidNumber]));
       if uid.Text <> '' then
       begin
         PopulateGroupList;
@@ -956,7 +957,7 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
     ColumnNames := 'Name,Description';
-    Populate(Session, GetGroupQuery(true), ['cn', 'description']);
+    Populate(Connection, GetGroupQuery(true), ['cn', 'description']);
 
     if ShowModal=MrOK then begin
       CopyGroups;
@@ -967,7 +968,7 @@ begin
         GroupItem.Data := StrNew(pchar(Selected[i].DN));
         GroupItem.Caption := selected[i].AttributesByName['cn'].AsString;
         GroupItem.SubItems.Add(selected[i].AttributesByName['description'].AsString);
-        ClassifyLdapEntry(selected[i], b, idx);
+        Connection.DI.ClassifyLdapEntry(selected[i], b, idx);
         GroupItem.ImageIndex := idx;
         HandleGroupModify(PChar(selected[i].dn), GRP_ADD);
       end;
@@ -1015,7 +1016,7 @@ begin
       modop := Integer(Objects[i]);
       if modop <> 0 then
       begin
-        GroupEntry := TLdapEntry.Create(Session, origGroups[i]);
+        GroupEntry := TLdapEntry.Create(Connection, origGroups[i]);
         GroupEntry.Read;
         with GroupEntry.AttributesByName['objectclass'] do
         begin
@@ -1053,7 +1054,7 @@ end;
 procedure TUserDlg.GroupListDeletion(Sender: TObject; Item: TListItem);
 begin
   if Assigned(Item.Data) then
-    StrDispose(Item.Data);
+    StrDispose(PChar(Item.Data));
 end;
 
 procedure TUserDlg.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -1070,17 +1071,17 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
     ColumnNames := 'Name,Description';
-    Populate(Session, sPOSIXGROUPS, ['cn', 'description']);
+    Populate(Connection, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;
 
     ShowModal;
 
     if (SelCount>0) and (AnsiCompareStr(edGidNumber.Text, Selected[0].Dn) <> 0) then begin
-      gidnr := StrToInt(Session.Lookup(Selected[0].Dn, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE));
+      gidnr := StrToInt(Connection.Lookup(Selected[0].Dn, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE));
       if SambaAccount.Activated then
       begin
-        gsid := Session.Lookup(Selected[0].Dn, sANYCLASS, 'sambasid', LDAP_SCOPE_BASE);
+        gsid := Connection.Lookup(Selected[0].Dn, sANYCLASS, 'sambasid', LDAP_SCOPE_BASE);
         if (Copy(gsid, 1, LastDelimiter('-', gsid) - 1) <> SambaAccount.DomainSID) and
            (MessageDlg(stGidNotSamba, mtWarning, [mbYes, mbNo], 0) = mrNo) then Abort;
         SambaAccount.GidNumber := gidnr;
@@ -1311,7 +1312,7 @@ end;
 
 procedure TUserDlg.BtnAdvancedClick(Sender: TObject);
 begin
-  TSambaAdvancedDlg.Create(Self, Session, SambaAccount).ShowModal;
+  TSambaAdvancedDlg.Create(Self, Connection, SambaAccount).ShowModal;
 end;
 
 procedure TUserDlg.CheckListBoxDrawItem(Control: TWinControl;

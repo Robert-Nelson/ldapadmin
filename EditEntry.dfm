@@ -1093,6 +1093,12 @@ object EditEntryFrm: TEditEntryFrm
     object mbViewBinary1: TMenuItem
       Action = ActBinView
     end
+    object Viewcertificate1: TMenuItem
+      Action = ActCertView
+    end
+    object Viewpicture1: TMenuItem
+      Action = ActPicView
+    end
   end
   object OpenFileDialog: TOpenDialog
     Filter = 'All files (*.*)|*.*'
@@ -1190,6 +1196,16 @@ object EditEntryFrm: TEditEntryFrm
       Category = 'Edit'
       Caption = '&Find in schema...'
       OnExecute = ActFindInSchemaExecute
+    end
+    object ActPicView: TAction
+      Category = 'Edit'
+      Caption = 'View &picture...'
+      OnExecute = ActPicViewExecute
+    end
+    object ActCertView: TAction
+      Category = 'Edit'
+      Caption = 'View &certificate...'
+      OnExecute = ActCertViewExecute
     end
   end
   object TemplatePopupMenu: TPopupMenu

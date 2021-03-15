@@ -3,6 +3,9 @@
   *
   *      Author: Alexander Sokoloff
   *
+  *      Changes: Removed Compat Support - T.Karlovic 25.05.2011
+  *               Removed FakeAccount    - T.Karlovic 11.06.2012
+  *               Unicode Support        - T:karlovic 11.06.2012
   *
   * This file is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published by
@@ -235,9 +238,6 @@ type
     FRootPath:    string;
     function      GetKeyName(Ident: string): string;
     function      GetValName(Ident: string): string;
-    {Removed 25.05.2011 T.Karlovic
-    procedure     CompatImportAccount(Account: TAccount);
-    procedure     CompatExportAccount(Account: TAccount);}
   protected
     function      GetName: string; override;
     procedure     Copy(Parent, SrcName, DestName: string); override;
@@ -300,7 +300,6 @@ type
 
 var
   GlobalConfig:  TGlobalConfig;
-  AccountConfig: TAccount;
 
 const
   ACCOUNTS_PREFIX              = 'Accounts';
@@ -327,22 +326,12 @@ const
   LAC_ROOTNAME    = 'LDAPAccounts';
   LAC_NOTLAC      = 'The file "%s" is not an Ldap Admin accounts file';
 
-procedure SetAccount(Account: TAccount);
 procedure RegProtocol(Ext: string);
 
 implementation
 
 uses Constant, WinLdap, Dialogs, Forms, StdCtrls, Controls, ComObj, Base64,
      Math;
-
-var
-  FakeAccount: TAccount;
-
-procedure SetAccount(Account: TAccount);
-begin
-  if Account<>nil then AccountConfig:=Account
-  else AccountConfig:=FakeAccount;
-end;
 
 function CheckProto(Ext: string): boolean;
 var
@@ -797,7 +786,7 @@ var
     StrLen: Integer;
   begin
     StrLen := RdInteger;
-    SetString(Result, PChar(@Buffer[Offset]), StrLen);
+    SetString(Result, PAnsiChar(@Buffer[Offset]), StrLen);
     inc(Offset, StrLen);
   end;
 
@@ -831,7 +820,7 @@ var
     inc(len, SizeOf(i));
   end;
 
-  procedure WrString(s: string);
+  procedure WrString(s: ansistring);
   begin
     WrInteger(length(S));
     setlength(Buffer, len+length(S));
@@ -1015,11 +1004,6 @@ end;
 { TRegistryConfigStorage }
 
 constructor TRegistryConfigStorage.Create(const RootKey: HKEY; const ARootPath: string);
-{Removed 25.05.2011 T.Karlovic
-var
-  i: integer;
-  Idents: TStrings;
-  Account: TAccount;}
 begin
   inherited Create;
   FrootPath:=Norm(ArootPath);
@@ -1028,156 +1012,13 @@ begin
   FRegistry.RootKey := RootKey;
 
   LoadAccounts;
-  // Import compat accounts ////////////////////////////////////////////////////
-  { Removed 25.05.2011 T.Karlovic
-  Idents:=TStringList.Create;
-  GetValueNames(ACCOUNTS_PREFIX, Idents);
-  for i:=0 to Idents.Count-1 do begin
-    Account:=AccountByName(Idents[i]);
-    if Account=nil then Account:=AddAccount(Idents[i]);
-    CompatImportAccount(Account);
-  end;
-  Idents.Free;}
-  //////////////////////////////////////////////////////////////////////////////
 end;
 
 destructor TRegistryConfigStorage.Destroy;
-{Removed 25.05.2011 T.Karlovic
-var
-  i: integer;}
 begin
-  // Export compat accounts ////////////////////////////////////////////////////
-  { Removed 25.05.2011 T.Karlovic
-  for i:=0 to AccountsCount-1 do
-    CompatExportAccount(Accounts[i]);}
-  //////////////////////////////////////////////////////////////////////////////
   FRegistry.Free;
   inherited;
 end;
-
-{Removed 25.05.2011 T.Karlovic
-procedure TRegistryConfigStorage.CompatImportAccount(Account: TAccount);
-var
-  Buffer: PByteArray;
-  BufSize, Offset: Integer;
-
-  function ReadInteger: Integer;
-  begin
-    result:=integer((@Buffer[Offset])^);
-    inc(Offset, SizeOf(Integer));
-  end;
-
-  function ReadBoolean: Boolean;
-  begin
-    result:=boolean((@Buffer[Offset])^);
-    inc(Offset, SizeOf(boolean));
-  end;
-
-  function ReadString: string;
-  var
-    StrLen: Integer;
-  begin
-    StrLen := ReadInteger;
-    SetString(Result, PChar(@Buffer[Offset]), StrLen);
-    inc(Offset, StrLen);
-  end;
-
-begin
-    BufSize:=Account.GetDataSize('');
-    if BufSize<1 then exit;
-    GetMem(Buffer, BufSize);
-    Account.ReadBinaryData('', Buffer^, BufSize);
-    Offset:=0;
-    Account.Server      := ReadString;
-    Account.Base        := ReadString;
-    Account.User        := ReadString;
-    Account.Password    := ReadString;
-    Account.Port        := ReadInteger;
-    Account.SSL         := ReadBoolean;
-    Account.LdapVersion := ReadInteger;
-
-  if Offset < BufSize then begin //Compatibility with the old version //////////
-    Account.WriteInteger(rposixFirstUID      , ReadInteger);
-    Account.WriteInteger(rposixLastUID       , ReadInteger);
-    Account.WriteInteger(rposixFirstGID      , ReadInteger);
-    Account.WriteInteger(rposixLastGID       , ReadInteger);
-    Account.WriteString (rposixUserName      , ReadString);
-    Account.WriteString (rinetDisplayName    , ReadString);
-    Account.WriteString (rposixHomeDir       , ReadString);
-    Account.WriteString (rposixLoginShell    , ReadString);
-    Account.WriteInteger(rposixGroup         , ReadInteger);
-    Account.WriteString (rsambaNetbiosName   , ReadString);
-    Account.WriteString (rsambaDomainName    , ReadString);
-    Account.WriteString (rsambaHomeShare     , ReadString);
-    Account.WriteString (rsambaHomeDrive     , ReadString);
-    Account.WriteString (rsambaScript        , ReadString);
-    Account.WriteString (rsambaProfilePath   , ReadString);
-    Account.WriteString (rpostfixMailAddress , ReadString);
-    Account.WriteString (rpostfixMaildrop    , ReadString);
-  end;
-
-  FreeMem(Buffer);
-end;
-
-procedure TRegistryConfigStorage.CompatExportAccount(Account: TAccount);
-var
-  Buffer: array of byte;
-  len: Integer;
-
-  procedure WrInteger(i: Integer);
-  begin
-    setlength(Buffer, len+SizeOf(i));
-    integer((@Buffer[len])^):=i;
-    inc(len, SizeOf(i));
-  end;
-
-  procedure WrBoolean(b: Boolean);
-  begin
-    setlength(Buffer, len+SizeOf(b));
-    boolean((@Buffer[len])^):=b;
-    inc(len, SizeOf(b));
-  end;
-
-  procedure WrString(s: string);
-  begin
-    WrInteger(length(S));
-    setlength(Buffer, len+length(S));
-    System.Move(Pointer(s)^, Buffer[len], length(S));
-    Inc(len, length(S));
-  end;
-
-begin
-   setlength(Buffer,0);
-   len:=0;
-   WrString (Account.Server);
-   WrString (Account.Base);
-   WrString (Account.User);
-   WrString (Account.Password);
-   WrInteger(Account.Port);
-   WrBoolean(Account.SSL);
-   WrInteger(Account.ldapVersion);
-
-   WrInteger(Account.ReadInteger(rposixFirstUID      , FIRST_UID));
-   WrInteger(Account.ReadInteger(rposixLastUID       , LAST_UID));
-   WrInteger(Account.ReadInteger(rposixFirstGID      , FIRST_GID));
-   WrInteger(Account.ReadInteger(rposixLastGID       , LAST_GID));
-   WrString (Account.ReadString (rposixUserName      , ''));
-   WrString (Account.ReadString (rinetDisplayName    , ''));
-   WrString (Account.ReadString (rposixHomeDir       , ''));
-   WrString (Account.ReadString (rposixLoginShell    , ''));
-   WrInteger(Account.ReadInteger(rposixGroup         , NO_GROUP));
-   WrString (Account.ReadString (rsambaNetbiosName   , ''));
-   WrString (Account.ReadString (rsambaDomainName    , ''));
-   WrString (Account.ReadString (rsambaHomeShare     , ''));
-   WrString (Account.ReadString (rsambaHomeDrive     , ''));
-   WrString (Account.ReadString (rsambaScript        , ''));
-   WrString (Account.ReadString (rsambaProfilePath   , ''));
-   WrString (Account.ReadString (rpostfixMailAddress , ''));
-   WrString (Account.ReadString (rpostfixMaildrop    , ''));
-   WrInteger(0);
-
-   Account.WriteBinaryData('', Buffer[0], length(Buffer));
-end;}
 
 function TRegistryConfigStorage.GetKeyName(Ident: string): string;
 begin
@@ -1223,23 +1064,11 @@ end;
 
 procedure TRegistryConfigStorage.SetAccountName(Parent, OldName, NewName: string);
 begin
-  { Removed 28.02.2012 T.Karlovic
-  // Compat - TODO - Remove later
-  FRegistry.OpenKey(FrootPath+Norm(Parent), false);
-  FRegistry.RenameValue(OldName, NewName);
-  FRegistry.CloseKey;
-  // Compat ends }
   FRegistry.MoveKey(FrootPath+Norm(Parent)+Norm(OldName), FrootPath+Norm(Parent)+Norm(NewName), true);
 end;
 
 procedure TRegistryConfigStorage.Delete(Ident: string);
 begin
-  {Removed 28.02.2012 T.Karlovic
-  // Compat - TODO - Remove later
-  FRegistry.OpenKey(FrootPath+GetKeyName(Ident), false);
-  FRegistry.DeleteValue(GetValName(Ident));
-  FRegistry.CloseKey;
-  // Compat ends }
   FRegistry.DeleteKey(FRootPath+Norm(Ident));
 end;
 
@@ -1675,14 +1504,12 @@ end;
 
 
 initialization
-  GlobalConfig:=TGlobalConfig.Create(TRegistryConfigStorage.Create(HKEY_CURRENT_USER, REG_KEY));
-  FakeAccount:=TFakeAccount.Create(nil, 'FAKE');
-  AccountConfig:=FakeAccount;
 
-//  log(GlobalConfig.ReadBool('qqq', false));
+  GlobalConfig:=TGlobalConfig.Create(TRegistryConfigStorage.Create(HKEY_CURRENT_USER, REG_KEY));
+
 finalization
+
   GlobalConfig.Free;
-  FakeAccount.Free;
 
 end.
 

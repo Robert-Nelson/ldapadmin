@@ -86,10 +86,10 @@ object PrefWizDlg: TPrefWizDlg
       Top = 0
       Caption = '1'
       object ListView1: TListView
-        Left = 56
-        Top = 96
-        Width = 353
-        Height = 137
+        Left = 16
+        Top = 80
+        Width = 433
+        Height = 161
         Columns = <
           item
             Caption = 'Type'
@@ -150,10 +150,10 @@ object PrefWizDlg: TPrefWizDlg
       Top = 0
       Caption = '2'
       object ListView2: TListView
-        Left = 56
-        Top = 96
-        Width = 353
-        Height = 137
+        Left = 16
+        Top = 80
+        Width = 433
+        Height = 161
         Columns = <
           item
             Caption = 'Type'
@@ -237,7 +237,7 @@ object PrefWizDlg: TPrefWizDlg
         Width = 193
         Height = 21
         Style = csDropDownList
-        ItemHeight = 0
+        ItemHeight = 13
         TabOrder = 1
       end
       object Panel5: TPanel

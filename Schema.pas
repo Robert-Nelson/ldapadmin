@@ -3,6 +3,7 @@
   *
   *      Author: Alexander Sokoloff
   *
+  *      Changes: Removed Global Schema - T.Karlovic 11.06.2012
   *
   * This file is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published by
@@ -250,29 +251,11 @@ type
     property              Loaded: boolean read FLoaded;
   end;
 
-{ Global Schema }
-function  LdapSchema(Session: TLdapSession): TLdapSchema;
-procedure ClearLdapSchema;
 
 implementation
 
 uses TypInfo;
 
-{ Global Schema }
-var
-  GlobalSchema: TLdapSchema;
-
-function LdapSchema(Session: TLdapSession): TLdapSchema;
-begin
-  if not Assigned(GlobalSchema) then
-    GlobalSchema := TLdapSchema.Create(Session);
-  Result := GlobalSchema;
-end;
-
-procedure ClearLdapSchema;
-begin
-  FreeAndNil(GlobalSchema);
-end;
 
 { Procedures }
 
@@ -614,7 +597,8 @@ begin
   FLoaded:=false;
   Clear;
 
-  if FSession=nil then exit;
+  if (FSession=nil) or (FSession.Version < LDAP_VERSION3) then exit;
+  
   SearchResult:=TLdapEntryList.Create;
   try
     // Search path to schema ///////////////////////////////////////////////////
@@ -795,13 +779,5 @@ function TLDAPSchemaMatchingRuleUses.GetItems(Index: Integer): TLDAPSchemaMatchi
 begin
    result:= TLDAPSchemaMatchingRuleUse(inherited GetItem(Index));
 end;
-
-initialization
-
-  GlobalSchema := nil;
-
-finalization
-
-  GlobalSchema.Free;
 
 end.

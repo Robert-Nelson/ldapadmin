@@ -74,7 +74,7 @@ type
   public
     constructor       CreateNew(AOwner: TComponent; Dummy: Integer = 0); override;
     destructor        Destroy; override;
-    procedure         Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string);
+    procedure         Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string; const Base: string = '');
 
     property          Entries:  TLdapEntryList read FEntries;
     property          ImageIndex: integer read FImageIndex write FImageIndex;
@@ -91,7 +91,7 @@ implementation
 
 {$R *.DFM}
 
-uses WinLDAP, Constant, Main, Misc;
+uses WinLDAP, Constant, Main, Connection;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -126,12 +126,13 @@ begin
   inherited;
 end;
 
-procedure TPickupDlg.Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string);
+procedure TPickupDlg.Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string; const Base: string = '');
 var
   i: integer;
   popIdx: integer;
   attrs: PCharArray;
   len: Integer;
+  aBase: string;
 begin
   popIdx:=length(FPopulates);
   setlength(FPopulates, popIdx+1);
@@ -172,8 +173,11 @@ begin
       attrs[len] := PChar(Attributes[len]);
     until len = 0;
   end;
-
-  Session.Search(Filter, Session.Base, LDAP_SCOPE_SUBTREE, attrs, false, FEntries);
+  if Base = '' then
+    aBase := Session.Base
+  else
+    aBase := Base;
+  Session.Search(Filter, aBase, LDAP_SCOPE_SUBTREE, attrs, false, FEntries);
 end;
 
 procedure TPickupDlg.FilterEditChange(Sender: TObject);
@@ -208,15 +212,17 @@ var
   i: integer;
   IcoIndex: integer;
   b: Boolean;
+  Entry: TLDapEntry;
 begin
-  Item.Caption:=GetText(0, TLdapEntry(FShowed[Item.Index]));
+  Entry := TLdapEntry(FShowed[Item.Index]);
+  Item.Caption:=GetText(0, Entry);
   for i:=1 to ListView.Columns.Count-1 do
-    Item.SubItems.Add(GetText(i, TLdapEntry(FShowed[Item.Index])));
+    Item.SubItems.Add(GetText(i, Entry));
 
   IcoIndex:=FImageIndex;
-  if assigned(FOnGetImageIndex) then FOnGetImageIndex(TLdapEntry(FShowed[Item.Index]), IcoIndex);
+  if assigned(FOnGetImageIndex) then FOnGetImageIndex(Entry, IcoIndex);
   if IcoIndex = -1 then
-    ClassifyLdapEntry(TLdapEntry(FShowed[Item.Index]), b, IcoIndex);
+    (Entry.Session as TConnection).DI.ClassifyLdapEntry(Entry, b, IcoIndex);
   Item.ImageIndex := IcoIndex;
 end;
 

@@ -319,7 +319,10 @@ var
   dn: string;
 begin
   Prepare(List);
-  Message.Caption := cCopying;
+  if Move then
+    Message.Caption := cMoving
+  else
+    Message.Caption := cCopying;
   ModalResult := mrNone;
   for i := 0 to List.Count - 1 do
   begin

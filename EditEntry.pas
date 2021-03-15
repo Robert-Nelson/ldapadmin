@@ -1,5 +1,5 @@
   {      LDAPAdmin - EditEntry.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -26,7 +26,8 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, ExtCtrls, ComCtrls, WinLDAP, Grids, ToolWin, LDAPClasses, Constant,
-  Menus, ImgList, ActnList, IControls, Schema, Templates, TemplateCtrl, Sorter;
+  Menus, ImgList, ActnList, IControls, Schema, Templates, TemplateCtrl, Sorter,
+  Connection;
 
 const
   NAMING_VALUE_TAG = -1;
@@ -115,6 +116,10 @@ type
     ActFindInSchema: TAction;
     N6: TMenuItem;
     pbFindInSchema: TMenuItem;
+    ActPicView: TAction;
+    ActCertView: TAction;
+    Viewcertificate1: TMenuItem;
+    Viewpicture1: TMenuItem;
     procedure mbSaveClick(Sender: TObject);
     procedure mbExitClick(Sender: TObject);
     procedure mbDeleteRowClick(Sender: TObject);
@@ -150,7 +155,10 @@ type
     procedure StringGridMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure ActFindInSchemaExecute(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
+    procedure ActPicViewExecute(Sender: TObject);
+    procedure ActCertViewExecute(Sender: TObject);
   private
+    fConnection: TConnection;
     Entry: TLDAPEntry;
     ObjectCombo: TInplaceComboBox;
     AttributeCombo: TInplaceComboBox;
@@ -162,6 +170,7 @@ type
     fSchema: TLdapSchema;
     fValueSorter: TStringGridSorter;
     fOcSorter: TStringGridSorter;
+    fOnWrite: TNotifyEvent;
     procedure DataChange(Sender: TLdapAttributeData);
     procedure PushShortCut(Command: TAction);
     procedure HandleTabExit(InplaceAttribute: TInplaceAttribute);
@@ -182,9 +191,10 @@ type
     function  NewValue(Attr: TLdapAttribute): TLdapAttributeData;
     procedure TemplatePopupClick(Sender: TObject);
   public
-    constructor Create(const AOwner: TComponent; const adn: string;
-                       const ASession: TLDAPSession; const Mode: TEditMode); reintroduce; overload;
+    constructor Create(AOwner: TComponent; const adn: string;
+                       AConnection: TConnection; const Mode: TEditMode); reintroduce; overload;
     procedure   SessionDisconnect(Sender: TObject);
+    property    OnWrite: TNotifyEvent read fOnWrite write fOnWrite;
   end;
 
 var
@@ -192,7 +202,7 @@ var
 
 implementation
 
-uses BinView, Misc, Main, Config;
+uses BinView, PicView, Cert, Misc, Main, Config;
 
 {$R *.DFM}
 
@@ -423,17 +433,18 @@ begin
   end;
 end;
 
-constructor TEditEntryFrm.Create(const AOwner: TComponent; const adn: string;
-                                 const ASession: TLDAPSession; const Mode: TEditMode);
+constructor TEditEntryFrm.Create(AOwner: TComponent; const adn: string;
+                                 AConnection: TConnection; const Mode: TEditMode);
 var
   i, j: integer;
 begin
   inherited Create(AOwner);
-  SchemaCheckBtn.Down := AccountConfig.ReadBool(rEditorSchemaHelp, true);
+  fConnection := AConnection;
+  SchemaCheckBtn.Down := AConnection.Account.ReadBool(rEditorSchemaHelp, true);
+  fSchema := AConnection.Schema;
   fBold := TFont.Create;
   fBold.Assign(Font);
   fBold.Style := fBold.Style + [fsBold];
-  fSchema := LdapSchema(ASession);
   ObjectCombo := NewInplaceControl(TInplaceComboBox, objStringGrid, nil, false) as TInplaceComboBox;
   objStringGrid.Objects[0, 1] := ObjectCombo;
   with ObjectCombo do begin
@@ -457,7 +468,7 @@ begin
     Control.DropDownCount := 16;
     Control.Sorted := true;
   end;
-  Entry := TLDAPEntry.Create(ASession, adn);
+  Entry := TLDAPEntry.Create(AConnection, adn);
   if Mode = EM_MODIFY then
   begin
     Caption := cEditEntry;
@@ -485,8 +496,8 @@ begin
   end;
   FButtonWidth := GetSystemMetrics(SM_CXVSCROLL);
   edDn.Width := Panel2.Width - edDn.Left - FButtonWidth - 4;
-  ASession.OnDisconnect.Add(SessionDisconnect);
-  StatusBar.Panels[0].Text := Format(cServer, [ASession.Server]);
+  AConnection.OnDisconnect.Add(SessionDisconnect);
+  StatusBar.Panels[0].Text := Format(cServer, [AConnection.Server]);
   StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(StatusBar.Panels[0].Text) + 16;
   StatusBar.Panels[1].Text := Format(cPath, [adn]);
   fValueSorter := TStringGridSorter.Create;
@@ -814,7 +825,6 @@ begin
     begin
       RowCount := RowCount + 1;
       Cells[0, I + 1] := fAttributes[I];
-      //Objects[1, I + 1] := NewInplaceControl(TInplaceMemo, attrStringGrid, TLdapAttributeData(fAttributes.Objects[I]), false);
       Objects[1, I + 1] := CheckNamingValue(TLdapAttributeData(fAttributes.Objects[I]), NewInplaceControl(TInplaceMemo, attrStringGrid, TLdapAttributeData(fAttributes.Objects[I]), false));
     end;
     Objects[0, RowCount - 1] := AttributeCombo;
@@ -839,27 +849,12 @@ begin
     cbRdn.SetFocus;
     raise Exception.Create(stNoRdn);
   end;
-  if Assigned(ActiveControl.Parent) then
+  if Assigned(ActiveControl.Parent) and Assigned(ActiveControl.Parent.Parent) then
     TInplaceAttribute(ActiveControl).Parent.Parent.SetFocus; // Force OnExit for TInplacexx and TTemplatexx controls
   if esNew in Entry.State then
     Entry.Dn := cbRdn.Text + ',' + edDn.Text;
   Entry.Write;
-  with MainFrm, LdapTree do
-  begin
-    {if Assigned(Selected) and (PChar(Selected.Data) = Entry.dn) then
-      LDAPTreeChange(nil, LDAPTree.Selected);}
-    if Assigned(Selected) then
-    begin
-      if esNew in Entry.State then
-      begin
-        if PChar(Selected.Data) = GetDirFromDn(Entry.dn) then
-          ActRefreshExecute(nil)
-      end
-      else
-      if PChar(Selected.Data) = Entry.dn then
-        LDAPTreeChange(nil, LDAPTree.Selected);
-    end;
-  end;
+  if Assigned(fOnWrite) then fOnWrite(Entry);
   Close;
 end;
 
@@ -918,7 +913,6 @@ begin
   fOcSorter.Free;
   ObjectCombo.Free;
   AttributeCombo.Free;
-  //Entry.Free;
   fBold.Free;
   fTemplateScrollBox.Free;
   Entry.Free;
@@ -993,6 +987,9 @@ begin
   end;
 
   ActBinView.Enabled := false;
+  ActCertView.Visible := false;
+  ActPicView.Visible := false;
+  
   ac := ActiveControl;
   if Assigned(ac) then
   begin
@@ -1007,7 +1004,13 @@ begin
     begin
       ac := TComponent(TStringGrid(ac).Objects[1, TStringGrid(ac).Row]);
       if Assigned(ac) and (TInplaceAttribute(ac).Value.DataSize > 0) then
+      begin
         ActBinView.Enabled := true;
+        case TInplaceAttribute(ac).Value.DataType of
+          dtCert: ActCertView.Visible := true;
+          dtJpeg: ActPicView.Visible := true;
+        end;
+      end;
     end;
   end;
 
@@ -1173,10 +1176,8 @@ end;
 
 procedure TEditEntryFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  {if Owner = MainFrm then
-    MainFrm.ActRefreshExecute(nil);}
   Action := caFree;
-  AccountConfig.WriteBool(rEditorSchemaHelp, SchemaCheckBtn.Down);
+  fConnection.Account.WriteBool(rEditorSchemaHelp, SchemaCheckBtn.Down);
   Entry.Session.OnDisconnect.Delete(SessionDisconnect);
 end;
 
@@ -1352,6 +1353,25 @@ end;
 procedure TEditEntryFrm.FormDeactivate(Sender: TObject);
 begin
   RevealWindow(Self, True, True);
+end;
+
+procedure TEditEntryFrm.ActPicViewExecute(Sender: TObject);
+begin
+  with attrStringGrid do
+  if Assigned(Objects[1, Row]) then
+    with TViewPicFrm.Create(Self, TInplaceAttribute(Objects[1, Row]).Value, smReference) do
+    begin
+      ShowModal;
+      Cells[1, Row] := TInplaceAttribute(Objects[1, Row]).CellData;
+    end;
+end;
+
+procedure TEditEntryFrm.ActCertViewExecute(Sender: TObject);
+begin
+  with attrStringGrid do
+  if Assigned(Objects[1, Row]) then
+    with TInplaceAttribute(Objects[1, Row]).Value do
+        ShowContext(Data, DataSize, ctxAuto);
 end;
 
 end.

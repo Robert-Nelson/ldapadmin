@@ -115,6 +115,7 @@ type
     destructor      Destroy; override;
     procedure       SessionDisconnect(Sender: TObject);
     function        Search(const SearchStr: string; const WholeWords: boolean; const InNewTab: boolean): TTreeNode;
+    property        Schema: TLdapSchema read FSchema;
   end;
 
 implementation

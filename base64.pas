@@ -1,5 +1,5 @@
   {      LDAPAdmin - base64.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -94,10 +94,10 @@ function  Base64EncSize(InSize: Cardinal): Cardinal;
 function  Base64DecSize(InSize: Cardinal): Cardinal; overload;
 procedure Base64Encode(const InBuf; const Length: Cardinal; var OutBuf); overload;
 function  Base64Decode(const InBuf; const Length: Cardinal; var OutBuf): Cardinal; overload;
-function  Base64Encode(const InStr: string): string; overload;
-function  Base64Encode(const InBuf; const Length: Cardinal): string; overload;
-function  Base64DecSize(InBuf: string): Cardinal; overload;
-function  Base64Decode(const InBuf: string; var OutBuf): integer; overload;
+function  Base64Encode(const InStr: AnsiString): AnsiString; overload;
+function  Base64Encode(const InBuf; const Length: Cardinal): AnsiString; overload;
+function  Base64DecSize(InBuf: AnsiString): Cardinal; overload;
+function  Base64Decode(const InBuf: AnsiString; var OutBuf): integer; overload;
 
 implementation
 
@@ -212,14 +212,14 @@ begin
 end;
 
 ////////////////////////////////////////////////////////////////////////////////
-function Base64Encode(const InBuf; const Length: Cardinal): string;
+function Base64Encode(const InBuf; const Length: Cardinal): AnsiString;
 begin
   SetLength(result, Base64encSize(Length));
   if Length=0 then Exit;
   Base64Encode(InBuf, Length, Result[1]);
 end;
 
-function Base64Encode(const InStr: string): string;
+function Base64Encode(const InStr: AnsiString): AnsiString;
 var
   Len: Integer;
 begin
@@ -229,7 +229,7 @@ begin
   Base64Encode(InStr[1], Len, Result[1]);
 end;
 
-function Base64decSize(InBuf: string): Cardinal; overload;
+function Base64decSize(InBuf: AnsiString): Cardinal; overload;
 var
   i: integer;
 begin
@@ -243,7 +243,7 @@ begin
   end;
 end;
 
-function Base64Decode(const InBuf: string; var OutBuf): Integer;
+function Base64Decode(const InBuf: AnsiString; var OutBuf): Integer;
 begin
   Result := Base64Decode(InBuf[1], Length(InBuf), Outbuf);
 end;

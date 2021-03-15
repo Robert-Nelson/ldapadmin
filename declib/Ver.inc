@@ -103,6 +103,10 @@
   {$DEFINE VER_BCB1H}
 {$ENDIF}
 
+{$IFDEF VER230}
+  {$DEFINE NATIVE_INT}
+{$ENDIF}
+
 {$IFNDEF VER80}           { Delphi 1.0     }
  {$IFNDEF VER90}          { Delphi 2.0     }
   {$IFNDEF VER93}         { C++Builder 1.0 }

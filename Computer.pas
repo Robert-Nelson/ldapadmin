@@ -1,5 +1,5 @@
   {      LDAPAdmin - Computer.pas
-  *      Copyright (C) 2003-2005 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -25,7 +25,7 @@ interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, LDAPClasses, Samba, Posix, PropertyObject, Config,
-  Constant;
+  Constant, Connection;
 
 type
   TComputerDlg = class(TForm)
@@ -42,11 +42,12 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
   private
+    Connection: TConnection;
     DomList: TDomainList;
     Entry: TLdapEntry;
     Account: TSamba3Computer;
   public
-    constructor Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; AMode: TEditMode); reintroduce;
+    constructor Create(AOwner: TComponent; adn: string; AConnection: TConnection; AMode: TEditMode); reintroduce;
   end;
 
 var
@@ -58,17 +59,17 @@ uses Misc;
 
 {$R *.DFM}
 
-constructor TComputerDlg.Create(AOwner: TComponent; adn: string; ASession: TLDAPSession; AMode: TEditMode);
+constructor TComputerDlg.Create(AOwner: TComponent; adn: string; AConnection: TConnection; AMode: TEditMode);
 var
   i: Integer;
 begin
   inherited Create(AOwner);
-  Entry := TLdapEntry.Create(ASession, adn);
+  Connection := AConnection;
+  Entry := TLdapEntry.Create(AConnection, adn);
   Account := TSamba3Computer.Create(Entry);
   if AMode = EM_MODIFY then
   begin
     Entry.Read;
-    //Account := TSamba3Computer.Create(Entry);
     with Account do
     begin
       if DomainName <> '' then
@@ -82,12 +83,12 @@ begin
     Caption := Format(cPropertiesOf, [edComputername.Text]);
   end
   else begin
-    DomList := TDomainList.Create(ASession);
+    DomList := TDomainList.Create(AConnection);
     with cbDomain do
     begin
       for i := 0 to DomList.Count - 1 do
         Items.Add(DomList.Items[i].DomainName);
-      ItemIndex := Items.IndexOf(AccountConfig.ReadString(rSambaDomainName));
+      ItemIndex := Items.IndexOf(Connection.Account.ReadString(rSambaDomainName));
       if ItemIndex = -1 then
         ItemIndex := 0;
     end;
@@ -102,25 +103,18 @@ end;
 procedure TComputerDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 var
   uidnr: Integer;
-  //idType: Integer;
 begin
   if ModalResult = mrOk then
   begin
     if esNew in Entry.State then
     begin
-      //Account := TSamba3Computer.Create(Entry);
       with Account do
       begin
         New;
         ComputerName := edComputername.Text;
         DomainData := DomList.Items[cbDomain.ItemIndex];
         // Acquire next available uidNumber
-        {idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
-        if idType <> POSIX_ID_NONE then
-          UidNumber := Entry.Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
-                                                      AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
-                                                      IdType = POSIX_ID_SEQUENTIAL);}
-        uidnr := GetUid(Entry.Session);
+        uidnr := Connection.GetUid;
         if uidnr <> -1 then
           UidNumber := uidnr;
         GidNumber := COMPUTER_GROUP;

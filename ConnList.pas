@@ -102,8 +102,10 @@ type
     procedure SetViewStyle(Style: integer);
     procedure RefreshAccountsView;
     procedure RefreshStoragesList(ItemIndex: integer=-1);
+    function  GetAccount: TAccount;
   public
     constructor Create(AOwner: TComponent); reintroduce;
+    property    Account: TAccount read GetAccount;
   end;
 
 implementation
@@ -124,6 +126,11 @@ begin
   SetViewStyle(GlobalConfig.ReadInteger(CONF_ACCLV_STYLE, 0));
 end;
 
+function TConnListFrm.GetAccount: TAccount;
+begin
+  Result := TAccount(AccountsView.Selected.Data)
+end;
+
 procedure TConnListFrm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
  GlobalConfig.WriteInteger(CONF_STORLIST_WIDTH, StoragesList.Width);
@@ -133,7 +140,6 @@ begin
   ActNewAccountExecute(self);
   Abort;
  end;
- SetAccount(TAccount(AccountsView.Selected.Data));
 end;
 
 

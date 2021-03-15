@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ComCtrls, ExtCtrls, Constant, Samba, LDAPClasses;
+  StdCtrls, ComCtrls, ExtCtrls, Constant, Samba, LDAPClasses, Connection;
 
 type
   TPrefDlg = class(TForm)
@@ -91,10 +91,10 @@ type
     procedure cbxExtendGroupsClick(Sender: TObject);
     procedure IDGroupClick(Sender: TObject);
   private
-    Session: TLDAPSession;
+    Connection: TConnection;
     DomList: TDomainList;
   public
-    constructor Create(AOwner: TComponent; lSession: TLDAPSession); reintroduce; overload;
+    constructor Create(AOwner: TComponent; AConnection: TConnection); reintroduce; overload;
   end;
 
 var
@@ -106,13 +106,13 @@ uses Pickup, WinLdap, PrefWiz, Main, Config;
 
 {$R *.DFM}
 
-constructor TPrefDlg.Create(AOwner: TComponent; lSession: TLDAPSession);
+constructor TPrefDlg.Create(AOwner: TComponent; AConnection: TConnection);
 var
   idx: Integer;
 begin
   inherited Create(AOwner);
-  Session := lSession;
-  with AccountConfig do
+  Connection := AConnection;
+  with Connection.Account do
   begin
     try
       IDGroup.ItemIndex    := ReadInteger(rPosixIDType, POSIX_ID_RANDOM)
@@ -127,7 +127,7 @@ begin
     edHomeDir.Text         := ReadString(rposixHomeDir, '');
     edLoginShell.Text      := ReadString(rposixLoginShell, '');
     if ReadInteger(rposixGroup, NO_GROUP) <> NO_GROUP then
-      edGroup.Text         := Session.GetDN(Format(sGROUPBYGID, [ReadInteger(rposixGroup, NO_GROUP)]));
+      edGroup.Text         := Connection.GetDN(Format(sGROUPBYGID, [ReadInteger(rposixGroup, NO_GROUP)]));
     edNetbios.Text         := ReadString(rsambaNetbiosName, '');
     edHomeShare.Text       := ReadString(rsambaHomeShare, '');
     cbHomeDrive.ItemIndex  := cbHomeDrive.Items.IndexOf(ReadString(rsambaHomeDrive, ''));
@@ -150,7 +150,7 @@ end;
 procedure TPrefDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   if ModalResult = mrOK then
-  with AccountConfig do begin
+  with Connection.Account do begin
     WriteInteger(rPosixIDType,        IDGroup.ItemIndex);
     WriteInteger(rposixFirstUID,      StrToInt(edFirstUID.Text));
     WriteInteger(rposixLastUID,       StrToInt(edLastUID.Text));
@@ -160,7 +160,7 @@ begin
     WriteString (rinetDisplayName,    edDisplayName.Text);
     WriteString (rposixHomeDir,       edHomeDir.Text);
     WriteString (rposixLoginShell,    edLoginShell.Text);
-    WriteInteger(rposixGroup,         StrToIntDef(Session.Lookup(edGroup.Text, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE), NO_GROUP));
+    WriteInteger(rposixGroup,         StrToIntDef(Connection.Lookup(edGroup.Text, sANYCLASS, 'gidNumber', LDAP_SCOPE_BASE), NO_GROUP));
     WriteString (rsambaNetbiosName,   edNetbios.Text);
     WriteString (rsambaDomainName,    cbDomain.Text);
     WriteString (rsambaHomeShare,     edHomeShare.Text);
@@ -179,7 +179,7 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
     ColumnNames := 'Name,Description';
-    Populate(Session, sPOSIXGROUPS, ['cn', 'description']);
+    Populate(Connection, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;
 
@@ -197,12 +197,12 @@ var
 begin
   if not Assigned(DomList) then
   try
-    DomList := TDomainList.Create(Session);
+    DomList := TDomainList.Create(Connection);
     with cbDomain do
     begin
       for i := 0 to DomList.Count - 1 do
         Items.Add(DomList.Items[i].DomainName);
-      ItemIndex := Items.IndexOf(AccountConfig.ReadString(rSambaDomainName, ''));
+      ItemIndex := Items.IndexOf(Connection.Account.ReadString(rSambaDomainName, ''));
       if ItemIndex = -1 then
         ItemIndex := 0;
     end;

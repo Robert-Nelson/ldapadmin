@@ -66,7 +66,11 @@ uses
   ShaCrypt in 'ShaCrypt.pas',
   ParseErr in 'ParseErr.pas' {ParseErrDlg},
   ScriptIntf in 'ScriptIntf.pas',
-  Script in 'Script.pas';
+  Script in 'Script.pas',
+  GraphicHint in 'GraphicHint.pas',
+  Connection in 'Connection.pas',
+  adsie in 'adsie.pas',
+  ADPassDlg in 'ADPassDlg.pas' {ADPassDlg};
 
 {$R *.RES}
 

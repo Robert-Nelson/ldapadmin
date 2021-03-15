@@ -9,7 +9,7 @@
 {                                                                  }
 { The original file is: WinLDAP.h released 05 Aug 1999.            }
 { The original Pascal code is: WinLDAP.pas, released 02 Dec 1998.  }
-{ Last update: 16 Feb 2000 (Rudy Velthuis)                         }
+{ Last update: 12 Feb 2012 (T. Karlovic) - UNICODE support         }
 {                                                                  }
 { Note: Fixed var-related bugs on some funktions (ldap_add,        }
 {       ldap_modify, see below), there are probably some more      }
@@ -649,19 +649,31 @@ type
   {$NODEFINE PPPLDAPControlA}
   PPPLDAPControlW = ^PPLDAPControlW;
   {$NODEFINE PPPLDAPControlW}
+  {$IFDEF UNICODE}
+  PPPLDAPControl = PPPLDAPControlW;
+  {$ELSE}
   PPPLDAPControl = PPPLDAPControlA;
+  {$ENDIF}
   PPLDAPControlA = ^PLDAPControlA;
   {$NODEFINE PPLDAPControlA}
   PPLDAPControlW = ^PLDAPControlW;
   {$NODEFINE PPLDAPControlW}
+  {$IFDEF UNICODE}
+  PPLDAPControl = PPLDAPControlW;
+  {$ELSE}
   PPLDAPControl = PPLDAPControlA;
+  {$ENDIF}
 
   {$EXTERNALSYM PLDAPControlA}
   PLDAPControlA = ^LDAPControlA;
   {$EXTERNALSYM PLDAPControlW}
   PLDAPControlW = ^LDAPControlW;
   {$EXTERNALSYM PLDAPControl}
+  {$IFDEF UNICODE}
+  PLDAPControl = PLDAPControlW;
+  {$ELSE}
   PLDAPControl = PLDAPControlA;
+  {$ENDIF}
 
   {$EXTERNALSYM LDAPControlA}
   LDAPControlA = record
@@ -676,11 +688,19 @@ type
     ldctl_iscritical: ByteBool;
   end;
   {$EXTERNALSYM LDAPControl}
+  {$IFDEF UNICODE}
+  LDAPControl = LDAPControlW;
+  {$ELSE}
   LDAPControl = LDAPControlA;
+  {$ENDIF}
 
   TLDAPControlA = LDAPControlA;
   TLDAPControlW = LDAPControlW;
+  {$IFDEF UNICODE}
+  TLDAPControl = TLDAPControlW;
+  {$ELSE}
   TLDAPControl = TLDAPControlA;
+  {$ENDIF}
 
 //
 //  Client controls section : these are the client controls that wldap32.dll
@@ -696,8 +716,11 @@ const
   {$EXTERNALSYM LDAP_CONTROL_REFERRALS_W}
   LDAP_CONTROL_REFERRALS_W = '1.2.840.113556.1.4.616';
   {$EXTERNALSYM LDAP_CONTROL_REFERRALS}
+  {$IFDEF UNICODE}
+  LDAP_CONTROL_REFERRALS   = LDAP_CONTROL_REFERRALS_W;
+  {$ELSE}
   LDAP_CONTROL_REFERRALS   = '1.2.840.113556.1.4.616';
-
+  {$ENDIF}
 
 //
 //  Values required for Modification command  These are options for the
@@ -721,7 +744,11 @@ type
   {$EXTERNALSYM PLDAPModW}
   PLDAPModW = ^LDAPModW;
   {$EXTERNALSYM PLDAPMod}
+  {$IFDEF UNICODE}
+  PLDAPMod = PLDAPModW;
+  {$ELSE}
   PLDAPMod = PLDAPModA;
+  {$ENDIF}
   {$EXTERNALSYM LDAPModA}
   LDAPModA = record
     mod_op: ULONG;
@@ -739,10 +766,18 @@ type
       1:(modv_bvals: ^PLDAPBerVal);
   end;
   {$EXTERNALSYM LDAPMod}
+  {$IFDEF UNICODE}
+  LDAPMod = LDAPModW;
+  {$ELSE}
   LDAPMod = LDAPModA;
+  {$ENDIF}
   TLDAPModA = LDAPModA;
   TLDAPModW = LDAPModW;
+  {$IFDEF UNICODE}
+  TLDAPMod = TLDAPModW;
+  {$ELSE}
   TLDAPMod = TLDAPModA;
+  {$ENDIF}
 
 {$HPPEMIT '#pragma pack(pop)'}
 
@@ -818,7 +853,6 @@ function cldap_openA(HostName: PAnsiChar; PortNumber: ULONG): PLDAP; cdecl;
 function cldap_openW(HostName: PWideChar; PortNumber: ULONG): PLDAP; cdecl;
 {$EXTERNALSYM cldap_open}
 function cldap_open(HostName: PChar; PortNumber: ULONG): PLDAP; cdecl;
-
 
 //
 //  Call unbind when you're done with the connection, it will free all
@@ -1094,7 +1128,6 @@ function ldap_sasl_bind_s(ExternalHandle: PLDAP; DistName: PChar;
   var ServerCtrls, ClientCtrls: PLDAPControl;
   var ServerData: PBERVAL): Integer; cdecl;
 
-
 //
 //  Synchronous and asynch search routines.
 //
@@ -1273,7 +1306,6 @@ function ldap_modify_ext_sW(ld: PLDAP; dn: PWideChar; var mods: PLDAPModW;
 function ldap_modify_ext_s(ld: PLDAP; dn: PChar; var mods: PLDAPMod;
   var ServerControls, ClientControls: PLDAPControl): ULONG; cdecl;
 
-
 //
 //  modrdn and modrdn2 function both as RenameObject and MoveObject.
 //
@@ -1361,7 +1393,6 @@ function ldap_modrdn_sW(var ExternalHandle: LDAP;
 function ldap_modrdn_s(var ExternalHandle: LDAP;
   DistinguishedName, NewDistinguishedName: PChar): ULONG; cdecl;
 
-
 //
 //  Extended Rename operations.  These take controls and separate out the
 //  parent from the RDN, for clarity.
@@ -1392,7 +1423,6 @@ function ldap_rename_ext_sW(ld: PLDAP;
 function ldap_rename_ext_s(ld: PLDAP;
   dn, NewRDN, NewParent: PChar; DeleteOldRdn: Integer;
   var ServerControls, ClientControls: PLDAPControl): ULONG; cdecl;
-
 
 //
 //  Add an entry to the tree
@@ -1513,7 +1543,6 @@ function ldap_compare_ext_s(ld: PLDAP;
   dn, Attr, Value: PChar; Data: PLDAPBerVal;
   var ServerControls, ClientControls: PLDAPControl): ULONG; cdecl;
 
-
 //
 //  Delete an object out of the tree
 //
@@ -1565,7 +1594,6 @@ function ldap_delete_ext_sW(ld: PLDAP; dn: PWideChar;
 {$EXTERNALSYM ldap_delete_ext_s}
 function ldap_delete_ext_s(ld: PLDAP; dn: PChar;
   var ServerControls, ClientControls: PLDAPControl): ULONG; cdecl;
-
 
 //
 //  Give up on a request.  No guarentee that it got there as there is no
@@ -1851,7 +1879,6 @@ function ldap_get_values_lenW(ExternalHandle: PLDAP; Message: PLDAPMessage;
 function ldap_get_values_len(ExternalHandle: PLDAP; Message: PLDAPMessage;
  attr: PChar): PPLDAPBerVal; cdecl;
 
-
 //
 //  Return the number of values in a list returned by ldap_get_values.
 //
@@ -1862,7 +1889,6 @@ function ldap_count_valuesA(vals: PPCharA): ULONG; cdecl;
 function ldap_count_valuesW(vals: PPCharW): ULONG; cdecl;
 {$EXTERNALSYM ldap_count_values}
 function ldap_count_values(vals: PPChar): ULONG; cdecl;
-
 
 //
 //  Return the number of values in a list returned by ldap_get_values_len.
@@ -1881,7 +1907,6 @@ function ldap_value_freeA(vals: PPCharA): ULONG; cdecl;
 function ldap_value_freeW(vals: PPCharW): ULONG; cdecl;
 {$EXTERNALSYM ldap_value_free}
 function ldap_value_free(vals: PPChar): ULONG; cdecl;
-
 
 //
 //  Free structures returned by ldap_get_values_len.
@@ -1902,7 +1927,6 @@ function ldap_get_dnW(ld: PLDAP; entry: PLDAPMessage): PWideChar; cdecl;
 {$EXTERNALSYM ldap_get_dn}
 function ldap_get_dn(ld: PLDAP; entry: PLDAPMessage): PChar; cdecl;
 
-
 //
 //  When using ldap_explode_dn, you should free the returned string by
 //  calling ldap_value_free.
@@ -1915,7 +1939,6 @@ function ldap_explode_dnW(dn: PWideChar; notypes: ULONG): PPCharW; cdecl;
 {$EXTERNALSYM ldap_explode_dn}
 function ldap_explode_dn(dn: PChar; notypes: ULONG): PPChar; cdecl;
 
-
 //
 //  When calling ldap_dn2ufn, you should free the returned string by calling
 //  ldap_memfree.
@@ -1927,7 +1950,6 @@ function ldap_dn2ufnA(dn: PAnsiChar): PAnsiChar; cdecl;
 function ldap_dn2ufnW(dn: PWideChar): PWideChar; cdecl;
 {$EXTERNALSYM ldap_dn2ufn}
 function ldap_dn2ufn(dn: PChar): PChar; cdecl;
-
 
 //
 //  This is used to free strings back to the LDAP API heap.  Don't pass in
@@ -2129,7 +2151,11 @@ type
   {$EXTERNALSYM PLDAPSortKeyW}
   PLDAPSortKeyW = ^LDAPSortKeyW;
   {$EXTERNALSYM PLDAPSortKey}
+  {$IFDEF UNICODE}
+    PLDAPSortKey = PLDAPSortKeyW;
+  {$ELSE}
   PLDAPSortKey = PLDAPSortKeyA;
+  {$ENDIF}
   {$EXTERNALSYM LDAPSortKeyA}
   LDAPSortKeyA = packed record
     sk_attrtype: PAnsiChar;
@@ -2143,7 +2169,11 @@ type
     sk_reverseorder: ByteBool;
   end;
   {$EXTERNALSYM LDAPSortKey}
+  {$IFDEF UNICODE}
+  LDAPSortKey = LDAPSortKeyW;
+  {$ELSE}
   LDAPSortKey = LDAPSortKeyA;
+  {$ENDIF}
 
 //
 //  This API formats a list of sort keys into a search control.  Call
@@ -2238,7 +2268,6 @@ function ldap_parse_page_control(ExternalHandle: PLDAP;
   ServerControls: PPLDAPControl; var TotalCount: ULONG;
   var Cookie: PLDAPBerVal): ULONG; cdecl; // Use ber_bvfree to free Cookie
 
-
 //
 //  LDAPv3: This is the interface for simple paging of results.  To ensure
 //  that the server supports it, check the supportedControl property off of
@@ -2300,7 +2329,6 @@ function ldap_search_init_page(ExternalHandle: PLDAP;
   var ServerControls, ClientControls: PLDAPControl;
   PageTimeLimit, TotalSizeLimit: ULONG;
   var SortKeys: PLDAPSortKey): PLDAPSearch; cdecl;
-
 
 {$EXTERNALSYM ldap_get_next_page}
 function ldap_get_next_page(ExternalHandle: PLDAP; SearchHandle: PLDAPSearch;
@@ -2579,13 +2607,15 @@ function ldap_conn_from_msg(PrimaryConn: PLDAP; res: PLDAPMessage): PLDAP; cdecl
 //  the connection pointer back by calling ldap_conn_from_msg?
 //
 
-{$EXTERNALSYM ldap_start_tls_s}
+{$EXTERNALSYM ldap_start_tls_sA}
 function ldap_start_tls_sA( ExternalHandle: PLDAP; ServerReturnValue: PULONG;
                            result: PPLDAPMessage; ServerControls: PPLDAPControl;
                            ClientControls: PPLDAPControl): ULONG; cdecl;
+{$EXTERNALSYM ldap_start_tls_sW}
 function ldap_start_tls_sW( ExternalHandle: PLDAP; ServerReturnValue: PULONG;
                            result: PPLDAPMessage; ServerControls: PPLDAPControl;
                            ClientControls: PPLDAPControl): ULONG; cdecl;
+{$EXTERNALSYM ldap_start_tls_s}
 function ldap_start_tls_s( ExternalHandle: PLDAP; ServerReturnValue: PULONG;
                            result: PPLDAPMessage; ServerControls: PPLDAPControl;
                            ClientControls: PPLDAPControl): ULONG; cdecl;
@@ -2605,200 +2635,461 @@ const
 procedure ber_free; external LDAPLib name 'ber_free';
 function ldap_openA; external LDAPLib name 'ldap_openA';
 function ldap_openW; external LDAPLib name 'ldap_openW';
+{$IFDEF UNICODE}
+function ldap_open; external LDAPLib name 'ldap_openW';
+{$ELSE}
 function ldap_open; external LDAPLib name 'ldap_openA';
+{$ENDIF}
 function ldap_initA; external LDAPLib name 'ldap_initA';
 function ldap_initW; external LDAPLib name 'ldap_initW';
+{$IFDEF UNICODE}
+function ldap_init; external LDAPLib name 'ldap_initW';
+{$ELSE}
 function ldap_init; external LDAPLib name 'ldap_initA';
+{$ENDIF}
 function ldap_sslinitA; external LDAPLib name 'ldap_sslinitA';
 function ldap_sslinitW; external LDAPLib name 'ldap_sslinitW';
+{$IFDEF UNICODE}
+function ldap_sslinit; external LDAPLib name 'ldap_sslinitW';
+{$ELSE}
 function ldap_sslinit; external LDAPLib name 'ldap_sslinitA';
+{$ENDIF}
 function cldap_openA; external LDAPLib name 'cldap_openA';
 function cldap_openW; external LDAPLib name 'cldap_openW';
+{$IFDEF UNICODE}
+function cldap_open; external LDAPLib name 'cldap_openW';
+{$ELSE}
 function cldap_open; external LDAPLib name 'cldap_openA';
+{$ENDIF}
 function ldap_simple_bindA; external LDAPLib name 'ldap_simple_bindA';
 function ldap_simple_bindW; external LDAPLib name 'ldap_simple_bindW';
+{$IFDEF UNICODE}
+function ldap_simple_bind; external LDAPLib name 'ldap_simple_bindW';
+{$ELSE}
 function ldap_simple_bind; external LDAPLib name 'ldap_simple_bindA';
+{$ENDIF}
 function ldap_simple_bind_sA; external LDAPLib name 'ldap_simple_bind_sA';
 function ldap_simple_bind_sW; external LDAPLib name 'ldap_simple_bind_sW';
+{$IFDEF UNICODE}
+function ldap_simple_bind_s; external LDAPLib name 'ldap_simple_bind_sW';
+{$ELSE}
 function ldap_simple_bind_s; external LDAPLib name 'ldap_simple_bind_sA';
+{$ENDIF}
 function ldap_bindA; external LDAPLib name 'ldap_bindA';
 function ldap_bindW; external LDAPLib name 'ldap_bindW';
+{$IFDEF UNICODE}
+function ldap_bind; external LDAPLib name 'ldap_bindW';
+{$ELSE}
 function ldap_bind; external LDAPLib name 'ldap_bindA';
+{$ENDIF}
 function ldap_bind_sA; external LDAPLib name 'ldap_bind_sA';
 function ldap_bind_sW; external LDAPLib name 'ldap_bind_sW';
+{$IFDEF UNICODE}
+function ldap_bind_s; external LDAPLib name 'ldap_bind_sW';
+{$ELSE}
 function ldap_bind_s; external LDAPLib name 'ldap_bind_sA';
+{$ENDIF}
 function ldap_sasl_bindA; external LDAPLib name 'ldap_sasl_bindA';
 function ldap_sasl_bindW; external LDAPLib name 'ldap_sasl_bindW';
+{$IFDEF UNICODE}
+function ldap_sasl_bind; external LDAPLib name 'ldap_sasl_bindW';
+{$ELSE}
 function ldap_sasl_bind; external LDAPLib name 'ldap_sasl_bindA';
+{$ENDIF}
 function ldap_sasl_bind_sA; external LDAPLib name 'ldap_sasl_bind_sA';
 function ldap_sasl_bind_sW; external LDAPLib name 'ldap_sasl_bind_sW';
+{$IFDEF UNICODE}
+function ldap_sasl_bind_s; external LDAPLib name 'ldap_sasl_bind_sW';
+{$ELSE}
 function ldap_sasl_bind_s; external LDAPLib name 'ldap_sasl_bind_sA';
+{$ENDIF}
 function ldap_searchA; external LDAPLib name 'ldap_searchA';
 function ldap_searchW; external LDAPLib name 'ldap_searchW';
+{$IFDEF UNICODE}
+function ldap_search; external LDAPLib name 'ldap_searchW';
+{$ELSE}
 function ldap_search; external LDAPLib name 'ldap_searchA';
+{$ENDIF}
 function ldap_search_sA; external LDAPLib name 'ldap_search_sA';
 function ldap_search_sW; external LDAPLib name 'ldap_search_sW';
+{$IFDEF UNICODE}
+function ldap_search_s; external LDAPLib name 'ldap_search_sW';
+{$ELSE}
 function ldap_search_s; external LDAPLib name 'ldap_search_sA';
+{$ENDIF}
 function ldap_search_stA; external LDAPLib name 'ldap_search_stA';
 function ldap_search_stW; external LDAPLib name 'ldap_search_stW';
+{$IFDEF UNICODE}
+function ldap_search_st; external LDAPLib name 'ldap_search_stW';
+{$ELSE}
 function ldap_search_st; external LDAPLib name 'ldap_search_stA';
+{$ENDIF}
 function ldap_modifyA; external LDAPLib name 'ldap_modifyA';
 function ldap_modifyW; external LDAPLib name 'ldap_modifyW';
+{$IFDEF UNICODE}
+function ldap_modify; external LDAPLib name 'ldap_modifyW';
+{$ELSE}
 function ldap_modify; external LDAPLib name 'ldap_modifyA';
+{$ENDIF}
 function ldap_modify_sA; external LDAPLib name 'ldap_modify_sA';
 function ldap_modify_sW; external LDAPLib name 'ldap_modify_sW';
+{$IFDEF UNICODE}
+function ldap_modify_s; external LDAPLib name 'ldap_modify_sW';
+{$ELSE}
 function ldap_modify_s; external LDAPLib name 'ldap_modify_sA';
+{$ENDIF}
 function ldap_modrdn2A; external LDAPLib name 'ldap_modrdn2A';
 function ldap_modrdn2W; external LDAPLib name 'ldap_modrdn2W';
+{$IFDEF UNICODE}
+function ldap_modrdn2; external LDAPLib name 'ldap_modrdn2W';
+{$ELSE}
 function ldap_modrdn2; external LDAPLib name 'ldap_modrdn2A';
+{$ENDIF}
 function ldap_modrdnA; external LDAPLib name 'ldap_modrdnA';
 function ldap_modrdnW; external LDAPLib name 'ldap_modrdnW';
+{$IFDEF UNICODE}
+function ldap_modrdn; external LDAPLib name 'ldap_modrdnW';
+{$ELSE}
 function ldap_modrdn; external LDAPLib name 'ldap_modrdnA';
+{$ENDIF}
 function ldap_modrdn2_sA; external LDAPLib name 'ldap_modrdn2_sA';
 function ldap_modrdn2_sW; external LDAPLib name 'ldap_modrdn2_sW';
+{$IFDEF UNICODE}
+function ldap_modrdn2_s; external LDAPLib name 'ldap_modrdn2_sW';
+{$ELSE}
 function ldap_modrdn2_s; external LDAPLib name 'ldap_modrdn2_sA';
+{$ENDIF}
 function ldap_modrdn_sA; external LDAPLib name 'ldap_modrdn_sA';
 function ldap_modrdn_sW; external LDAPLib name 'ldap_modrdn_sW';
+{$IFDEF UNICODE}
+function ldap_modrdn_s; external LDAPLib name 'ldap_modrdn_sW';
+{$ELSE}
 function ldap_modrdn_s; external LDAPLib name 'ldap_modrdn_sA';
+{$ENDIF}
 function ldap_addA; external LDAPLib name 'ldap_addA';
 function ldap_addW; external LDAPLib name 'ldap_addW';
+{$IFDEF UNICODE}
+function ldap_add; external LDAPLib name 'ldap_addW';
+{$ELSE}
 function ldap_add; external LDAPLib name 'ldap_addA';
+{$ENDIF}
 function ldap_add_sA; external LDAPLib name 'ldap_add_sA';
 function ldap_add_sW; external LDAPLib name 'ldap_add_sW';
+{$IFDEF UNICODE}
+function ldap_add_s; external LDAPLib name 'ldap_add_sW';
+{$ELSE}
 function ldap_add_s; external LDAPLib name 'ldap_add_sA';
+{$ENDIF}
 function ldap_compareA; external LDAPLib name 'ldap_compareA';
 function ldap_compareW; external LDAPLib name 'ldap_compareW';
+{$IFDEF UNICODE}
+function ldap_compare; external LDAPLib name 'ldap_compareW';
+{$ELSE}
 function ldap_compare; external LDAPLib name 'ldap_compareA';
+{$ENDIF}
 function ldap_compare_sA; external LDAPLib name 'ldap_compare_sA';
 function ldap_compare_sW; external LDAPLib name 'ldap_compare_sW';
+{$IFDEF UNICODE}
+function ldap_compare_s; external LDAPLib name 'ldap_compare_sW';
+{$ELSE}
 function ldap_compare_s; external LDAPLib name 'ldap_compare_sA';
+{$ENDIF}
 function ldap_deleteA; external LDAPLib name 'ldap_deleteA';
 function ldap_deleteW; external LDAPLib name 'ldap_deleteW';
+{$IFDEF UNICODE}
+function ldap_delete; external LDAPLib name 'ldap_deleteW';
+{$ELSE}
 function ldap_delete; external LDAPLib name 'ldap_deleteA';
+{$ENDIF}
 function ldap_delete_sA; external LDAPLib name 'ldap_delete_sA';
 function ldap_delete_sW; external LDAPLib name 'ldap_delete_sW';
+{$IFDEF UNICODE}
+function ldap_delete_s; external LDAPLib name 'ldap_delete_sW';
+{$ELSE}
 function ldap_delete_s; external LDAPLib name 'ldap_delete_sA';
+{$ENDIF}
 function ldap_err2stringA; external LDAPLib name 'ldap_err2stringA';
 function ldap_err2stringW; external LDAPLib name 'ldap_err2stringW';
+{$IFDEF UNICODE}
+function ldap_err2string; external LDAPLib name 'ldap_err2stringW';
+{$ELSE}
 function ldap_err2string; external LDAPLib name 'ldap_err2stringA';
+{$ENDIF}
 function ldap_first_attributeA; external LDAPLib name 'ldap_first_attributeA';
 function ldap_first_attributeW; external LDAPLib name 'ldap_first_attributeW';
+{$IFDEF UNICODE}
+function ldap_first_attribute; external LDAPLib name 'ldap_first_attributeW';
+{$ELSE}
 function ldap_first_attribute; external LDAPLib name 'ldap_first_attributeA';
+{$ENDIF}
 function ldap_next_attributeA; external LDAPLib name 'ldap_next_attributeA';
 function ldap_next_attributeW; external LDAPLib name 'ldap_next_attributeW';
+{$IFDEF UNICODE}
+function ldap_next_attribute; external LDAPLib name 'ldap_next_attributeW';
+{$ELSE}
 function ldap_next_attribute; external LDAPLib name 'ldap_next_attributeA';
+{$ENDIF}
 function ldap_get_valuesA; external LDAPLib name 'ldap_get_valuesA';
 function ldap_get_valuesW; external LDAPLib name 'ldap_get_valuesW';
+{$IFDEF UNICODE}
+function ldap_get_values; external LDAPLib name 'ldap_get_valuesW';
+{$ELSE}
 function ldap_get_values; external LDAPLib name 'ldap_get_valuesA';
+{$ENDIF}
 function ldap_get_values_lenA; external LDAPLib name 'ldap_get_values_lenA';
 function ldap_get_values_lenW; external LDAPLib name 'ldap_get_values_lenW';
+{$IFDEF UNICODE}
+function ldap_get_values_len; external LDAPLib name 'ldap_get_values_lenW';
+{$ELSE}
 function ldap_get_values_len; external LDAPLib name 'ldap_get_values_lenA';
+{$ENDIF}
 function ldap_count_valuesA; external LDAPLib name 'ldap_count_valuesA';
 function ldap_count_valuesW; external LDAPLib name 'ldap_count_valuesW';
+{$IFDEF UNICODE}
+function ldap_count_values; external LDAPLib name 'ldap_count_valuesW';
+{$ELSE}
 function ldap_count_values; external LDAPLib name 'ldap_count_valuesA';
+{$ENDIF}
 function ldap_value_freeA; external LDAPLib name 'ldap_value_freeA';
 function ldap_value_freeW; external LDAPLib name 'ldap_value_freeW';
+{$IFDEF UNICODE}
+function ldap_value_free; external LDAPLib name 'ldap_value_freeW';
+{$ELSE}
 function ldap_value_free; external LDAPLib name 'ldap_value_freeA';
+{$ENDIF}
 function ldap_get_dnA; external LDAPLib name 'ldap_get_dnA';
 function ldap_get_dnW; external LDAPLib name 'ldap_get_dnW';
+{$IFDEF UNICODE}
+function ldap_get_dn; external LDAPLib name 'ldap_get_dnW';
+{$ELSE}
 function ldap_get_dn; external LDAPLib name 'ldap_get_dnA';
+{$ENDIF}
 function ldap_explode_dnA; external LDAPLib name 'ldap_explode_dnA';
 function ldap_explode_dnW; external LDAPLib name 'ldap_explode_dnW';
+{$IFDEF UNICODE}
+function ldap_explode_dn; external LDAPLib name 'ldap_explode_dnW';
+{$ELSE}
 function ldap_explode_dn; external LDAPLib name 'ldap_explode_dnA';
+{$ENDIF}
 function ldap_dn2ufnA; external LDAPLib name 'ldap_dn2ufnA';
 function ldap_dn2ufnW; external LDAPLib name 'ldap_dn2ufnW';
+{$IFDEF UNICODE}
+function ldap_dn2ufn; external LDAPLib name 'ldap_dn2ufnW';
+{$ELSE}
 function ldap_dn2ufn; external LDAPLib name 'ldap_dn2ufnA';
+{$ENDIF}
 procedure ldap_memfreeA; external LDAPLib name 'ldap_memfreeA';
 procedure ldap_memfreeW; external LDAPLib name 'ldap_memfreeW';
+{$IFDEF UNICODE}
+procedure ldap_memfree; external LDAPLib name 'ldap_memfreeW';
+{$ELSE}
 procedure ldap_memfree; external LDAPLib name 'ldap_memfreeA';
+{$ENDIF}
 function ldap_ufn2dnA; external LDAPLib name 'ldap_ufn2dnA';
 function ldap_ufn2dnW; external LDAPLib name 'ldap_ufn2dnW';
+{$IFDEF UNICODE}
+function ldap_ufn2dn; external LDAPLib name 'ldap_ufn2dnW';
+{$ELSE}
 function ldap_ufn2dn; external LDAPLib name 'ldap_ufn2dnA';
+{$ENDIF}
 function ldap_escape_filter_elementA; external LDAPLib name 'ldap_escape_filter_elementA';
 function ldap_escape_filter_elementW; external LDAPLib name 'ldap_escape_filter_elementW';
+{$IFDEF UNICODE}
+function ldap_escape_filter_element; external LDAPLib name 'ldap_escape_filter_elementW';
+{$ELSE}
 function ldap_escape_filter_element; external LDAPLib name 'ldap_escape_filter_elementA';
+{$ENDIF}
 function ldap_search_extA; external LDAPLib name 'ldap_search_extA';
 function ldap_search_extW; external LDAPLib name 'ldap_search_extW';
+{$IFDEF UNICODE}
+function ldap_search_ext; external LDAPLib name 'ldap_search_extW';
+{$ELSE}
 function ldap_search_ext; external LDAPLib name 'ldap_search_extA';
+{$ENDIF}
 function ldap_search_ext_sA; external LDAPLib name 'ldap_search_ext_sA';
 function ldap_search_ext_sW; external LDAPLib name 'ldap_search_ext_sW';
+{$IFDEF UNICODE}
+function ldap_search_ext_s; external LDAPLib name 'ldap_search_ext_sW';
+{$ELSE}
 function ldap_search_ext_s; external LDAPLib name 'ldap_search_ext_sA';
+{$ENDIF}
 function ldap_check_filterA; EXTERNAL LDAPLib name 'ldap_check_filterA';
 function ldap_check_filterW; EXTERNAL LDAPLib name 'ldap_check_filterW';
+{$IFDEF UNICODE}
+function ldap_check_filter; EXTERNAL LDAPLib name 'ldap_check_filterW';
+{$ELSE}
 function ldap_check_filter; EXTERNAL LDAPLib name 'ldap_check_filterA';
+{$ENDIF}
 function ldap_modify_extA; external LDAPLib name 'ldap_modify_extA';
 function ldap_modify_extW; external LDAPLib name 'ldap_modify_extW';
+{$IFDEF UNICODE}
+function ldap_modify_ext; external LDAPLib name 'ldap_modify_extW';
+{$ELSE}
 function ldap_modify_ext; external LDAPLib name 'ldap_modify_extA';
+{$ENDIF}
 function ldap_modify_ext_sA; external LDAPLib name 'ldap_modify_ext_sA';
 function ldap_modify_ext_sW; external LDAPLib name 'ldap_modify_ext_sW';
+{$IFDEF UNICODE}
+function ldap_modify_ext_s; external LDAPLib name 'ldap_modify_ext_sW';
+{$ELSE}
 function ldap_modify_ext_s; external LDAPLib name 'ldap_modify_ext_sA';
+{$ENDIF}
 function ldap_rename_extA; external LDAPLib name 'ldap_rename_extA';
 function ldap_rename_extW; external LDAPLib name 'ldap_rename_extW';
+{$IFDEF UNICODE}
+function ldap_rename_ext; external LDAPLib name 'ldap_rename_extW';
+{$ELSE}
 function ldap_rename_ext; external LDAPLib name 'ldap_rename_extA';
+{$ENDIF}
 function ldap_rename_ext_sA; external LDAPLib name 'ldap_rename_ext_sA';
 function ldap_rename_ext_sW; external LDAPLib name 'ldap_rename_ext_sW';
+{$IFDEF UNICODE}
+function ldap_rename_ext_s; external LDAPLib name 'ldap_rename_ext_sW';
+{$ELSE}
 function ldap_rename_ext_s; external LDAPLib name 'ldap_rename_ext_sA';
+{$ENDIF}
 function ldap_add_extA; external LDAPLib name 'ldap_add_extA';
 function ldap_add_extW; external LDAPLib name 'ldap_add_extW';
+{$IFDEF UNICODE}
+function ldap_add_ext; external LDAPLib name 'ldap_add_extW';
+{$ELSE}
 function ldap_add_ext; external LDAPLib name 'ldap_add_extA';
+{$ENDIF}
 function ldap_add_ext_sA; external LDAPLib name 'ldap_add_ext_sA';
 function ldap_add_ext_sW; external LDAPLib name 'ldap_add_ext_sW';
+{$IFDEF UNICODE}
+function ldap_add_ext_s; external LDAPLib name 'ldap_add_ext_sW';
+{$ELSE}
 function ldap_add_ext_s; external LDAPLib name 'ldap_add_ext_sA';
+{$ENDIF}
 function ldap_compare_extA; external LDAPLib name 'ldap_compare_extA';
 function ldap_compare_extW; external LDAPLib name 'ldap_compare_extW';
+{$IFDEF UNICODE}
+function ldap_compare_ext; external LDAPLib name 'ldap_compare_extW';
+{$ELSE}
 function ldap_compare_ext; external LDAPLib name 'ldap_compare_extA';
+{$ENDIF}
 function ldap_compare_ext_sA; external LDAPLib name 'ldap_compare_ext_sA';
 function ldap_compare_ext_sW; external LDAPLib name 'ldap_compare_ext_sW';
+{$IFDEF UNICODE}
+function ldap_compare_ext_s; external LDAPLib name 'ldap_compare_ext_sW';
+{$ELSE}
 function ldap_compare_ext_s; external LDAPLib name 'ldap_compare_ext_sA';
+{$ENDIF}
 function ldap_delete_extA; external LDAPLib name 'ldap_delete_extA';
 function ldap_delete_extW; external LDAPLib name 'ldap_delete_extW';
+{$IFDEF UNICODE}
+function ldap_delete_ext; external LDAPLib name 'ldap_delete_extW';
+{$ELSE}
 function ldap_delete_ext; external LDAPLib name 'ldap_delete_extA';
+{$ENDIF}
 function ldap_delete_ext_sA; external LDAPLib name 'ldap_delete_ext_sA';
 function ldap_delete_ext_sW; external LDAPLib name 'ldap_delete_ext_sW';
+{$IFDEF UNICODE}
+function ldap_delete_ext_s; external LDAPLib name 'ldap_delete_ext_sW';
+{$ELSE}
 function ldap_delete_ext_s; external LDAPLib name 'ldap_delete_ext_sA';
+{$ENDIF}
 function ldap_parse_resultA; external LDAPLib name 'ldap_parse_resultA';
 function ldap_parse_resultW; external LDAPLib name 'ldap_parse_resultW';
+{$IFDEF UNICODE}
+function ldap_parse_result; external LDAPLib name 'ldap_parse_resultW';
+{$ELSE}
 function ldap_parse_result; external LDAPLib name 'ldap_parse_resultA';
+{$ENDIF}
 function ldap_controls_freeA; external LDAPLib name 'ldap_controls_freeA';
 function ldap_controls_freeW; external LDAPLib name 'ldap_controls_freeW';
+{$IFDEF UNICODE}
+function ldap_controls_free; external LDAPLib name 'ldap_controls_freeW';
+{$ELSE}
 function ldap_controls_free; external LDAPLib name 'ldap_controls_freeA';
+{$ENDIF}
 function ldap_parse_extended_resultA; external LDAPLib name 'ldap_parse_extended_resultA';
 function ldap_parse_extended_resultW; external LDAPLib name 'ldap_parse_extended_resultW';
+{$IFDEF UNICODE}
+function ldap_parse_extended_result; external LDAPLib name 'ldap_parse_extended_resultW';
+{$ELSE}
 function ldap_parse_extended_result; external LDAPLib name 'ldap_parse_extended_resultA';
+{$ENDIF}
 function ldap_control_freeA; external LDAPLib name 'ldap_control_freeA';
 function ldap_control_freeW; external LDAPLib name 'ldap_control_freeW';
+{$IFDEF UNICODE}
+function ldap_control_free; external LDAPLib name 'ldap_control_freeW';
+{$ELSE}
 function ldap_control_free; external LDAPLib name 'ldap_control_freeA';
+{$ENDIF}
 function ldap_free_controlsA; external LDAPLib name 'ldap_free_controlsA';
 function ldap_free_controlsW; external LDAPLib name 'ldap_free_controlsW';
+{$IFDEF UNICODE}
+function ldap_free_controls; external LDAPLib name 'ldap_free_controlsW';
+{$ELSE}
 function ldap_free_controls; external LDAPLib name 'ldap_free_controlsA';
+{$ENDIF}
 function ldap_create_sort_controlA; external LDAPLib name 'ldap_create_sort_controlA';
 function ldap_create_sort_controlW; external LDAPLib name 'ldap_create_sort_controlW';
+{$IFDEF UNICODE}
+function ldap_create_sort_control; external LDAPLib name 'ldap_create_sort_controlW';
+{$ELSE}
 function ldap_create_sort_control; external LDAPLib name 'ldap_create_sort_controlA';
+{$ENDIF}
 function ldap_parse_sort_controlA; external LDAPLib name 'ldap_parse_sort_controlA';
 function ldap_parse_sort_controlW; external LDAPLib name 'ldap_parse_sort_controlW';
+{$IFDEF UNICODE}
+function ldap_parse_sort_control; external LDAPLib name 'ldap_parse_sort_controlW';
+{$ELSE}
 function ldap_parse_sort_control; external LDAPLib name 'ldap_parse_sort_controlA';
+{$ENDIF}
 function ldap_encode_sort_controlA; external LDAPLib name 'ldap_encode_sort_controlA';
 function ldap_encode_sort_controlW; external LDAPLib name 'ldap_encode_sort_controlW';
+{$IFDEF UNICODE}
+function ldap_encode_sort_control; external LDAPLib name 'ldap_encode_sort_controlW';
+{$ELSE}
 function ldap_encode_sort_control; external LDAPLib name 'ldap_encode_sort_controlA';
+{$ENDIF}
 function ldap_create_page_controlA; external LDAPLib name 'ldap_create_page_controlA';
 function ldap_create_page_controlW; external LDAPLib name 'ldap_create_page_controlW';
+{$IFDEF UNICODE}
+function ldap_create_page_control; external LDAPLib name 'ldap_create_page_controlW';
+{$ELSE}
 function ldap_create_page_control; external LDAPLib name 'ldap_create_page_controlA';
+{$ENDIF}
 function ldap_parse_page_controlA; external LDAPLib name 'ldap_parse_page_controlA';
 function ldap_parse_page_controlW; external LDAPLib name 'ldap_parse_page_controlW';
+{$IFDEF UNICODE}
+function ldap_parse_page_control; external LDAPLib name 'ldap_parse_page_controlW';
+{$ELSE}
 function ldap_parse_page_control; external LDAPLib name 'ldap_parse_page_controlA';
+{$ENDIF}
 function ldap_search_init_pageA; external LDAPLib name 'ldap_search_init_pageA';
 function ldap_search_init_pageW; external LDAPLib name 'ldap_search_init_pageW';
+{$IFDEF UNICODE}
+function ldap_search_init_page; external LDAPLib name 'ldap_search_init_pageW';
+{$ELSE}
 function ldap_search_init_page; external LDAPLib name 'ldap_search_init_pageA';
+{$ENDIF}
 function ldap_parse_referenceA; external LDAPLib name 'ldap_parse_referenceA';
 function ldap_parse_referenceW; external LDAPLib name 'ldap_parse_referenceW';
+{$IFDEF UNICODE}
+function ldap_parse_reference; external LDAPLib name 'ldap_parse_referenceW';
+{$ELSE}
 function ldap_parse_reference; external LDAPLib name 'ldap_parse_referenceA';
+{$ENDIF}
 function ldap_extended_operationA; external LDAPLib name 'ldap_extended_operationA';
 function ldap_extended_operationW; external LDAPLib name 'ldap_extended_operationW';
+{$IFDEF UNICODE}
+function ldap_extended_operation; external LDAPLib name 'ldap_extended_operationW';
+{$ELSE}
 function ldap_extended_operation; external LDAPLib name 'ldap_extended_operationA';
+{$ENDIF}
 function ldap_unbind; external LDAPLib name 'ldap_unbind';
 function ldap_unbind_s; external LDAPLib name 'ldap_unbind_s';
+{$IFDEF UNICODE}
+function ldap_get_option; external LDAPLib name 'ldap_get_optionW';
+function ldap_set_option; external LDAPLib name 'ldap_set_optionW';
+{$ELSE}
 function ldap_get_option; external LDAPLib name 'ldap_get_option';
 function ldap_set_option; external LDAPLib name 'ldap_set_option';
+{$ENDIF}
 function ldap_get_optionW; external LDAPLib name 'ldap_get_optionW';
 function ldap_set_optionW; external LDAPLib name 'ldap_set_optionW';
 function ldap_abandon; external LDAPLib name 'ldap_abandon';
@@ -2832,7 +3123,11 @@ function LdapMapErrorToWin32; external LDAPLib name 'LdapMapErrorToWin32';
 function ldap_conn_from_msg; external LDAPLib name 'ldap_conn_from_msg';
 function ldap_start_tls_sA; external LDAPLib name 'ldap_start_tls_sA';
 function ldap_start_tls_sW; external LDAPLib name 'ldap_start_tls_sW';
+{$IFDEF UNICODE}
+function ldap_start_tls_s; external LDAPLib name 'ldap_start_tls_sW';
+{$ELSE}
 function ldap_start_tls_s; external LDAPLib name 'ldap_start_tls_sA';
+{$ENDIF}
 function ldap_stop_tls_s; external LDAPLib name 'ldap_stop_tls_s';
 
 // Macros.

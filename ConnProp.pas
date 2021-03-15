@@ -402,7 +402,6 @@ begin
   begin
     cbSASL.Checked := false;
     cbSASL.Enabled := false;
-    //cbSASL.Color := clBtnFace;
     cbAnonymous.Caption := cAnonymousConn;
   end
   else begin
