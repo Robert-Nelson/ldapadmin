@@ -13,6 +13,7 @@ object ConnListFrm: TConnListFrm
   OldCreateOrder = False
   Position = poOwnerFormCenter
   OnClose = FormClose
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 13
   object Panel1: TPanel
@@ -24,7 +25,7 @@ object ConnListFrm: TConnListFrm
     BevelOuter = bvNone
     TabOrder = 0
     object OkBtn: TButton
-      Left = 414
+      Left = 406
       Top = 9
       Width = 75
       Height = 25
@@ -35,7 +36,7 @@ object ConnListFrm: TConnListFrm
       TabOrder = 0
     end
     object CancelBtn: TButton
-      Left = 494
+      Left = 490
       Top = 9
       Width = 75
       Height = 25

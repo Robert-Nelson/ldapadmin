@@ -1,5 +1,5 @@
   {      LDAPAdmin - Copy.pas
-  *      Copyright (C) 2005 Tihomir Karlovic
+  *      Copyright (C) 2005-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -49,14 +49,14 @@ type
   private
     cbConnections: TLAComboBox;
     RdnAttribute: string;
-    MainSessionIdx: Integer;
+    MainConnectionIdx: Integer;
     fExpandNode: TExpandNodeProc;
     fSortProc: TTVCompare;
     ddRoot: TTreeNode;
     procedure cbConnectionsCloseUp(var Index: integer; var CanCloseUp: boolean);
     function  GetTgtDn: string;
     function  GetTgtRdn: string;
-    function  GetTgtSession: TLDAPSession;
+    function  GetTgtConnection: TConnection;
   public
     constructor Create(AOwner: TComponent;
                        dn: string;
@@ -66,7 +66,7 @@ type
                        SortProc: TTVCompare); reintroduce;
     property TargetDn: string read GetTgtDn;
     property TargetRdn: string read GetTgtRdn;
-    property TargetSession: TLDAPSession read GetTgtSession;
+    property TargetConnection: TConnection read GetTgtConnection;
   end;
 
 var
@@ -76,7 +76,7 @@ implementation
 
 {$R *.DFM}
 
-uses Registry, Config, Constant;
+uses Registry, Config, SizeGrip, Constant, ObjectInfo;
 
 { TCopyDlg }
 
@@ -91,7 +91,7 @@ end;
 
 function TCopyDlg.GetTgtDn: string;
 begin
-  Result := TLdapEntry(TreeView.Selected.Data).dn;
+  Result := TObjectInfo(TreeView.Selected.Data).dn;
 end;
 
 function TCopyDlg.GetTgtRdn: string;
@@ -99,11 +99,11 @@ begin
   Result := RdnAttribute + '=' + edName.Text;
 end;
 
-function TCopyDlg.GetTgtSession: TLDAPSession;
+function TCopyDlg.GetTgtConnection: TConnection;
 begin
   with cbConnections, Items do
-  if (Objects[ItemIndex] is TLdapSession) then
-    Result := TLdapSession(Objects[ItemIndex])
+  if (Objects[ItemIndex] is TConnection) then
+    Result := TConnection(Objects[ItemIndex])
   else
     Result := nil;
 end;
@@ -119,6 +119,7 @@ var
   i,j: integer;
 begin
   inherited Create(AOwner);
+  TSizeGrip.Create(Self);
   OkBtn.Enabled := false;
   cbConnections := TLAComboBox.Create(Self);
   with cbConnections do begin
@@ -144,31 +145,31 @@ begin
 
   SplitRdn(GetRdnFromDn(dn), RdnAttribute, v);
   edName.Text := v;
-  MainSessionIdx := cbConnections.Items.IndexOf(Connection.Account.Name);
-  if MainSessionIdx = -1 then
-    raise Exception.Create('Session error: could not locate active session!');
-  cbConnections.Items.Objects[MainSessionIdx] := Connection;
+  MainConnectionIdx := cbConnections.Items.IndexOf(Connection.Account.Name);
+  if MainConnectionIdx = -1 then
+    raise Exception.Create('Connection error: could not locate active connection!');
+  cbConnections.Items.Objects[MainConnectionIdx] := Connection;
   fExpandNode := ExpandNode;
   fSortProc := SortProc;
   TreeView.Images := ImageList;
-  cbConnections.ItemIndex := MainSessionIdx;
+  cbConnections.ItemIndex := MainConnectionIdx;
   cbConnectionsChange(nil);
 end;
 
 procedure TCopyDlg.cbConnectionsChange(Sender: TObject);
 var
-  Session: TLDAPSession;
+  Connection: TConnection;
   Account: TAccount;
 begin
   TreeView.Items.Clear;
   TreeView.Repaint;
   OkBtn.Enabled := false;
-  Session := TargetSession;
-  if not Assigned(Session) then
+  Connection := TargetConnection;
+  if not Assigned(Connection) then
   begin
     Account := TAccount(cbConnections.Items.Objects[cbConnections.ItemIndex]);
-    Session := TLDAPSession.Create;
-    with Session do
+    Connection := TConnection.Create(Account);
+    with Connection do
     try
       Screen.Cursor := crHourGlass;
       Server   := Account.Server;
@@ -179,14 +180,14 @@ begin
       Port     := Account.Port;
       Version  := Account.ldapVersion;
       Connect;
-      cbConnections.Items.Objects[cbConnections.ItemIndex] := Session;
+      cbConnections.Items.Objects[cbConnections.ItemIndex] := Connection;
     finally
       Screen.Cursor := crDefault;
     end;
   end;
-  ddRoot := TreeView.Items.Add(nil, Format('%s [%s]', [Session.Base, Session.Server]));
-  ddRoot.Data := TLdapEntry.Create(Session, Session.Base);
-  fExpandNode(ddRoot, Session);
+  ddRoot := TreeView.Items.Add(nil, Format('%s [%s]', [Connection.Base, Connection.Server]));
+  ddRoot.Data := TLdapEntry.Create(Connection, Connection.Base);
+  fExpandNode(ddRoot, Connection);
   ddRoot.ImageIndex := bmRoot;
   ddRoot.SelectedIndex := bmRoot;
   TreeView.CustomSort(@fSortProc, 0);
@@ -199,7 +200,7 @@ var
 begin
   with cbConnections.Items do
   for i := 0 to Count - 1 do
-    if (i <> MainSessionIdx) and (Objects[i] is TLdapSession)then
+    if (i <> MainConnectionIdx) and (Objects[i] is TConnection)then
       Objects[i].Free;
 end;
 
@@ -211,7 +212,7 @@ begin
   try
     Items.BeginUpdate;
     Node.Item[0].Delete;
-    fExpandNode(Node, TargetSession);
+    fExpandNode(Node, TargetConnection);
     CustomSort(@fSortProc, 0);
   finally
     Items.EndUpdate;
@@ -256,7 +257,7 @@ end;
 procedure TCopyDlg.TreeViewDeletion(Sender: TObject; Node: TTreeNode);
 begin
   if (Node.Data <> nil) and (Integer(Node.Data) <> ncDummyNode) then
-    TLdapEntry(Node.Data).Free;
+    TObjectInfo(Node.Data).Free;
 end;
 
 end.

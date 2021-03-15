@@ -125,6 +125,7 @@ begin
       Account.Description := Self.edDescription.Text;
     Entry.Write;
   end;
+  Action := caFree;
 end;
 
 procedure TComputerDlg.FormDestroy(Sender: TObject);

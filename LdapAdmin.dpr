@@ -70,7 +70,12 @@ uses
   GraphicHint in 'GraphicHint.pas',
   Connection in 'Connection.pas',
   adsie in 'adsie.pas',
-  ADPassDlg in 'ADPassDlg.pas' {ADPassDlg};
+  ADPassDlg in 'ADPassDlg.pas' {ADPassDlg},
+  Alias in 'Alias.pas' {AliasDlg},
+  SizeGrip in 'SizeGrip.pas',
+  CustomMenus in 'CustomMenus.pas',
+  CustMenuDlg in 'CustMenuDlg.pas' {CustomMenuDlg},
+  ObjectInfo in 'ObjectInfo.pas';
 
 {$R *.RES}
 

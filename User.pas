@@ -797,8 +797,6 @@ var
   i: Integer;
   EntryList: TLdapEntryList;
   ListItem: TListItem;
-  c: Boolean;
-  ImageIndex: Integer;
 begin
 
   EntryList := TLdapEntryList.Create;
@@ -814,8 +812,7 @@ begin
       ListItem.Data := StrNew(PChar(Dn));
       if Attributes.Count > 1 then
         ListItem.SubItems.Add(AttributesByName['description'].AsString);
-      Connection.DI.ClassifyLdapEntry(EntryList[i], c, ImageIndex);
-      ListItem.ImageIndex := ImageIndex;
+      ListItem.ImageIndex := (Entry.Session as TConnection).GetImageIndex(EntryList[i]);
     end;
     GroupList.AlphaSort;
   finally
@@ -951,8 +948,7 @@ end;
 procedure TUserDlg.AddGroupBtnClick(Sender: TObject);
 var
   GroupItem: TListItem;
-  i, idx: integer;
-  b: Boolean;
+  i: integer;
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
@@ -968,8 +964,7 @@ begin
         GroupItem.Data := StrNew(pchar(Selected[i].DN));
         GroupItem.Caption := selected[i].AttributesByName['cn'].AsString;
         GroupItem.SubItems.Add(selected[i].AttributesByName['description'].AsString);
-        Connection.DI.ClassifyLdapEntry(selected[i], b, idx);
-        GroupItem.ImageIndex := idx;
+        GroupItem.ImageIndex := Connection.GetImageIndex(selected[i]);
         HandleGroupModify(PChar(selected[i].dn), GRP_ADD);
       end;
       GroupList.Tag := 1;

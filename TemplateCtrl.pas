@@ -1,5 +1,5 @@
   {      LDAPAdmin - TemplateCtrl.pas
-  *      Copyright (C) 2006-2012 Tihomir Karlovic
+  *      Copyright (C) 2006-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -280,7 +280,7 @@ end;
 procedure TTemplatePanel.InstallHandlers;
 var
   i: Integer;
-
+  NotParented: Boolean;
 begin
 
   if fHandlerInstalled or not (Assigned(fEventHandler) and Assigned(fTemplate)) then Exit;
@@ -296,11 +296,27 @@ begin
 
   fHandlerInstalled := true;
 
-  { Trigger events for all attribute once }
-  for i := 0 to fEntry.Attributes.Count - 1 do
+  { Some VCL Controls require visible parents on property access!!! ( like
+    TComboBox for access to Items or ItemIndex properties! )               }
+  NotParented := not Assigned(Parent);
+  if NotParented then
   begin
-    fEventHandler.HandleEvent(fEntry.Attributes[i], etChange);
-    fEventHandler.HandleEvent(fEntry.Attributes[i], etUpdate);
+    Visible := false;
+    Parent := Application.MainForm;
+  end;
+  try
+    { Trigger events for all attributes }
+    for i := 0 to fEntry.Attributes.Count - 1 do
+    begin
+      fEventHandler.HandleEvent(fEntry.Attributes[i], etChange);
+      fEventHandler.HandleEvent(fEntry.Attributes[i], etUpdate);
+    end;
+  finally
+    if NotParented then
+    begin
+      Parent := nil;
+      Visible := true;
+    end;
   end;
 
 end;
@@ -351,6 +367,8 @@ var
       else
       if Element is TTemplateControl then
       begin
+        if Assigned(fEntry) then
+          TTemplateControl(Element).LdapSession := fEntry.Session;      
         fControls.Add(Element);
         HandleElements(TTemplateControl(Element).Elements);
       end
@@ -855,7 +873,7 @@ begin
     Left := Panel.Width - Width - 4;
     Anchors := [akTop, akRight];
     ModalResult := mrCancel;
-    Caption := '&Cancel';
+    Caption := cCancel;
     //Cancel := true;
   end;
 
@@ -867,7 +885,7 @@ begin
     TabOrder := 0;
     Default := true;
     ModalResult := mrOk;
-    Caption := '&OK';
+    Caption := cOk;
     OnClick := OkBtnClick;
   end;
 end;

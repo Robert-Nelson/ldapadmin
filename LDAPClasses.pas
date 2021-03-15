@@ -253,15 +253,17 @@ type
     fdn: string;
     fAttributes: TLdapAttributeList;
     fOperationalAttributes: TLdapAttributeList;
+    fObjectClass: TLdapAttribute;
     fState: TLdapEntryStates;
     fOnChangeProc: TDataNotifyEvent;
     fOnRead: TNotifyEvent;
     fOnWrite: TNotifyEvent;
     function GetNamedAttribute(const AName: string): TLdapAttribute;
+    function GetObjectClass: TLdapAttribute;
   protected
     procedure SetDn(const adn: string);
   public
-    Tag: Integer;
+    ObjectId: Integer;
     property Session: TLDAPSession read fSession;
     constructor Create(const ASession: TLDAPSession; const adn: string); virtual;
     destructor Destroy; override;
@@ -277,6 +279,7 @@ type
     property OnChange: TDataNotifyEvent read fOnChangeProc write fOnChangeProc;
     property OnRead: TNotifyEvent read fOnRead write fOnRead;
     property OnWrite: TNotifyEvent read fOnWrite write fOnWrite;
+    property ObjectClass: TLdapAttribute read GetObjectClass;
   end;
 
   TLdapEntryList = class
@@ -298,12 +301,15 @@ type
   end;
 
 { Name handling routines }
+function  DecodeDNString(const Src: string; const Escape: Char ='\'): string;
+function  EncodeDNString(const Src: string; const Escape: Char ='\'): string;
 function  CanonicalName(dn: string): string;
 procedure SplitRdn(const dn: string; var attrib, value: string);
 function  GetAttributeFromDn(const dn: string): string;
 function  GetNameFromDn(const dn: string): string;
 function  GetRdnFromDn(const dn: string): string;
 function  GetDirFromDn(const dn: string): string;
+
 
 function GetAttributeSortType(Attribute: string): TLdapAttributeSortType;
 
@@ -317,6 +323,68 @@ implementation
 uses Misc, Input, Dialogs, Cert, Gss;
 
 { Name handling routines }
+
+const
+  InvalidDNChars = ['=','+','"','\',',','>','<','#',';'];
+
+function DecodeDNString(const Src: string; const Escape: Char ='\'): string;
+var
+  p0, p, p1, pr: PChar;
+begin
+  p := PChar(Src);
+  p1 := StrScan(p, Escape);
+  if p1 = nil then
+  begin
+    Result := Src;
+    exit;
+  end;
+  SetLength(Result, length(Src));
+  pr := PChar(Result);
+  p0 := pr;
+  while p^ <> #0 do
+  begin
+    p1 := CharNext(p);
+    if p^ = Escape then
+    begin
+      p := p1;
+      if not (p^ in InvalidDNChars) then
+      begin
+        p1 := CharNext(p);
+        p1 := CharNext(p1);
+        HexToBin(p, pr, p1-p);
+        pr := CharNext(pr);
+      end;
+      p := p1;
+      //p1 := CharNext(p1);
+      continue;
+    end;
+    pr^:= p^;
+    p := p1;
+    pr := CharNext(pr);
+  end;
+  SetLength(Result, pr - p0);
+end;
+
+function EncodeDNString(const Src: string; const Escape: Char ='\'): string;
+var
+  p0, p: PChar;
+begin
+  p := PChar(Src);
+  p0 := p;
+  Result := '';
+  while (p^ <> #0) do
+  begin
+    if p^ in InvalidDNChars then
+    begin
+      Result := Result + Copy(p0, 1, p - p0) + Escape + p^;
+      p := CharNext(p);
+      p0 := p;
+    end
+    else
+      p := CharNext(p);
+  end;
+  Result := Result + Copy(p0, 1, Length(Src));
+end;
 
 function CanonicalName(dn: string): string;
 var
@@ -347,7 +415,15 @@ begin
   p := CharNext(p);
   p1 := p;
   while (p1^ <> #0) and (p1^ <> ',') do
+  begin
+    if p1^ = '\' then
+    begin
+      p1 := CharNext(p1);
+      if p1^ = #0 then
+        break;
+    end;
     p1 := CharNext(p1);
+  end;
   SetString(value, P, P1 - P);
 end;
 
@@ -372,7 +448,15 @@ begin
   p := CharNext(p);
   p1 := p;
   while (p1^ <> #0) and (p1^ <> ',') do
+  begin
+    if p1^ = '\' then
+    begin
+      p1 := CharNext(p1);
+      if p1^ = #0 then
+        break;
+    end;
     p1 := CharNext(p1);
+  end;
   SetString(Result, P, P1 - P);
 end;
 
@@ -383,7 +467,15 @@ begin
   p := PChar(dn);
   p1 := p;
   while (p1^ <> #0) and (p1^ <> ',') do
+  begin
+    if p1^ = '\' then
+    begin
+      p1 := CharNext(p1);
+      if p1^ = #0 then
+        break;
+    end;
     p1 := CharNext(p1);
+  end;
   SetString(Result, P, P1 - P);
 end;
 
@@ -394,6 +486,13 @@ begin
   p := PChar(dn);
   while (p^ <> #0) do
   begin
+    if p^ = '\' then
+    begin
+      p := CharNext(p);
+      if p^ = #0 then
+        break;
+    end
+    else
     if (p^ = ',') then
     begin
       p := CharNext(p);
@@ -1628,6 +1727,8 @@ var
   attrib, value: string;
   i, j: Integer;
 begin
+  if adn = fdn then
+    exit;
   if esBrowse in State then
   begin
     if GetRdnFromDn(adn) <> GetRdnFromDn(fdn) then
@@ -1635,7 +1736,7 @@ begin
       SplitRDN(adn, attrib, value);
       with AttributesByName[attrib] do
         if AsString <> '' then
-          AsString := value;
+          AsString := DecodeDNString(value);
     end;
     // Reset all flags
     i := Attributes.Count - 1;
@@ -1684,6 +1785,7 @@ end;
 procedure TLDAPEntry.Read;
 begin
   fAttributes.Clear;
+  fObjectClass := nil;
   fOperationalAttributes.Clear;
   fState := [esReading];
   try
@@ -1729,6 +1831,13 @@ begin
     Result := fAttributes.Add(AName)
   else
     Result := fAttributes[i];
+end;
+
+function TLDAPEntry.GetObjectClass: TLdapAttribute;
+begin
+  if not Assigned(FObjectClass) then
+    FObjectClass := GetNamedAttribute('objectclass');
+  Result := FObjectClass;
 end;
 
 { TLdapEntryList }

@@ -37,11 +37,12 @@ type
   TOnGetImageIndex= procedure(const Entry: TLdapEntry; var ImageIndex: integer) of object;
 
   TPickupDlg = class(TForm)
-    OKBtn:            TButton;
-    CancelBtn:        TButton;
-    ListView:         TListView;
-    FilterLbl:        TLabel;
-    FilterEdit:       TEdit;
+    Panel1: TPanel;
+    FilterLbl: TLabel;
+    ListView: TListView;
+    FilterEdit: TEdit;
+    OKBtn: TButton;
+    CancelBtn: TButton;
     procedure         ListViewDblClick(Sender: TObject);
     procedure         FilterEditChange(Sender: TObject);
     procedure         ListViewData(Sender: TObject; Item: TListItem);
@@ -91,7 +92,7 @@ implementation
 
 {$R *.DFM}
 
-uses WinLDAP, Constant, Main, Connection;
+uses WinLDAP, Constant, Main, Connection, SizeGrip;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -119,6 +120,7 @@ end;
 
 procedure TPickupDlg.DoShow;
 begin
+  TSizeGrip.Create(Panel1);
   FillListView;
   FSorter:=TListViewSorter.Create;
   FSorter.ListView:=self.ListView;
@@ -211,7 +213,6 @@ procedure TPickupDlg.ListViewData(Sender: TObject; Item: TListItem);
 var
   i: integer;
   IcoIndex: integer;
-  b: Boolean;
   Entry: TLDapEntry;
 begin
   Entry := TLdapEntry(FShowed[Item.Index]);
@@ -222,7 +223,7 @@ begin
   IcoIndex:=FImageIndex;
   if assigned(FOnGetImageIndex) then FOnGetImageIndex(Entry, IcoIndex);
   if IcoIndex = -1 then
-    (Entry.Session as TConnection).DI.ClassifyLdapEntry(Entry, b, IcoIndex);
+    IcoIndex := (Entry.Session as TConnection).GetImageIndex(Entry);
   Item.ImageIndex := IcoIndex;
 end;
 

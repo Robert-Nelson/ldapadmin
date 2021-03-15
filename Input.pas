@@ -41,7 +41,8 @@ begin
     begin
       AValue := Edit.Text;
       Result := true
-    end
+    end;
+    Free;
   end;
 end;
 

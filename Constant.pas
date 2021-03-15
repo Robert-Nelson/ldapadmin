@@ -19,6 +19,7 @@ const
   bmComputerSel        =  7;
   bmMailGroup          =  9;
   bmMailGroupSel       =  9;
+  bmDelete             = 12;
   bmOu                 = 13;
   bmOuSel              = 13;
   bmTransport          = 15;
@@ -57,6 +58,12 @@ const
   bmConfigurationSel   = 42;
   bmContainer          = 43;
   bmContainerSel       = 43;
+  bmAlias              = 44;
+  bmAliasSel           = 44;
+  bmTemplateEntry      = 45;
+  bmTemplateEntrySel   = 45;
+  bmOverlayTemplate    = 46;
+  bmOverlayDisabled    = 47;
 
   ncDummyNode          = -1;
 
@@ -84,6 +91,8 @@ const
 
   COMBO_HISTORY        = 10;
 
+  ScrollAccMargin  = 40;
+    
 type
   TEditMode            = (EM_ADD, EM_MODIFY);
 
@@ -218,6 +227,7 @@ const
   cHostName         = 'Host Name:';
   cSambaDomain      = 'Samba Domain';
   cEnterPasswd      = 'Enter password';
+  cEnterNewValue    = 'Enter new value:';
   cSearchResults    = 'Search results:';
   cAttribute        = 'Attribute';
   cValue            = 'Value';
@@ -244,6 +254,24 @@ const
   cSaveToLdap       = 'Save to LDAP';
   cAddValue         = 'Add value';
   cEditValue        = 'Edit value';
+  cMore             = 'More...';
+  cOk               = '&OK';
+  cCancel           = '&Cancel';
+
+// Menu captions
+
+  mcNew               = '&New...';
+  mcEntry             = '&Entry...';
+  mcUser              = '&User...';
+  mcComputer          = '&Computer...';
+  mcGroup             = '&Group...';
+  mcMailingList       = '&Mailing list...';
+  mcTransportTable    = '&Transport table...';
+  mcOu                = '&Organizational unit...';
+  mcHost              = '&Host...';
+  mcLocality          = '&Locality...';
+  mcGroupOfUN         = 'Grou&p of unique names...';
+  mcAlias             = 'Alias...';
 
 // Messages
   stUserBreak       = 'User break!';
@@ -268,7 +296,8 @@ const
   stObjnRetrvd      = 'Object not yet retrieved!';
   stSmbDomainReq    = 'You have to select samba domain to which this group should be mapped!';
   stDeleteAll       = '"%s"'#10#13'This directory entry is not empty (it contains further leaves). Delete all recursively?';
-  stDelNamingAttr   = 'You cannot delete the naming value of this entry!';
+  //stDelNamingAttr   = 'You cannot delete the naming value of this entry!';
+  stDelNamingAttr   = 'Attribute %s is the naming value of this entry! Do you want to delete it?';
   stMoveOverlap     = 'Cannot move: Source and destination paths overlap!';
   stAskTreeCopy     = 'Copy %s to %s?';
   stAskTreeMove     = 'Move %s to %s?';
@@ -333,11 +362,18 @@ const
   stScriptNoProc    = 'Procedure "%s" could not be located.';
   stScriptParamType = 'Unsupported parameter type!';
   stScriptSetErr    = 'Could not convert set to integer!';
+  stUnsuppScript    = 'Unsupported script type: ';
   stWritePropRO     = 'Can not write to read only property!';
   stNotEnoughArgs   = 'Not enough arguments!';
   stTooManyArgs     = 'Too many arguments!';
   stEmptyArg        = 'Empty argument!';
   stRequired        = '%s is required!';
+  stInvalidCmdVer   = 'Invalid LDAP version in command line: %s';
+  stDeleteMenuItem  = 'Delete this menu item?';
+  stDeleteSubmenu   = 'Delete this submenu?';
+  stMenuLocateTempl = 'The template "%s" which is assigned to this action could not be located!';
+  stMenuAssignTempl = 'A template name must not be empty!';
+  stDuplicateSC     = 'Shortcut ''%s'' is already assigned to ''%s'' menu item!';
 
 implementation
 

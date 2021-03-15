@@ -225,7 +225,6 @@ begin
     WriteBool(rMwLTEnfContainer, cbEnforceContainer.Checked);
     WriteString(rSearchFilter, edSearch.Text);
     WriteString(rQuickSearchFilter, edQSearch.Text);
-    Delete(CONFIG_PREFIX + '\' + rLocalTransTable);
     s := '';
     with TranscodingTable do
     for i := FixedRows to RowCount - 1 do

@@ -55,7 +55,11 @@ function BindProc(ProcName: string): Pointer;
 begin
   if ActiveDSHandle = 0 then
     LoadLib;
-  Result := GetProcAddress(ActiveDSHandle, @ProcName[1]);
+  {$IFDEF UNICODE}
+  Result := GetProcAddress(ActiveDSHandle, PWideChar(@ProcName[1]));
+  {$ELSE}
+  Result := GetProcAddress(ActiveDSHandle, PAnsiChar(@ProcName[1]));
+  {$ENDIF}
   if not Assigned(Result) then
     raise Exception.Create('Cannot GetProcAddress of ' + ProcName);
 end;

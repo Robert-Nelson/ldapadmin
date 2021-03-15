@@ -57,6 +57,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure CancelBtnClick(Sender: TObject);
     procedure btnRejectedClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
     ObjCount: Integer;
     ErrCount: Integer;
@@ -239,6 +240,11 @@ procedure TImportDlg.btnRejectedClick(Sender: TObject);
 begin
   if OpenDialog.Execute then
     edRejected.Text := OpenDialog.FileName;
+end;
+
+procedure TImportDlg.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  Action := caFree;
 end;
 
 end.

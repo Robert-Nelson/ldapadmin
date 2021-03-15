@@ -1,5 +1,5 @@
   {      LDAPAdmin - Templates.pas
-  *      Copyright (C) 2006-2012 Tihomir Karlovic
+  *      Copyright (C) 2006-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -60,6 +60,7 @@ type
     fControl:     TControl;
     fTemplateAttribute: TTemplateAttribute;
     fLdapAttribute: TLdapAttribute;
+    fLdapSession: TLdapSession;
     fControlIndex: Integer;
     fUseDefaults: Boolean;
     fChangeProc:  TNotifyEvent;
@@ -79,6 +80,7 @@ type
     procedure     OnChangeProc(Sender: TObject);
     procedure     OnExitProc(Sender: TObject);
     procedure     SetParentControl(AControl: TTemplateControl);
+    function      GetLdapSession: TLdapSession;
   protected
     function      GetParams: TStringList; virtual; abstract;
     procedure     SetOnChange(Event: TNotifyEvent); virtual;
@@ -107,6 +109,7 @@ type
     property      OnExit: TNotifyEvent write SetOnExit;
     property      TemplateAttribute: TTemplateAttribute read fTemplateAttribute;
     property      LdapAttribute: TLdapAttribute read fLdapAttribute write SetLdapAttribute;
+    property      LdapSession: TLdapSession read GetLdapSession write fLdapSession;
     property      ParentControl: TTemplateControl read fParentControl write SetParentControl;
     property      Elements: TObjectList read fElements;
     property      AutoSize: Boolean read fAutoSize;
@@ -574,6 +577,7 @@ type
     FObjectclass: TTemplateAttribute;
     FExtends:     TStringList;
     FIcon:        TBitmap;
+    FImageIndex:  Integer;
     function      GetObjectclasses(Index: Integer): string;
     function      GetObjectclassCount: Integer;
   public
@@ -590,6 +594,7 @@ type
     property      Rdn: string read fRdn;
     property      Icon: TBitmap read FIcon;
     property      XmlTree: TxmlTree read fXmlTree;
+    property      ImageIndex: Integer read FImageIndex;
   end;
 
   TTemplateList = class(TList)
@@ -615,18 +620,22 @@ type
   private
     fTemplateFiles: TStringList;
     fExtensionList: TExtensionList;
+    fImageList:   TImageList;
     function      GetTemplate(Index: Integer): TTemplate;
     function      GetCount: Integer;
     procedure     SetCommaPaths(Value: string);
+    procedure     SetImageList(AList: TImageList);
   public
     constructor   Create; virtual;
     destructor    Destroy; override;
     procedure     Clear;
     procedure     AddTemplatePath(Path: string);
+    function      IndexOf(const Name: string): Integer;
     property      Templates[Index: Integer]: TTemplate read GetTemplate;
     property      Count: Integer read GetCount;
     property      Extensions: TExtensionList read fExtensionList;
     property      Paths: string write SetCommaPaths;
+    property      ImageList: TImageList read fImageList write SetImageList;
   end;
 
 var
@@ -776,7 +785,7 @@ begin
   if (XmlType = '') or (XmlType='text/vbscript') then
     Result := TVisualBasicScript.Create
   else
-    raise Exception.Create('Unsupported script type: ' + XmlType);
+    raise Exception.Create(stUnsuppScript + XmlType);
 
   Filename := XmlNode.Attributes.Values['src'];
   if FileName <> '' then
@@ -955,6 +964,16 @@ begin
           Control.Width := Control.Parent.ClientWidth - CT_LEFT_BORDER - CT_RIGHT_BORDER;
         AdjustSizes;
       end;
+end;
+
+function TTemplateControl.GetLdapSession: TLdapSession;
+begin
+  if not Assigned(fLdapSession) then
+  begin
+    if Assigned(fLdapAttribute) and Assigned(fLdapAttribute.Entry) then
+      fLdapSession := fLdapAttribute.Entry.Session;
+  end;
+  Result := fLdapSession;
 end;
 
 procedure TTemplateControl.OnChangeProc(Sender: TObject);
@@ -1564,27 +1583,28 @@ end;
 procedure TTemplateCtrlComboLookupList.SetLdapAttribute(Attribute: TLdapAttribute);
 var
   EntryList: TLdapEntryList;
-  Session: TLdapSession;
+  //Session: TLdapSession;
   i: Integer;
   val, cap: string;
 begin
   inherited;
 
-  if not Assigned(fLdapAttribute) then Exit;
+  {if not Assigned(fLdapAttribute) then Exit;
   try
     Session := Attribute.Entry.Session;
   except
     Session := nil;
   end;
-  if not Assigned(Session) then Exit;
+  if not Assigned(Session) then Exit;}
+  if not Assigned(LdapSession) then Exit;
 
   if fSearchFilter = '' then
     fSearchFilter := sANYCLASS;
   if fBase = '' then
-    fBase := Session.Base;
+    fBase := LdapSession.Base;
   EntryList := TLdapEntryList.Create;
   try
-    Session.Search(fSearchFilter, fBase, fScope, [fDisplayAttribute, fValueAttribute], False, EntryList);
+    LdapSession.Search(fSearchFilter, fBase, fScope, [fDisplayAttribute, fValueAttribute], False, EntryList);
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     try
       if fDisplayAttribute <> '' then
@@ -1740,10 +1760,10 @@ end;
 
 procedure TTemplateCtrlGrid.SetValue(AValue: TTemplateAttributeValue);
 var
-  i: Integer;
+  i, j: Integer;
 begin
-  if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
-    Exit;
+  {if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
+    Exit;}
   with (Control as TStringGrid) do
   begin
     i := RowCount;
@@ -1753,13 +1773,21 @@ begin
         break;
       dec(i);
     end;
-    if i = RowCount then
+
+    for j := 0 to i - 1 do
+      if AnsiCompareText(Cells[0, j], AValue.AsString) = 0 then
+        exit;
+
+    {if i = RowCount then
     begin
       RowCount := RowCount + 1;
       Cells[0, RowCount - 1] := AValue.AsString;
     end
     else
-      Cells[0, i] := AValue.AsString;
+      Cells[0, i] := AValue.AsString;}
+    if i = RowCount then
+      RowCount := RowCount + 1;
+    Cells[0, i] := AValue.AsString;
   end;
   OnChangeProc(Self);
 end;
@@ -2197,7 +2225,7 @@ end;
 function TDateTimePickerFixed.MsgSetDateTime(Value: TSystemTime): Boolean;
 begin
   Result := true;
-  if not fChanging then
+  if Checked and not fChanging then
   begin
     Result := inherited MsgSetDateTime(Value);
     {$IFDEF VER130}
@@ -2211,6 +2239,27 @@ end;
 { TTemplateCtrlDate }
 
 function TTemplateCtrlDate.GetTime(Value: string): TDateTime;
+
+  function ConvertVariant(const Value: string): TDateTime;
+  var
+    aValue: string;
+  begin
+    try
+      Result := VarToDateTime(Value);
+    except
+      on E: EVariantError do
+        { try some common variants }
+        if Length(Value) = 8 then
+        begin
+          aValue := Value;
+          Insert('-', AValue, 7);
+          Insert('-', AValue, 5);
+          Result := VarToDateTime(aValue);
+        end
+        else raise;
+    end;
+  end;
+
 begin
   if Value = '' then
     Result := 0
@@ -2221,7 +2270,7 @@ begin
   if (fDateFormat = FMT_DATE_TIME_GTZ) or (fTimeFormat = FMT_DATE_TIME_GTZ) then
     Result := GTZToDateTime(Value)
   else
-    Result := VarToDateTime(Value);
+    Result := ConvertVariant(Value);
 end;
 
 function TTemplateCtrlDate.GetDisplayFormat: string;
@@ -2524,11 +2573,13 @@ begin
   fDate.OnChange := MyOnChangeProc;
   fDate.ParentControl := Self;
   fDate.Control.Parent := TPanel(Control);
+  fDate.Control.Name := 'date';
 
   fTime := TTemplateCtrltime.Create(Attribute);
   fTime.OnChange := MyOnChangeProc;
   fTime.ParentControl := Self;
   fTime.Control.Parent := TPanel(Control);
+  fTime.Control.Name := 'time';
 
   fDate.Control.Left := CT_LEFT_BORDER;
   fDate.Control.Top := CT_FIX_TOP;
@@ -2545,14 +2596,16 @@ var
   Attr: TLdapAttribute;
   s: string;
 begin
-  if Assigned(fLdapAttribute) and Assigned(fLdapAttribute.Entry) and Assigned(fLdapAttribute.Entry.Session) then
+  //if Assigned(fLdapAttribute) and Assigned(fLdapAttribute.Entry) and Assigned(fLdapAttribute.Entry.Session) then
+  if Assigned(LdapSession) then
   with TPickupDlg.Create(Sender as TControl) do
   try
     Caption := fCaption;
     for i := 0 to High(fColNames) do
       s := s + '"' + fColNames[i] + '"' + ',';
     ColumnNames := s;
-    Populate(fLdapAttribute.Entry.Session, fFilter, fColumns, fBase);
+    //Populate(fLdapAttribute.Entry.Session, fFilter, fColumns, fBase);
+    Populate(LdapSession, fFilter, fColumns, fBase);
     if (ShowModal = mrOK) and Assigned(fDataControl) then
     begin
       Value := TTemplateAttributeValue.Create(nil);
@@ -2769,10 +2822,15 @@ end;
 
 procedure TTemplateCtrlList.SetValue(AValue: TTemplateAttributeValue);
 begin
-  if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
+  {if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
     Exit;
   (Control as TListBox).Items.Add(AValue.AsString);
-  OnChangeProc(Self);
+  OnChangeProc(Self);}
+  if (Control as TListBox).Items.IndexOf(AValue.AsString) = -1 then
+  begin
+    (Control as TListBox).Items.Add(AValue.AsString);
+    OnChangeProc(Self);
+  end;
 end;
 
 function TTemplateCtrlList.GetLineCount: Integer;
@@ -3075,7 +3133,8 @@ var
     if action <> '' then
       AssignAction(btn, action);
     Ctrl.Load(Node);
-    fBrowseBtn.fDataControlName := ''; // prevent user from redirecting the control
+    {if Assigned(fBrowseBtn) then
+      fBrowseBtn.fDataControlName := ''; // prevent user from redirecting the control}
 
     if btn.Width > fMaxBtnWidth then
       fMaxBtnWidth := btn.Width;
@@ -3110,6 +3169,11 @@ begin
       LoadButtons(XmlNode[i]);
   fList.LoadProc(XmlNode);
   fList.Control.Top := fMargin;
+  { Instead of the panel, make the list accessible by the assigned name }
+  fList.fName := fName;
+  fControl.Name := fName + 'Panel';
+  fList.Control.Name := fName;
+  fName := fName + 'Panel';
   ArrangeBox;
   ArrangeButtons;
   MyOnButtonProc(nil);
@@ -3147,6 +3211,7 @@ begin
   fBtnHeight := 25;
   fMargin := CT_SPACING;
 
+  TPanel(fControl).Height := 2 * fMargin + fList.Control.Height + fBtnHeight;
 end;
 
 { TTemplateList }
@@ -3280,6 +3345,9 @@ var
   begin
     try
       Template := TTemplate.Create(name);
+      if Assigned (FImageList) then with Template do
+        if Assigned(Icon) then
+          fImageIndex := FImageList.AddMasked(Icon, Icon.TransparentColor);
     except
       on E:EXmlException do
       begin
@@ -3308,6 +3376,13 @@ begin
   end;
 end;
 
+function TTemplateParser.IndexOf(const Name: string): Integer;
+begin
+  for Result := 0 to Count - 1 do
+    if AnsiCompareText(GetTemplate(Result).Name, Name) = 0 then Exit;
+  Result := -1;
+end;
+
 function TTemplateParser.GetTemplate(Index: Integer): TTemplate;
 begin
   Result := fTemplateFiles.Objects[Index] as TTemplate;
@@ -3334,6 +3409,24 @@ begin
     List.Free;
   end;
 end;
+
+procedure TTemplateParser.SetImageList(AList: TImageList);
+var
+  i: Integer;
+begin
+  fImageList := AList;
+  if Assigned(fImageList) then
+  begin
+    for i := 0 to Count - 1 do with Templates[i] do
+      if Assigned(Icon) then
+        fImageIndex := AList.AddMasked(Icon, Icon.TransparentColor);
+  end
+  else begin
+    for i := 0 to Count - 1 do with Templates[i] do
+      fImageIndex := -1;
+  end;
+end;
+
 
 { TTemplate }
 
@@ -3390,6 +3483,7 @@ var
 
 begin
   inherited Create;
+  FImageIndex := -1;
   FAutoArrange := true;
   FFileName:=AFileName;
   FExtends := TStringList.Create;

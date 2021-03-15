@@ -119,6 +119,25 @@ uses Graphics, Misc, LAControls;
 procedure TInplaceAttribute.SubClassWndProc(var Message: TMessage);
 var
   KeyState: TKeyboardState;
+
+  procedure Scroll(Down: Boolean);
+  var
+    Param: WPARAM;
+  begin
+    if not Assigned(Owner) then
+      exit;
+    if fControl is TMemo then
+    begin
+      if Down then
+        Param := SB_PAGEDOWN
+      else
+        Param := SB_PAGEUP;
+      SendMessage((Owner as TStringGrid).Handle, WM_VSCROLL, Param, 0);
+    end
+    else
+      WndProc(Message);
+  end;
+  
 begin
   with Message do
   case Msg of
@@ -129,11 +148,7 @@ begin
         GetKeyboardState(KeyState);
         fBackPaddle := KeyState[VK_SHIFT] and $80 <> 0;
       end;
-    {CM_MOUSEWHEEL:
-      begin
-        TabExit := true;
-        Backpaddle := WParam > 0;
-      end}
+    CM_MOUSEWHEEL: Scroll(WParam > 0);
   else
     WndProc(Message);
   end;

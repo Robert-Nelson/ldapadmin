@@ -5,7 +5,9 @@
   *
   *      Changes: Removed Compat Support - T.Karlovic 25.05.2011
   *               Removed FakeAccount    - T.Karlovic 11.06.2012
-  *               Unicode Support        - T:karlovic 11.06.2012
+  *               Unicode Support        - T.Karlovic 11.06.2012
+  *               TRegistryConfigStorage.Delete and
+  *               TConfig.Delete         - T.Karlovic 09.11.2012
   *
   * This file is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published by
@@ -407,7 +409,7 @@ end;
 
 procedure TConfig.Delete(const Ident: string);
 begin
-  if FStorage<>nil then FStorage.Delete(Ident);
+  if FStorage<>nil then FStorage.Delete(FRootPath+Norm(Ident));
   FChanged:=true;
 end;
 
@@ -1068,8 +1070,41 @@ begin
 end;
 
 procedure TRegistryConfigStorage.Delete(Ident: string);
+var
+  s, parent, value: string;
+
+  procedure SplitPath(const s: string; out ParentKey, ValueName: string);
+  var
+    l, i: Integer;
+  begin
+    i := Length(S);
+    l := i;
+    while i > 1 do begin
+      if S[i - 1] = '\' then
+        break;
+      dec(i);
+    end;
+    ParentKey := System.Copy(S, 1, i - 1);
+    ValueName := System.Copy(S, i, l - i + 1);
+  end;
+
 begin
-  FRegistry.DeleteKey(FRootPath+Norm(Ident));
+  s := FRootPath+Norm(Ident);
+  { is it key or value? }
+  with FRegistry do
+    if OpenKey(s, false) then
+    begin
+      CloseKey;
+      DeleteKey(s);
+    end
+    else begin
+      SplitPath(s, parent, value);
+      if OpenKey(parent, false) then
+      begin
+        DeleteValue(value);
+        CloseKey;
+      end;
+  end;
 end;
 
 procedure TRegistryConfigStorage.GetKeyNames(Parent: string; var Result: TStrings);

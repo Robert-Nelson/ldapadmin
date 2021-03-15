@@ -1,5 +1,5 @@
   {      LDAPAdmin - Dsml.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -57,6 +57,23 @@ var
   OC: TLdapAttribute;
   Node: TxmlNode;
 
+  function EncodeXmlString(const s: string): string;
+  var
+    i: Integer;
+  begin
+    Result := '';
+    for i := 1 to Length(s) do
+      case s[i] of
+        '"':  Result := Result + '&quot;';
+        '&':  Result := Result + '&amp;';
+        '''': Result := Result + '&apos;';
+        '<':  Result := Result + '&lt;';
+        '>':  Result := Result + '&gt;';
+      else
+        Result := Result + s[i]
+      end;
+  end;
+
   procedure XmlAddValue(Node: TXmlNode; Value: TLdapAttributeData);
   var
     v: string;
@@ -68,7 +85,7 @@ var
       Node.Attributes.Add('encoding=base64');
     end
     else
-      v := Value.AsString;
+      v := EncodeXmlString(Value.AsString);
     Node.Add('value', v);
   end;
 

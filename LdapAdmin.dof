@@ -59,8 +59,8 @@ RootDir=
 IncludeVerInfo=1
 AutoIncBuild=0
 MajorVer=1
-MinorVer=4
-Release=1
+MinorVer=5
+Release=0
 Build=0
 Debug=0
 PreRelease=0
@@ -72,7 +72,7 @@ CodePage=1252
 [Version Info Keys]
 CompanyName=
 FileDescription=
-FileVersion=1.4.1.0
+FileVersion=1.5.0.0
 InternalName=
 LegalCopyright=
 LegalTrademarks=
@@ -80,9 +80,3 @@ OriginalFilename=
 ProductName=
 ProductVersion=1.4.0
 Comments=
-[HistoryLists\hlUnitAliases]
-Count=1
-Item0=WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;
-[HistoryLists\hlSearchPath]
-Count=1
-Item0=.\declib

@@ -297,14 +297,12 @@ end;
 procedure TSamba3Account.SetDomainRec(pdr: PDomainRec);
 begin
   pDomainData := pdr;
-  //if Assigned(pDomaindata) then
   if fNew and Assigned(pDomaindata) then
   begin
     SetString(eSambaDomainName, pDomainData^.DomainName);
     if not fPosixAccount.IsNull(eUidNumber) then
       SetSid(UidNumber);
     if IsNull(eSambaPrimaryGroupSID) and not fPosixAccount.IsNull(eGidNumber) then
-      //SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * GidNumber + 1001]));
       SetGidNumber(fPosixAccount.GidNumber)
   end;
 end;

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Connection.pas
-  *      Copyright (C) 2012 Tihomir Karlovic
+  *      Copyright (C) 2012-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,7 +23,63 @@ unit Connection;
 
 interface
 
-uses Config, Sorter, Schema, LdapClasses, Controls;
+uses Config, Sorter, Schema, LdapClasses, CustomMenus, Controls, Templates,
+     Constant;
+
+const
+  { Posix objects }
+  oidUnknown           = -1;
+  oidEntry             = 0;
+  oidRoot              = oidEntry + 1;
+  oidPosixUser         = oidRoot + 1;
+  oidSambaUser         = oidPosixUser + 1;
+  oidComputer          = oidSambaUser + 1;
+  oidGroup             = oidComputer + 1;
+  oidSambaGroup        = oidGroup + 1;
+  oidMailGroup         = oidSambaGroup + 1;
+  oidTransportTable    = oidMailGroup + 1;
+  oidOU                = oidTransportTable + 1;
+  oidHost              = oidOU + 1;
+  oidLocality          = oidHost + 1;
+  oidGroupOfUN         = oidLocality + 1;
+  oidAlias             = oidGroupOfUN + 1;
+  oidSudoer            = oidAlias + 1;
+  oidSambaDomain       = oidSudoer + 1;
+  oidIdPool            = oidSambaDomain + 1;
+  { AD objects }
+  oidAdUser            = oidIdPool + 1;
+  oidADContainer       = oidAdUser + 1;
+  oidADGroup           = oidADContainer + 1;
+  oidADClassSchema     = oidADGroup + 1;
+  oidADAttributeSchema = oidADClassSchema + 1;
+  oidADSchema          = oidADAttributeSchema + 1;
+  oidADConfiguration   = oidADSchema + 1;
+
+  ObjectIdToImage: array[oidEntry..oidADConfiguration] of Integer = (
+                    bmEntry,
+                    bmRoot,
+                    bmPosixUser,
+                    bmSamba3User,
+                    bmComputer,
+                    bmGroup,
+                    bmSambaGroup,
+                    bmMailGroup,
+                    bmTransport,
+                    bmOU,
+                    bmHost,
+                    bmLocality,
+                    bmGrOfUnqNames,
+                    bmAlias,
+                    bmSudoer,
+                    bmSambaDomain,
+                    bmIdPool,
+                    bmSamba3USer,
+                    bmContainer,
+                    bmADGroup,
+                    bmClassSchema,
+                    bmAttributeSchema,
+                    bmSchema,
+                    bmConfiguration);
 
 type
 
@@ -32,104 +88,83 @@ type
   TConnection = class;
 
   IDirectoryIdentity = Interface
-    procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-    function  SupportedPropertyObjects(const Index: Integer): Boolean;
-    function  NewProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
-    function  EditProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
+    function  ClassifyLdapEntry(Entry: TLdapEntry): Integer;
+    function  NewProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
+    function  EditProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
     function  ChangePassword(Entry: TLdapEntry): Boolean;
-    //function  IsContainer(Entry: TLdapEntry; Index: Integer): Boolean;
+    function  IsContainer(Index: Integer): Boolean;
+    function  CreateMenu: TCustomActionMenu;
   end;
 
   TConnection = class(TLdapSession)
   private
-    FAccount: TAccount;
-    FLVSorter: TListViewSorter;
-    FSchema: TLdapSchema;
-    FSelected: string;
+    FAccount:   TAccount;
+    FLVSorter:  TListViewSorter;
+    FSchema:    TLdapSchema;
+    FSelected:  string;
     FDirectoryIdentity: IDirectoryIdentity;
-    function GetDirectoryType: TDirectoryType;
-    function GetDirectoryIdentity: IDirectoryIdentity;
-    function GetSchema: TLdapSchema;
-    function GetFreeRandomNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
-    function GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+    FActionMenu: TCustomActionMenu;
+    function    GetDirectoryType: TDirectoryType;
+    function    GetDirectoryIdentity: IDirectoryIdentity;
+    function    GetActionMenu: TCustomActionMenu;
+    function    GetSchema: TLdapSchema;
+    function    GetFreeRandomNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+    function    GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
   public
     constructor Create(Account: TAccount);
-    destructor Destroy; override;
-    function GetFreeUidNumber(const MinUid, MaxUID: Integer; const Sequential: Boolean): Integer;
-    function GetFreeGidNumber(const MinGid, MaxGid: Integer; const Sequential: Boolean): Integer;
-    function GetUid: Integer;
-    function GetGid: Integer;
-    property Account: TAccount read FAccount;
-    property LVSorter: TListViewSorter read FLVSorter write FLVSorter;
-    property Schema: TLdapSchema read GetSchema;
-    property Selected: string read FSelected write FSelected;
-    property DirectoryType: TDirectoryType read GetDirectoryType;
-    property DI: IDirectoryIdentity read GetDirectoryIdentity;
+    destructor  Destroy; override;
+    function    GetObjectId(Entry: TLdapEntry): Integer;
+    function    GetImageIndex(Entry: TLdapEntry): Integer;
+    function    GetFreeUidNumber(const MinUid, MaxUID: Integer; const Sequential: Boolean): Integer;
+    function    GetFreeGidNumber(const MinGid, MaxGid: Integer; const Sequential: Boolean): Integer;
+    function    GetUid: Integer;
+    function    GetGid: Integer;
+    property    Account: TAccount read FAccount;
+    property    LVSorter: TListViewSorter read FLVSorter write FLVSorter;
+    property    Schema: TLdapSchema read GetSchema;
+    property    Selected: string read FSelected write FSelected;
+    property    DirectoryType: TDirectoryType read GetDirectoryType;
+    property    DI: IDirectoryIdentity read GetDirectoryIdentity;
+    property    ActionMenu: TCustomActionMenu read GetActionMenu;
   end;
-
-procedure InitTemplateIcons(ImageList: TImageList);
 
 var
   UseTemplateImages: Boolean;
 
 implementation
 
-uses SysUtils, WinLdap, Constant, User, Host, Locality, Computer, Group,
-     MailGroup, Transport, Ou, Classes, Templates, PassDlg, ADPassDlg;
-
-var
-  TemplateIcons: TList;
-  IconIndexBase: Integer;
-
-procedure InitTemplateIcons(ImageList: TImageList);
-var
-  i: Integer;
-begin
-  if Assigned(TemplateIcons) then exit;
-  IconIndexBase := ImageList.Count;
-  TemplateIcons := TList.Create;
-  for i := 0 to TemplateParser.Count - 1 do
-    if Assigned(TemplateParser.Templates[i].Icon) then
-    begin
-      TemplateIcons.Add(TemplateParser.Templates[i]);
-      ImageList.AddMasked(TemplateParser.Templates[i].Icon, TemplateParser.Templates[i].Icon.TransparentColor);
-    end;
-end;
-
-function GetTemplateIconIndex(ObjectClass: TLdapAttribute): Integer;
-var
-  i: Integer;
-begin
-  Result := -1;
-  for i := 0 to TemplateIcons.Count - 1 do
-    if TTemplate(TemplateIcons[i]).Matches(ObjectClass) then
-    begin
-      Result := i;
-      break;
-    end;
-end;
+uses SysUtils, WinLdap, User, Host, Locality, Computer, Group, {TemplateCtrl,}
+     MailGroup, Transport, Ou, Classes, PassDlg, ADPassDlg, Alias;
 
 { IDirectoryIdentity }
 
 type
-  TPosixDirectoryIdentity = class(TInterfacedObject, IDirectoryIdentity)
+  TCustomDirectoryIdentity = class(TInterfacedObject)
+  private
+    FConnection: TConnection;
   public
-    procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-    function  SupportedPropertyObjects(const Index: Integer): Boolean;
-    function  NewProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
-    function  EditProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
-    function  ChangePassword(Entry: TLdapEntry): Boolean;
-    //function  IsContainer(Entry: TLdapEntry; Index: Integer): Boolean;
+    constructor Create(Connection: TConnection);
+    property    Connection: TConnection read FConnection;
   end;
 
-  TADDirectoryIdentity = class(TInterfacedObject, IDirectoryIdentity)
+  TPosixDirectoryIdentity = class(TCustomDirectoryIdentity, IDirectoryIdentity)
   public
-    procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-    function  SupportedPropertyObjects(const Index: Integer): Boolean;
-    function  NewProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
-    function  EditProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
+    function  ClassifyLdapEntry(Entry: TLdapEntry): Integer;
+    function  NewProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
+    function  EditProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
     function  ChangePassword(Entry: TLdapEntry): Boolean;
-    //function  IsContainer(Entry: TLdapEntry; Index: Integer): Boolean;
+    function  IsContainer(Index: Integer): Boolean;
+    function  CreateMenu: TCustomActionMenu;
+  end;
+
+  TADDirectoryIdentity = class(TCustomDirectoryIdentity, IDirectoryIdentity)
+  public
+    function  ClassifyLdapEntry(Entry: TLdapEntry): Integer;
+    function  NewProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
+    function  EditProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
+    function  ChangePassword(Entry: TLdapEntry): Boolean;
+    function  IsContainer(Index: Integer): Boolean;
+    function  CreateMenu: TCustomActionMenu;
   end;
 
 function TConnection.GetDirectoryType: TDirectoryType;
@@ -155,12 +190,19 @@ begin
   if not Assigned(FDirectoryIdentity) then
   begin
     case DirectoryType of
-      dtActiveDirectory: fDirectoryIdentity := TADDirectoryIdentity.Create;
+      dtActiveDirectory: fDirectoryIdentity := TADDirectoryIdentity.Create(Self);
     else
-      fDirectoryIdentity := TPosixDirectoryIdentity.Create;
+      fDirectoryIdentity := TPosixDirectoryIdentity.Create(Self);
     end;
   end;
   Result := FDirectoryIdentity;
+end;
+
+function TConnection.GetActionMenu: TCustomActionMenu;
+begin
+  if not Assigned(FActionMenu) then
+    FActionMenu := DI.CreateMenu;
+  Result := FActionMenu;
 end;
 
 constructor TConnection.Create(Account: TAccount);
@@ -172,9 +214,29 @@ end;
 
 destructor TConnection.Destroy;
 begin
+  FActionMenu.Free;
   FSchema.Free;
   FLVSorter.Free;
   inherited;
+end;
+
+function TConnection.GetObjectId(Entry: TLdapEntry): Integer;
+begin
+  Result := DI.ClassifyLdapEntry(Entry);
+end;
+
+function TConnection.GetImageIndex(Entry: TLdapEntry): Integer;
+var
+  i: Integer;
+begin
+  Result := ObjectIdToImage[GetObjectId(Entry)];
+  if (Result = bmEntry) and UseTemplateImages then
+    for i := 0 to TemplateParser.Count - 1 do with TemplateParser.Templates[i] do
+      if (ImageIndex <> -1 ) and Matches(Entry.ObjectClass) then
+      begin
+        Result := ImageIndex;
+        break;
+      end;
 end;
 
 { Get random free uidNumber from the pool of available numbers, return -1 if
@@ -281,9 +343,16 @@ begin
                                IdType = POSIX_ID_SEQUENTIAL);
 end;
 
+{ TCustomDirectoryIdentity }
+
+constructor TCustomDirectoryIdentity.Create(Connection: TConnection);
+begin
+  FConnection := Connection;
+end;
+
 { TPosixDirectoryIDentity }
 
-procedure TPosixDirectoryIdentity.ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
+function TPosixDirectoryIdentity.ClassifyLdapEntry(Entry: TLdapEntry): Integer;
 var
   Attr: TLdapAttribute;
   i: integer;
@@ -298,148 +367,91 @@ var
   end;
 
 begin
-  Container := true;
-  ImageIndex := bmEntry;
-  Attr := Entry.AttributesByName['objectclass'];
+  Result := oidEntry;
+  Attr := Entry.Objectclass;
   i := Attr.ValueCount - 1;
   while i >= 0 do
   begin
     s := lowercase(Attr.Values[i].AsString);
     if s = 'organizationalunit' then
-      ImageIndex := bmOu
+      Result := oidOu
     else if s = 'posixaccount' then
     begin
-      if ImageIndex = bmEntry then // if not yet assigned to Samba account
-      begin
-        ImageIndex := bmPosixUser;
-        Container := false;
-      end;
+      if Result = oidEntry then // if not yet assigned to Samba account
+        Result := oidPosixUser;
     end
     else if s = 'sambasamaccount' then
     begin
       if IsComputer(Entry.dn) then             // it's samba computer account
-        ImageIndex := bmComputer               // else
+        Result := oidComputer               // else
       else                                     // it's samba user account
-        ImageIndex := bmSamba3User;
-      Container := false;
+        Result := oidSambaUser;
     end
     else if s = 'sambagroupmapping' then
-    begin
-      ImageIndex := bmSambaGroup;
-      Container := false;
-    end
+      Result := oidSambaGroup
     else if s = 'mailgroup' then
-    begin
-      ImageIndex := bmMailGroup;
-      Container := false;
-    end
+      Result := oidMailGroup
     else if s = 'posixgroup' then
     begin
-      if ImageIndex = bmEntry then // if not yet assigned to Samba group
-      begin
-        ImageIndex := bmGroup;
-        Container := false;
-      end;
+      if Result = oidEntry then // if not yet assigned to Samba group
+        Result := oidGroup;
     end
     else if s = 'groupofuniquenames' then
-    begin
-      ImageIndex := bmGrOfUnqNames;
-      Container := false;
-    end
+      Result := oidGroupOfUN
+    else if s = 'alias' then
+      Result := oidAlias
     else if s = 'transporttable' then
-    begin
-      ImageIndex := bmTransport;
-      Container := false;
-    end
+      Result := oidTransportTable
     else if s = 'sudorole' then
-    begin
-      ImageIndex := bmSudoer;
-      Container := false;
-    end
+      Result := oidSudoer
     else if s = 'iphost' then
-    begin
-      ImageIndex := bmHost;
-      Container := false;
-    end
+      Result := oidHost
     else if s = 'locality' then
-      ImageIndex := bmLocality
+      Result := oidLocality
     else if s = 'sambadomain' then
-    begin
-      ImageIndex := bmSambaDomain;
-      Container := false;
-    end
+      Result := oidSambaDomain
     else if s = 'sambaunixidpool' then
-    begin
-      ImageIndex := bmIdPool;
-      //Container := false;
-    end;
+      Result := oidIdPool;
     Dec(i);
   end;
-  if (UseTemplateImages) and (ImageIndex = bmEntry) then
-  begin
-    i := GetTemplateIconIndex(Attr);
-    if i <> -1 then
-      ImageIndex := i + IconIndexBase;
-  end;
 end;
 
-function TPosixDirectoryIdentity.SupportedPropertyObjects(const Index: Integer): Boolean;
+function  TPosixDirectoryIdentity.NewProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
 begin
+  Result := true;
   case Index of
-    bmSamba2User,
-    bmSamba3User,
-    bmPosixUser,
-    bmGroup,
-    bmSambaGroup,
-    bmGrOfUnqNames,
-    bmMailGroup,
-    bmComputer,
-    bmTransport,
-    bmOu,
-    bmLocality,
-    bmHost: Result := true;
+    aidUser:           TUserDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidComputer:       TComputerDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidGroup:          TGroupDlg.Create(Owner, dn, Connection, EM_ADD, true, Connection.Account.ReadInteger(rPosixGroupOfUnames, 0)).ShowModal;
+    aidMailingList:    TMailGroupDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidTransportTable: TTransportDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidOU:             TOuDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidHost:           THostDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidLocality:       TLocalityDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidGroupOfUN:      TGroupDlg.Create(Owner, dn, Connection, EM_ADD, false, 1).ShowModal;
+    aidAlias:          TAliasDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
   else
     Result := false;
   end;
 end;
 
-function  TPosixDirectoryIdentity.NewProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
+function TPosixDirectoryIdentity.EditProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
 begin
   Result := true;
   case Index of
-    2: TUserDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    3: TComputerDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    4: TGroupDlg.Create(Owner, dn, Connection, EM_ADD, true, Connection.Account.ReadInteger(rPosixGroupOfUnames, 0)).ShowModal;
-    5: TMailGroupDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    6: TTransportDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    7: TOuDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    8: THostDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    9: TLocalityDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-   10: TGroupDlg.Create(Owner, dn, Connection, EM_ADD, false, 1).ShowModal;
+    aidUser:            TUserDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidGroup,
+    aidGroupOfUn:       TGroupDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidMailingList:     TMailGroupDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidComputer:        TComputerDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidTransportTable:  TTransportDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidOu:              TOuDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidLocality:        TLocalityDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidHost:            THostDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    aidAlias:           TAliasDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
   else
     Result := false;
   end;
-end;
-
-function TPosixDirectoryIdentity.EditProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
-begin
-  Result := true;
-    case Index of
-      bmSamba2User,
-      bmSamba3User,
-      bmPosixUser:    TUserDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmGroup,
-      bmSambaGroup,
-      bmGrOfUnqNames: TGroupDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmMailGroup:    TMailGroupDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmComputer:     TComputerDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmTransport:    TTransportDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmOu:           TOuDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmLocality:     TLocalityDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmHost:         THostDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-    else
-      Result := false;
-    end;
 end;
 
 function TPosixDirectoryIdentity.ChangePassword(Entry: TLdapEntry): Boolean;
@@ -458,108 +470,81 @@ begin
   end;
 end;
 
-{function TPosixDirectoryIdentity.IsContainer(Entry: TLdapEntry; Index: Integer): Boolean;
+function TPosixDirectoryIdentity.IsContainer(Index: Integer): Boolean;
 begin
-  Result := Index in [bmOu, bmLocality, bmEntry, bmRoot];
-end;}
+  Result := Index in [oidOu, oidLocality, oidEntry, oidRoot];
+end;
+
+function TPosixDirectoryIdentity.CreateMenu: TCustomActionMenu;
+begin
+  Result := TPosixActionMenu.Create(Connection.Account);
+end;
 
 { TADDirectoryIdentity }
 
-procedure TADDirectoryIdentity.ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
+function TADDirectoryIdentity.ClassifyLdapEntry(Entry: TLdapEntry): Integer;
 var
   Attr: TLdapAttribute;
   i: integer;
   s: string;
 begin
-  Container := true;
-  ImageIndex := bmEntry;
-  Attr := Entry.AttributesByName['objectclass'];
+  Result := oidEntry;
+  Attr := Entry.ObjectClass;
   i := Attr.ValueCount - 1;
   while i >= 0 do
   begin
     s := lowercase(Attr.Values[i].AsString);
     if s = 'organizationalunit' then
-      ImageIndex := bmOu
+      Result := oidOu
     else if s = 'container' then
-      ImageIndex := bmContainer
+      Result := oidADContainer
     else if s = 'user' then
     begin
-      if ImageIndex = bmEntry then // if not yet assigned to computer account
-      begin
-        ImageIndex := bmADUser;
-        Container := false;
-      end;
+      if Result = oidEntry then // if not yet assigned to computer account
+        Result := oidADUser;
     end
     else
     if s = 'computer' then
-    begin
-      ImageIndex := bmComputer;
-      Container := false;
-    end
+      Result := oidComputer
     else if s = 'group' then
-    begin
-      ImageIndex := bmADGroup;
-      Container := false;
-    end
+      Result := oidADGroup
     else if s = 'locality' then
-      ImageIndex := bmLocality
+      Result := oidLocality
     else if s = 'configuration' then
-      ImageIndex := bmConfiguration
+      Result := oidADConfiguration
     else if s = 'classschema' then
-    begin
-      ImageIndex := bmClassSchema;
-      Container := false;
-    end
+      Result := oidADClassSchema
     else if s = 'attributeschema' then
-    begin
-      ImageIndex := bmAttributeSchema;
-      Container := false;
-    end
+      Result := oidADAttributeSchema
     else if (s = 'dmd') or (s = 'subschema') then
-      ImageIndex := bmSchema;
+      Result := oidADSchema;
     Dec(i);
   end;
-  if (UseTemplateImages) and (ImageIndex = bmEntry) then
-  begin
-    i := GetTemplateIconIndex(Attr);
-    if i <> -1 then
-      ImageIndex := i + IconIndexBase;
-  end;
+
 end;
 
-function TADDirectoryIdentity.SupportedPropertyObjects(const Index: Integer): Boolean;
+function  TADDirectoryIdentity.NewProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
 begin
+  Result := true;
   case Index of
-    bmOu,
-    bmHost,
-    bmLocality: Result := true;
+    aidOu:       TOuDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidHost:     THostDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    aidLocality: TLocalityDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
   else
     Result := false;
   end;
 end;
 
-function  TADDirectoryIdentity.NewProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
+function TADDirectoryIdentity.EditProperty(Owner: TControl; const Index: Integer; const dn: string): Boolean;
 begin
   Result := true;
   case Index of
-    7: TOuDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    8: THostDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
-    9: TLocalityDlg.Create(Owner, dn, Connection, EM_ADD).ShowModal;
+    oidOu:           TOuDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    oidLocality:     TLocalityDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
+    oidHost:         THostDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
   else
     Result := false;
   end;
-end;
-
-function TADDirectoryIdentity.EditProperty(Owner: TControl; Connection: TConnection; const Index: Integer; const dn: string): Boolean;
-begin
-  Result := true;
-    case Index of
-      bmOu:           TOuDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmLocality:     TLocalityDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-      bmHost:         THostDlg.Create(Owner, dn, Connection, EM_MODIFY).ShowModal;
-    else
-      Result := false;
-    end;
 end;
 
 function TADDirectoryIdentity.ChangePassword(Entry: TLdapEntry): Boolean;
@@ -572,17 +557,14 @@ begin
   end;
 end;
 
-{function TADDirectoryIdentity.IsContainer(Entry: TLdapEntry; Index: Integer): Boolean;
+function TADDirectoryIdentity.IsContainer(Index: Integer): Boolean;
 begin
-  Result := Entry.AttributesByName['objectclass'].IndexOf('container') <> -1;
-end;}
+  Result := Index in [oidOu, oidLocality, oidEntry, oidRoot, oidADContainer, oidADConfiguration, oidADSchema];
+end;
 
-initialization
-
-  TemplateIcons := nil;
-
-finalization
-
-  TemplateIcons.Free;
+function TADDirectoryIdentity.CreateMenu: TCustomActionMenu;
+begin
+  Result := TADActionMenu.Create(Connection.Account);
+end;
 
 end.

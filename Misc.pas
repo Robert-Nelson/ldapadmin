@@ -23,7 +23,8 @@ unit Misc;
 
 interface
 
-uses LdapClasses, Classes, SysUtils, Windows, Forms, Dialogs, Controls;
+uses LdapClasses, Classes, SysUtils, Windows, Forms, Dialogs, Controls,
+     ExtCtrls, ComCtrls;
 
 type
   TStreamProcedure = procedure(Stream: TStream) of object;
@@ -48,7 +49,7 @@ function  FormatMemoOutput(const Text: string): string;
 function  FileReadString(const FileName: TFileName): String;
 procedure FileWriteString(const FileName: TFileName; const Value: string);
 { URL handling routines }
-procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
+procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port, version: integer; var auth: TLdapAuthMethod);
 { Some handy dialogs }
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
@@ -59,7 +60,8 @@ procedure StreamCopy(pf, pt: TStreamProcedure);
 procedure LockControl(c: TWinControl; bLock: Boolean);
 function  PeekKey: Integer;
 procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
-function CreateComponent(const ClassName: string; Owner: TComponent): TComponent;
+function  CreateComponent(const ClassName: string; Owner: TComponent): TComponent;
+procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
 
 const
   mrCustom   = 1000;
@@ -68,8 +70,7 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF},
-     ExtCtrls, ComCtrls;
+uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF};
 
 { String conversion routines }
 
@@ -293,20 +294,17 @@ begin
   path:=AURL;
 end;
 
-procedure ParseRFCURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
+procedure ParseRFCURL(const URL: string; var proto, user, password, host, path: string; var port, version: integer; var auth: TLdapAuthMethod);
 var
   n1, n2: integer;
   AUrl: string;
   p: PChar;
   Extensions: TStringList;
 
-  //{$DEFINE UTF8}
-  function UnpackString(const Src: string): string;
+  function DecodeURL(const Src: string): string;
   var
     p, p1: PChar;
-  {$IFDEF UTF8}
     rg: string;
-  {$ENDIF}
   begin
     Result := '';
     p := PChar(Src);
@@ -317,17 +315,11 @@ var
         p := CharNext(p);
         p1 := CharNext(p);
         p1 := CharNext(p1);
-  {$IFDEF UTF8}
         SetString(rg, p, p1 - p);
         Result := Result + Char(StrToInt('$' + rg));
       end
       else
         Result := Result + p^;
-  {$ELSE}
-        HexToBin(p, p, p1-p);
-      end;
-      Result := Result + p^;
-  {$ENDIF}
       p := p1;
     end;
   end;
@@ -341,8 +333,8 @@ var
       Extensions := TStringList.Create;
       with Extensions do begin
         CommaText := ExtStr;
-        user := UnpackString(Values['bindname']);
-        password := UnpackString(Values['password']);
+        user := DecodeURL(Values['bindname']);
+        password := DecodeURL(Values['password']);
         val := Values['auth'];
         if (val='') or (val='simple') then
           auth := AUTH_SIMPLE
@@ -358,6 +350,16 @@ var
         end
         else
           raise Exception.Create(Format(stUnsupportedAuth, [val]));
+        val := Values['version'];
+        if val <> '' then
+        try
+          version := StrToInt(val);
+        except
+          on E: EConvertError do
+            raise Exception.CreateFmt(stInvalidCmdVer, [val]);
+          else
+            raise;
+        end;
       end;
     finally
       Extensions.Free;
@@ -365,7 +367,7 @@ var
   end;
 
 begin
-  //URL format <proto>://[host[:port]]/<dn>?[bindname=[username]][,password=[password]][,auth=[plain|gss|sasl]]
+  //URL format <proto>://[host[:port]]/<dn>?[bindname=[username]][,password=[password]][,auth=[plain|gss|sasl]][,version=n]
 
   AUrl:=Url;
   n1:=pos('://',AURL);
@@ -393,21 +395,21 @@ begin
   Delete(AURL,1,n1);
   n1:=pos('?',AURL);
   if n1=0 then
-    path:=UnpackString(AURL)
+    path:=DecodeURL(AURL)
   else begin
-    path := UnpackString(Copy(AURL,1,n1-1));
+    path := DecodeURL(Copy(AURL,1,n1-1));
     p := StrRScan(@AURL[n1], '?');
     p := CharNext(p);
     ParseExtensions(p);
   end;
 end;
 
-procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
+procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port, version: integer; var auth: TLdapAuthMethod);
 begin
   if Pos('@',URL) > 0 then // old LdapAdmin style
     ParseLAURL(URL, proto, user, password, host, path, port)
   else
-    ParseRFCURL(URL, proto, user, password, host, path, port, auth);
+    ParseRFCURL(URL, proto, user, password, host, path, port, version, auth);
 end;
 
 function HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
@@ -799,6 +801,63 @@ const
 
 begin
   Result := TComponentClass(ClassByName(ClassName)).Create(Owner);
+end;
+
+{procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
+var
+  Pt: TPoint;
+begin
+  GetCursorPos(pt);
+  pt := TreeView.ScreenToClient(pt);
+  if (pt.y < -ScrollAccMargin) or (pt.y > TreeView.ClientHeight + ScrollAccMargin) then
+  begin
+    if ScrollTimer.Interval <> 10 then
+      ScrollTimer.Interval := 10 // accelerate
+  end
+  else begin
+    if ScrollTimer.Interval <> 100 then
+      ScrollTimer.Interval := 100 // deccelerate
+  end;
+  if pt.y < 0 then
+    SendMessage(TreeView.Handle, WM_VSCROLL, SB_LINEUP, 0)
+  else
+  if pt.y > TreeView.ClientHeight then
+    SendMessage(TreeView.Handle, WM_VSCROLL, SB_LINEDOWN, 0);
+end;}
+
+procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
+var
+  ct, pt: TPoint;
+  Param: LParam;
+begin
+  GetCursorPos(ct);
+  pt := TreeView.ScreenToClient(ct);
+  if (pt.y < -ScrollAccMargin) or (pt.y > TreeView.ClientHeight + ScrollAccMargin) then
+  begin
+    if ScrollTimer.Interval <> 10 then
+      ScrollTimer.Interval := 10 // accelerate
+  end
+  else begin
+    if ScrollTimer.Interval <> 100 then
+      ScrollTimer.Interval := 100 // deccelerate
+  end;
+  if pt.y < 0 then
+  begin
+    if ct.y = 0 then
+      Param := SB_PAGEUP
+    else
+      Param := SB_LINEUP;
+    SendMessage(TreeView.Handle, WM_VSCROLL, Param, 0);
+  end
+  else
+  if pt.y > TreeView.ClientHeight then
+  begin
+    if ct.y = Screen.Height - 2 then
+      Param := SB_PAGEDOWN
+    else
+      Param := SB_LINEDOWN;
+    SendMessage(TreeView.Handle, WM_VSCROLL, Param, 0);
+  end;
 end;
 
 end.

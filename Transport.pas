@@ -87,6 +87,7 @@ begin
       Entry.dn := 'cn=' + cn.Text + ',' + Self.dn;
     Entry.Write;
   end;
+  Action := caFree;
 end;
 
 procedure TTransportDlg.FormDestroy(Sender: TObject);

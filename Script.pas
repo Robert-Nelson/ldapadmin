@@ -1633,6 +1633,7 @@ begin
   VarClear(Result);
   case MethodIndex of
     0: Result := CreateControl(Args);
+    1: TWinControl(_Object).SetFocus;
   end;
 end;
 
@@ -1640,6 +1641,7 @@ constructor TWinControlScriptlet.Create(Script: TCustomScript; Control: TWinCont
 begin
   inherited Create(Script, Control);
   Methods.Add('InsertControl');
+  Methods.Add('SetFocus');
 end;
 
 { TStringsScriptlet }
@@ -1802,7 +1804,10 @@ type
   protected
     function PropertySearch(const PropName: string): Boolean; override;
     function GetProperty(PropIndex: Integer; const Args: TArgList): OleVariant; override;
+    function OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant; override;
     procedure OnSetProperty(PropIndex: Integer; const Args: TArgList; const Value: OleVariant); override;
+  public
+    constructor Create(Script: TCustomScript; Attribute: TLdapAttribute);
   end;
 
 function TLdapAttributeScriptlet.PropertySearch(const PropName: string): Boolean;
@@ -1844,6 +1849,26 @@ begin
     TLdapAttribute(_Object)[StrToInt(PropName)].AsString := Value
   else
     inherited;
+end;
+
+function TLdapAttributeScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
+begin
+  VarClear(Result);
+  case MethodIndex of
+    0: TLdapAttribute(_Object).AddValue(string(ArgParam(Args, 0)));
+    1: TLdapAttribute(_Object).DeleteValue(string(ArgParam(Args, 0)));
+    2: TLdapAttribute(_Object).Values[ArgParam(Args, 0)].Delete;
+    3: TLdapAttribute(_Object).IndexOf(string(ArgParam(Args, 0)));
+  end;
+end;
+
+constructor TLdapAttributeScriptlet.Create(Script: TCustomScript; Attribute: TLdapAttribute);
+begin
+  inherited Create(Script, Attribute);
+  Methods.Add('addValue');
+  Methods.Add('deleteValue');
+  Methods.Add('deleteValueAt');
+  Methods.Add('indexOf');
 end;
 
 { TLdapAttributeListScriptlet }
@@ -2070,7 +2095,7 @@ begin
     Result := TLdapEntryScriptlet.Create(Script, TLdapEntry(AObject)) as IScriptlet
   else
   if AObject is TLdapAttribute then
-    Result := TLdapAttributeScriptlet.Create(Script, TLdapEntry(AObject)) as IScriptlet
+    Result := TLdapAttributeScriptlet.Create(Script, TLdapAttribute(AObject)) as IScriptlet
   else
     Result := TObjectScriptlet.Create(Script, AObject) as IObjectScriptlet;
   Result.Name := Name;

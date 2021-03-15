@@ -97,6 +97,7 @@ type
     procedure ActOpenStorageExecute(Sender: TObject);
     procedure ViewStyleMenuPopup(Sender: TObject);
     procedure ActDeleteStrorageExecute(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
     FStorage: TConfigStorage;
     procedure SetViewStyle(Style: integer);
@@ -110,17 +111,19 @@ type
 
 implementation
 
-uses ConnProp, Constant, Math, uAccountCopyDlg;
+uses ConnProp, Constant, Math, uAccountCopyDlg, SizeGrip;
 
 const
   CONF_ACCLV_STYLE='ConList\AccountsView\Style';
   CONF_STORLIST_WIDTH='ConList\StorragesList\Width';
   CONF_STORLIST_INDEX='ConList\StorragesList\Index';
+
 {$R *.DFM}
 
 constructor TConnListFrm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  TSizeGrip.Create(Panel1);
   StoragesList.Width:=GlobalConfig.ReadInteger(CONF_STORLIST_WIDTH, StoragesList.Width);
   RefreshStoragesList(GlobalConfig.ReadInteger(CONF_STORLIST_INDEX, 0));
   SetViewStyle(GlobalConfig.ReadInteger(CONF_ACCLV_STYLE, 0));
@@ -242,14 +245,26 @@ begin
       end;
 
       Account:=FStorage.AddAccount(AName);
-      Account.Base          := Base;
-      Account.SSL           := SSl;
-      Account.Port          := Port;
-      Account.LdapVersion   := LdapVersion;
-      Account.User          := User;
-      Account.Server        := Server;
-      Account.Password      := Password;
-      Account.AuthMethod    := AuthMethod;
+
+      Account.Name               := Name;
+      Account.Base               := Base;
+      Account.SSL                := SSl;
+      Account.TLS                := TLS;
+      Account.Port               := Port;
+      Account.LdapVersion        := LdapVersion;
+      Account.User               := User;
+      Account.Server             := Server;
+      Account.Password           := Password;
+      Account.TimeLimit          := Timelimit;
+      Account.SizeLimit          := SizeLimit;
+      Account.PagedSearch        := PagedSearch;
+      Account.PageSize           := PageSize;
+      Account.DereferenceAliases := DereferenceAliases;
+      Account.ChaseReferrals     := ChaseReferrals;
+      Account.ReferralHops       := ReferralHops;
+      Account.OperationalAttrs   := OperationalAttrs;
+      Account.AuthMethod         := AuthMethod;
+      
     end;
     Free;
   end;
@@ -363,6 +378,7 @@ begin
       Account.OperationalAttrs   := OperationalAttrs;
       Account.AuthMethod         := AuthMethod;
     end;
+    Free;
   end;
   RefreshAccountsView;
 end;
@@ -485,6 +501,11 @@ end;
 procedure TConnListFrm.Splitter1Moved(Sender: TObject);
 begin
   StoragesList.Invalidate;
+end;
+
+procedure TConnListFrm.FormResize(Sender: TObject);
+begin
+  RefreshAccountsView;
 end;
 
 end.

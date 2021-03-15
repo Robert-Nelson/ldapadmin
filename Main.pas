@@ -1,5 +1,5 @@
   {      LDAPAdmin - Main.pas
-  *      Copyright (C) 2003-2012 Tihomir Karlovic
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -27,10 +27,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, Sorter,
   ComCtrls, Menus, ImgList, ToolWin, WinLdap, StdCtrls, ExtCtrls, Posix, Samba,
   LDAPClasses, Clipbrd, ActnList, uSchemaDlg, Config, Tabs, contnrs, Schema,
-  uBetaImgLists, GraphicHint, Connection;
-
-const
-  ScrollAccMargin  = 40;
+  uBetaImgLists, GraphicHint, CustomMenus, Connection, ObjectInfo;
 
 type
   TMainFrm = class(TForm)
@@ -56,11 +53,6 @@ type
     mbNew: TMenuItem;
     EditPopup: TPopupMenu;
     pbNew: TMenuItem;
-    pbNewEntry: TMenuItem;
-    pbNewUser: TMenuItem;
-    pbNewGroup: TMenuItem;
-    pbNewVerteiler: TMenuItem;
-    pbNewTransporttable: TMenuItem;
     pbEdit: TMenuItem;
     pbDelete: TMenuItem;
     N2: TMenuItem;
@@ -68,13 +60,6 @@ type
     N3: TMenuItem;
     pbChangePassword: TMenuItem;
     DisconnectBtn: TToolButton;
-    pbNewComputer: TMenuItem;
-    mbNewEntry: TMenuItem;
-    mbNewUser: TMenuItem;
-    mbNewComputer: TMenuItem;
-    mbNewGroup: TMenuItem;
-    mbNewVerteiler: TMenuItem;
-    mbNewTransporttable: TMenuItem;
     mbEditEntry: TMenuItem;
     mbDeleteEntry: TMenuItem;
     N4: TMenuItem;
@@ -85,13 +70,11 @@ type
     mbSetpass: TMenuItem;
     N6: TMenuItem;
     pbSearch: TMenuItem;
-    pbNewOu: TMenuItem;
     mbTools: TMenuItem;
     mbExport: TMenuItem;
     mbImport: TMenuItem;
     N7: TMenuItem;
     mbSearch: TMenuItem;
-    mbNewOu: TMenuItem;
     N8: TMenuItem;
     mbInfo: TMenuItem;
     N9: TMenuItem;
@@ -102,10 +85,6 @@ type
     pbMove: TMenuItem;
     N10: TMenuItem;
     N11: TMenuItem;
-    mbNewHost: TMenuItem;
-    mbNewLocality: TMenuItem;
-    Host1: TMenuItem;
-    pbLocality: TMenuItem;
     ScrollTimer: TTimer;
     ActionList: TActionList;
     ActConnect: TAction;
@@ -159,8 +138,6 @@ type
     ActLocateEntry: TAction;
     N15: TMenuItem;
     Locateentry1: TMenuItem;
-    N16: TMenuItem;
-    N17: TMenuItem;
     ActCopyDn: TAction;
     Copydntoclipboard1: TMenuItem;
     Copydntoclipboard2: TMenuItem;
@@ -172,8 +149,6 @@ type
     pbViewCopy: TMenuItem;
     pbViewCopyName: TMenuItem;
     pbViewCopyValue: TMenuItem;
-    mbNewGoUN: TMenuItem;
-    pbGroupOfUN: TMenuItem;
     ActRenameEntry: TAction;
     N19: TMenuItem;
     N20: TMenuItem;
@@ -197,6 +172,11 @@ type
     ActEditValue: TAction;
     N14: TMenuItem;
     pbEditValue: TMenuItem;
+    ActAlias: TAction;
+    mbAlias: TMenuItem;
+    Createalias1: TMenuItem;
+    ActCustomizeMenu: TAction;
+    Customizemenu1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LDAPTreeExpanding(Sender: TObject; Node: TTreeNode;
@@ -217,7 +197,6 @@ type
     procedure ScrollTimerTimer(Sender: TObject);
     procedure ValueListViewCustomDrawItem(Sender: TCustomListView;
       Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
-    procedure pbNewClick(Sender: TObject);
     procedure ActConnectExecute(Sender: TObject);
     procedure ActExitExecute(Sender: TObject);
     procedure ActDisconnectExecute(Sender: TObject);
@@ -268,7 +247,8 @@ type
     procedure ValueListViewInfoTip(Sender: TObject; Item: TListItem;
       var InfoTip: String);
     procedure ActEditValueExecute(Sender: TObject);
-    procedure EditPopupPopup(Sender: TObject);
+    procedure ActAliasExecute(Sender: TObject);
+    procedure ActCustomizeMenuExecute(Sender: TObject);
   private
     Root: TTreeNode;
     fCmdLineAccount: TFakeAccount;
@@ -278,8 +258,7 @@ type
     fLdapTreeWidth: Integer;
     fSearchList: TLdapEntryList;
     fLocateList: TLdapEntryList;
-    fTemplateMenu: TMenuItem;
-    fTemplatePopupMenu: TMenuItem;
+    fTemplateMenu: TCustomMenuItem;
     fTickCount: Cardinal;
     fIdObject: Boolean;
     fEnforceContainer: Boolean;
@@ -292,10 +271,10 @@ type
     procedure EntryWrite(Sender: TObject);
     procedure EntrySortProc(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer);
     procedure SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
-    procedure DoTemplateMenu;
+    procedure InitTemplateMenu;
     procedure InitStatusBar;
     procedure RefreshStatusBar;
-    procedure ClassifyEntry(Entry: TLdapEntry; CNode: TTreeNode);
+    procedure ClassifyEntry(ObjectInfo: TObjectInfo; CNode: TTreeNode);
     procedure ExpandNode(Node: TTreeNode; Session: TLDAPSession);
     procedure RefreshNode(Node: TTreeNode; Expand: Boolean);
     procedure RefreshTree;
@@ -307,11 +286,12 @@ type
     function SelectedNode: TTreeNode;
     function IsContainer(ANode: TTreeNode): Boolean;
     procedure NewTemplateClick(Sender: TObject);
+    procedure NewClick(Sender: TObject);
   public
     function  ShowSchema: TSchemaDlg;
     function  PickEntry(const ACaption: string): string;
     function  LocateEntry(const dn: string; const Select: Boolean): TTreeNode;
-    procedure EditProperty(AOwner: TControl; const Index: Integer; const dn: string);
+    procedure EditProperty(AOwner: TControl; ObjectInfo: TObjectInfo);
     procedure ServerConnect(Account: TAccount);
     procedure ServerDisconnect;
     procedure ReadConfig;
@@ -325,7 +305,7 @@ implementation
 
 uses EditEntry, ConnList, Search, LdapOp, Constant, Export, Import, Prefs, Misc,
      LdapCopy, BinView, Input, ConfigDlg, Templates, TemplateCtrl, Shellapi,
-     Cert, PicView, Base64, About;
+     Cert, PicView, Base64, About, Alias, SizeGrip, CustMenuDlg;
 
 {$R *.DFM}
 {$I LdapAdmin.inc}
@@ -348,7 +328,7 @@ end;
 
 procedure TMainFrm.ValueWrite(Sender: TLdapAttributeData);
 begin
-  if TLdapEntry(LdapTree.Selected.Data).dn = Sender.Attribute.Entry.dn then
+  if TObjectInfo(LdapTree.Selected.Data).dn = Sender.Attribute.Entry.dn then
     RefreshValueListView(LdapTree.Selected);
 end;
 
@@ -356,6 +336,7 @@ procedure TMainFrm.EntryWrite(Sender: TObject);
 var
  Node: TTreeNode;
  Entry: TLdapEntry;
+ tgtDn: string;
 begin
   Node := LdapTree.Selected;
   if Assigned(Node) then
@@ -363,28 +344,33 @@ begin
     Entry := Sender as TLdapEntry;
     if esNew in Entry.State then
     begin
-      if TLdapEntry(Node.Data).dn = GetDirFromDn(Entry.dn) then
-        ActRefreshExecute(nil);
-      exit;
+      tgtDn := GetDirFromDn(Entry.dn);
+      if TObjectInfo(Node.Data).dn = tgtDn then
+        ActRefreshExecute(nil)
+      else try
+        LdapTree.Items.BeginUpdate;
+        RefreshNode(LocateEntry(tgtDn, false), true);
+        //LocateEntry(tgtDn, true);
+      finally
+        LdapTree.Items.EndUpdate;
+      end;
     end
     else
-    if ValueListView.Visible and (TLdapEntry(Node.Data).dn = Entry.dn) then
+    if ValueListView.Visible and (TObjectInfo(Node.Data).dn = Entry.dn) then
         RefreshValueListView(Node);
   end;
 end;
 
 procedure TMainFrm.EntrySortProc(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer);
-var
-  c: boolean;
 begin
-  if Entry1.Tag = 0 then
-    (Entry1.Session as TConnection).DI.ClassifyLdapEntry(Entry1, c, Entry1.Tag);
-  if Entry2.Tag = 0 then
-    (Entry2.Session as TConnection).DI.ClassifyLdapEntry(Entry2, c, Entry2.Tag);
-  if ((Entry1.Tag = bmOu) and (Entry2.Tag <> bmOu)) then
+  if Entry1.ObjectId = 0 then
+    Entry1.ObjectId := (Entry1.Session as TConnection).DI.ClassifyLdapEntry(Entry1);
+  if Entry2.ObjectId = 0 then
+    Entry2.ObjectId := (Entry2.Session as TConnection).DI.ClassifyLdapEntry(Entry2);
+  if ((Entry1.ObjectId = bmOu) and (Entry2.ObjectId <> bmOu)) then
     Result := -1
   else
-  if ((Entry2.Tag = bmOu) and (Entry1.Tag <> bmOu))then
+  if ((Entry2.ObjectId = bmOu) and (Entry1.ObjectId <> bmOu))then
     Result := 1
   else
     Result := CompareText(Entry1.dn, Entry2.dn);
@@ -403,36 +389,31 @@ begin
     AbortSearch := true;
 end;
 
-procedure TMainFrm.DoTemplateMenu;
+procedure TMainFrm.InitTemplateMenu;
 var
   i: Integer;
-  Item: TMenuItem;
+  Item: TCustomMenuItem;
 begin
   FreeAndNil(fTemplateMenu);
-  FreeAndNil(fTemplatePopupMenu);
   if fTemplateProperties and (TemplateParser.Count > 0) then
   begin
-    fTemplateMenu := TMenuItem.Create(Self);
-    fTemplatePopupMenu := TMenuItem.Create(Self);
-    fTemplateMenu.Caption := 'More...';
-    fTemplatePopupMenu.Caption := 'More...';
+    fTemplateMenu := TCustomMenuItem.Create(Self);
+    fTemplateMenu.Caption := cMore;
     for i := 0 to TemplateParser.Count - 1 do
     begin
-      Item := TMenuItem.Create(Self);
+      Item := TCustomMenuItem.Create(Self);
       Item.Caption := TemplateParser.Templates[i].Name;
       Item.Bitmap := TemplateParser.Templates[i].Icon;
-      Item.Tag := Integer(TemplateParser.Templates[i]);
+      Item.TemplateName := TemplateParser.Templates[i].Name;
       Item.OnClick := NewTemplateClick;
       fTemplateMenu.Add(Item);
-      Item := TMenuItem.Create(Self);
-      Item.Caption := TemplateParser.Templates[i].Name;
-      Item.Bitmap := TemplateParser.Templates[i].Icon;
-      Item.Tag := Integer(TemplateParser.Templates[i]);
-      Item.OnClick := NewTemplateClick;
-      fTemplatePopupMenu.Add(Item);
     end;
-    pbNew.Add(fTemplatePopupMenu);
-    mbNew.Add(fTemplateMenu);
+  end;
+  if Assigned(Connection) then with Connection do
+  begin
+    ActionMenu.TemplateMenu := fTemplateMenu;
+    ActionMenu.AssignItems(mbNew);
+    ActionMenu.AssignItems(pbNew);
   end;
 end;
 
@@ -460,20 +441,23 @@ begin
   ddPanel.Parent := DirDlg;
   ddPanel.Align := alBottom;
   ddPanel.Height := 34;
+  ddPanel.BevelOuter := bvNone;
+
+  TSizeGrip.Create(ddPanel);
 
   ddOkBtn := TButton.Create(DirDlg);
   ddOkBtn.Parent := ddPanel;
   ddOkBtn.Top := 4;
   ddOkBtn.Left := 4;
   ddOkBtn.ModalResult := mrOk;
-  ddOkBtn.Caption := '&OK';
+  ddOkBtn.Caption := cOK;
 
   ddCancelBtn := TButton.Create(DirDlg);
   ddCancelBtn.Parent := ddPanel;
   ddCancelBtn.Top := 4;
   ddCancelBtn.Left := ddOkBtn.Width + 8;
   ddCancelBtn.ModalResult := mrCancel;
-  ddCancelBtn.Caption := '&Cancel';
+  ddCancelBtn.Caption := cCancel;
 
 
   with DirDlg do
@@ -481,13 +465,13 @@ begin
     Caption := ACaption;
     Position := poMainFormCenter;
     ddRoot := ddTree.Items.Add(nil, Connection.Base);
-    ddRoot.Data := TLdapEntry.Create(Connection, Connection.Base);
+    ddRoot.Data := TObjectInfo.Create(TLdapEntry.Create(Connection, Connection.Base));
     ExpandNode(ddRoot, Connection);
     ddRoot.ImageIndex := bmRoot;
     ddRoot.SelectedIndex := bmRootSel;
     ddRoot.Expand(false);
     if (ShowModal = mrOk) and Assigned(ddTree.Selected) then
-      Result := TLdapEntry(ddTree.Selected.Data).dn
+      Result := TObjectInfo(ddTree.Selected.Data).dn
     else
       Result := '';
   finally
@@ -537,11 +521,13 @@ begin
 end;
 
 procedure TMainFrm.ServerConnect(Account: TAccount);
+var
+  NewConnection: TConnection;
 begin
   Application.ProcessMessages;
   Screen.Cursor := crHourGlass;
-  Connection := TConnection.Create(Account);
-  with Connection do
+  NewConnection := TConnection.Create(Account);
+  with NewConnection do
   try
     Server             := Account.Server;
     Base               := Account.Base;
@@ -561,11 +547,14 @@ begin
     OperationalAttrs   := Account.OperationalAttrs;
     AuthMethod         := Account.AuthMethod;
     Connect;
-    fConnections.Add(Connection);
+    fConnections.Add(NewConnection);
+    ActionMenu.TemplateMenu := fTemplateMenu;
+    ActionMenu.OnClick := NewClick;
     TabSet1.Tabs.Add(Account.Name);
     TabSet1.TabIndex := TabSet1.Tabs.Count - 1;
+    Connection := NewConnection;
   except
-    FreeAndNil(Connection);
+    FreeAndNil(NewConnection);
     Screen.Cursor := crDefault;
     raise;
   end;
@@ -655,7 +644,7 @@ begin
     StatusBar.Panels[1].Text := '';
     StatusBar.Panels[2].Text := '';
     StatusBar.Panels[3].Text := '';
-    StatusBar.Panels[4].Text := '';    
+    StatusBar.Panels[4].Text := '';
   end;
 end;
 
@@ -672,10 +661,11 @@ begin
   fEnforceContainer := GlobalConfig.ReadBool(rMwLTEnfContainer, true);
   fTemplateProperties := GlobalConfig.ReadBool(rTemplateProperties, true);
   UseTemplateImages := GlobalConfig.ReadBool(rUseTemplateImages, false);
-  if UseTemplateImages then InitTemplateIcons(ImageList);
+  if TemplateParser.ImageList <> ImageList then
+    TemplateParser.ImageList := ImageList;
   if Visible then
   begin
-    DoTemplateMenu;
+    InitTemplateMenu;
     if Assigned(Connection) and ((a <> fIdObject) or (b <> fEnforceContainer) or (c <> UseTemplateImages)) then
       RefreshTree;
   end;
@@ -689,7 +679,7 @@ begin
   s4 := '';
   if LDAPTree.Selected <> nil then with LDAPTree.Selected do
   begin
-    s3 := ' ' + TLdapEntry(Data).dn;
+    s3 := ' ' + TObjectInfo(Data).dn;
     if (Count=0) or (Integer(Item[0].Data) <> ncDummyNode) then
     begin
       s4 := Format(stCntSubentries, [Count]);
@@ -733,33 +723,25 @@ begin
     Result := LDAPTree.Selected
 end;
 
-procedure TMainFrm.ClassifyEntry(Entry: TLdapEntry; CNode: TTreeNode);
+procedure TMainFrm.ClassifyEntry(ObjectInfo: TObjectInfo; CNode: TTreeNode);
 var
-  Container: Boolean;
   bmIndex: Integer;
 begin
-  Container := true;
-  if CNode.Parent=nil then // if root node
-  begin
-    CNode.ImageIndex := bmRoot;
-    CNode.SelectedIndex := bmRootSel;
-  end
-  else begin
-    if fidObject then
-      (Entry.Session as TConnection).DI.ClassifyLdapEntry(Entry, Container, bmIndex)
-    else
-      bmIndex := bmEntry;
-    CNode.ImageIndex := bmIndex;
-    CNode.SelectedIndex := bmIndex;
-  end;
+  if fidObject then
+    bmIndex := ObjectInfo.ImageIndex
+  else
+    bmIndex := bmEntry;
+  CNode.ImageIndex := bmIndex;
+  CNode.SelectedIndex := bmIndex;
+
   { Add dummy node to make node expandable }
-  if not CNode.HasChildren and (not fEnforceContainer or Container) then
+  if not CNode.HasChildren and (not fEnforceContainer or ObjectInfo.IsContainer) then
     LDAPTree.Items.AddChildObject(CNode, '', Pointer(ncDummyNode));
 end;
 
 function TMainFrm.IsContainer(ANode: TTreeNode): Boolean;
 begin
-  Result := not fEnforceContainer or (ANode.ImageIndex in [bmOu, bmLocality, bmEntry, bmRoot, bmContainer]);
+  Result := not fEnforceContainer or TObjectInfo(ANode.Data).IsContainer;
 end;
 
 procedure TMainFrm.ExpandNode(Node: TTreeNode; Session: TLDAPSession);
@@ -768,18 +750,20 @@ var
   i: Integer;
   attrs: PCharArray;
   Entry: TLDapEntry;
+  ObjectInfo: TObjectInfo;
 begin
   FTickCount := GetTickCount + 500;
   try
     SetLength(attrs, 2);
     attrs[0] := 'objectclass';
     attrs[1] := nil;
-    Session.Search(sAnyClass, TLdapEntry(Node.Data).dn, LDAP_SCOPE_ONELEVEL, attrs, false, fSearchList, SearchCallback);
+    Session.Search(sAnyClass, TObjectInfo(Node.Data).dn, LDAP_SCOPE_ONELEVEL, attrs, false, fSearchList, SearchCallback);
     for i := 0 to fSearchList.Count - 1 do
     begin
       Entry := fSearchList[i];
-      CNode := LDAPTree.Items.AddChildObject(Node, GetRdnFromDn(Entry.dn), Entry);
-      ClassifyEntry(Entry, CNode);
+      ObjectInfo := TObjectInfo.Create(Entry);
+      CNode := LDAPTree.Items.AddChildObject(Node, DecodeDNString(GetRdnFromDn(Entry.dn)), ObjectInfo);
+      ClassifyEntry(ObjectInfo, CNode);
     end;
   finally
     RefreshStatusBar;
@@ -813,8 +797,12 @@ begin
   LDAPTree.Items.BeginUpdate;
   try
     LDAPTree.Items.Clear;
+    if ValueListView.Visible then
+      ValueListView.Items.Clear;
+    if EntryListView.Visible then
+      EntryListView.Items.Clear;
     Root := LDAPTree.Items.Add(nil, Format('%s [%s]', [Connection.Base, Connection.Server]));
-    Root.Data := TLdapEntry.Create(Connection, Connection.Base);
+    Root.Data := TObjectInfo.Create(TLdapEntry.Create(Connection, Connection.Base));
     ExpandNode(Root, Connection);
     Root.ImageIndex := bmRoot;
     Root.SelectedIndex := bmRootSel;
@@ -864,7 +852,7 @@ var
   end;
 
 begin
-  with TLdapEntry(Node.Data) do
+  with TObjectInfo(Node.Data).Entry do
   begin
     Read;
     try
@@ -914,6 +902,7 @@ begin
   fSearchList := TLdapEntryList.Create(false);
   fLocateList := TLdapEntryList.Create;
   fTreeHistory := TTreeHistory.Create;
+  TemplateParser.ImageList := ImageList;
   ValueListView.Align := alClient;
   ViewSplitter.Visible := false;
   ReadConfig;
@@ -951,7 +940,7 @@ end;
 procedure TMainFrm.LDAPTreeDeletion(Sender: TObject; Node: TTreeNode);
 begin
   if (Node.Data <> nil) and (Integer(Node.Data) <> ncDummyNode) then
-    TLdapEntry(Node.Data).Free;
+    TObjectInfo(Node.Data).Free;
 end;
 
 procedure TMainFrm.LDAPTreeChange(Sender: TObject; Node: TTreeNode);
@@ -1002,7 +991,7 @@ begin
   with TLdapOpDlg.Create(Self, Connection) do
   try
     LeftNode := LdapTree.Selected;
-    srcdn := TLdapEntry(LDAPTree.Selected.Data).dn;
+    srcdn := TObjectInfo(LDAPTree.Selected.Data).dn;
     ShowProgress := true;
     DestSession := TargetSession;
     if LDAPTree.Focused then
@@ -1023,7 +1012,7 @@ begin
         SelItem := EntryListView.Selected;
         Show;
         repeat
-          List.Add(TLdapEntry(TTreeNode(SelItem.Data).Data).dn);
+          List.Add(TObjectInfo(TTreeNode(SelItem.Data).Data).dn);
           SelItem:= EntryListView.GetNextItem(SelItem, sdAll, [isSelected]);
         until SelItem = nil;
         CopyTree(List,TargetDn, Move);
@@ -1043,7 +1032,7 @@ begin
       LdapTree.Items.BeginUpdate;
       try
         RefreshNode(LocateEntry(TargetDn, false), true);
-        if not Assigned(LdapTree.Selected) or (TLdapEntry(LdapTree.Selected.Data).dn <> srcdn) then
+        if not Assigned(LdapTree.Selected) or (TObjectInfo(LdapTree.Selected.Data).dn <> srcdn) then
           LocateEntry(srcdn, true);
       finally
         LdapTree.Items.EndUpdate;
@@ -1060,7 +1049,7 @@ begin
   Node := SelectedNode;
   if Assigned(Node) then
   begin
-    with TCopyDlg.Create(Self, TLdapEntry(Node.Data).dn, Connection, ImageList, ExpandNode, @CustomSortProc) do
+    with TCopyDlg.Create(Self, TObjectInfo(Node.Data).dn, Connection, ImageList, ExpandNode, @CustomSortProc) do
     try
       if EntryListView.Focused and (EntryListView.SelCount > 1) then
       begin
@@ -1069,14 +1058,14 @@ begin
         tgt := Format(stNumObjects, [EntryListView.SelCount])
       end
       else
-        tgt := '"' + TLdapEntry(LDAPTree.Selected.Data).dn + '"';
+        tgt := '"' + TObjectInfo(LDAPTree.Selected.Data).dn + '"';
       if Move then
         Caption := Format(cMoveTo, [tgt])
       else
         Caption := Format(cCopyTo, [tgt]);
       ShowModal;
       if ModalResult = mrOk then
-        DoCopyMove(TargetSession, TargetDn, TargetRdn, Move);
+        DoCopyMove(TargetConnection, TargetDn, TargetRdn, Move);
     finally
       Free;
     end;
@@ -1085,14 +1074,24 @@ end;
 
 procedure TMainFrm.LDAPTreeEdited(Sender: TObject; Node: TTreeNode; var S: String);
 var
-  pdn: string;
+  newdn, pdn, temp: string;
+  i: Integer;
 begin
   with TLdapOpDlg.Create(Self, Connection) do
   try
-    pdn := GetDirFromDn(TLdapEntry(LDAPTree.Selected.Data).dn);
-    CopyTree(TLdapEntry(LDAPTree.Selected.Data).dn, pdn, S, true);
-    TLdapEntry(LDAPTree.Selected.Data).Free;
-    LdapTree.Selected.Data := TLdapEntry.Create(Connection, S + ',' + pdn);
+    i := Pos('=', S);
+    if i = 0 then
+    begin
+      temp := GetAttributeFromDn(TObjectInfo(LDAPTree.Selected.Data).dn) + '=';
+      newdn := temp + EncodeDNString(S);
+      S := temp + S;
+    end
+    else
+      newdn := Copy(S, 1, i - 1) + '=' + EncodeDNString(Copy(S, i + 1, Length(S) - i));
+    pdn := GetDirFromDn(TObjectInfo(LDAPTree.Selected.Data).dn);
+    CopyTree(TObjectInfo(LDAPTree.Selected.Data).dn, pdn, newdn, true);
+    TObjectInfo(LDAPTree.Selected.Data).Free;
+    LdapTree.Selected.Data := TObjectInfo.Create(TLdapEntry.Create(Connection, newdn + ',' + pdn));
     ActRefreshExecute(nil);
   finally
     Free;
@@ -1105,7 +1104,7 @@ begin
   Accept := Accept and Assigned(LDAPTree.DropTarget) and (LDAPTree.DropTarget = LDAPTree.GetNodeAt(X, Y)) and
     (LDAPTree.DropTarget <> SelectedNode) and
     IsContainer(LDAPTree.DropTarget) and
-    (Copy(TLdapEntry(LDAPTree.DropTarget.Data).dn, Length(TLdapEntry(LDAPTree.DropTarget.Data).dn) - Length(TLdapEntry(SelectedNode.Data).dn) + 1, MaxInt) <> TLdapEntry(SelectedNode.Data).dn);
+    (Copy(TObjectInfo(LDAPTree.DropTarget.Data).dn, Length(TObjectInfo(LDAPTree.DropTarget.Data).dn) - Length(TObjectInfo(SelectedNode.Data).dn) + 1, MaxInt) <> TObjectInfo(SelectedNode.Data).dn);
 end;
 
 procedure TMainFrm.LDAPTreeDragDrop(Sender, Source: TObject; X, Y: Integer);
@@ -1129,7 +1128,7 @@ begin
 
   if Assigned(SelNode.Data) and Assigned(LDAPTree.DropTarget.Data) and
     (MessageDlg(msg, mtConfirmation, [mbOk, mbCancel], 0) = mrOk) then
-    DoCopyMove(Connection, TLdapEntry(LDAPTree.DropTarget.Data).dn, '', not cpy);
+    DoCopyMove(Connection, TObjectInfo(LDAPTree.DropTarget.Data).dn, '', not cpy);
 end;
 
 procedure TMainFrm.LDAPTreeStartDrag(Sender: TObject; var DragObject: TDragObject);
@@ -1143,25 +1142,8 @@ begin
 end;
 
 procedure TMainFrm.ScrollTimerTimer(Sender: TObject);
-var
-  Pt: TPoint;
 begin
-  GetCursorPos(pt);
-  pt := LDAPTree.ScreenToClient (pt);
-  if (pt.y < -ScrollAccMargin) or (pt.y > LDAPTree.ClientHeight + ScrollAccMargin) then
-  begin
-    if ScrollTimer.Interval <> 10 then
-      ScrollTimer.Interval := 10 // accelerate
-  end
-  else begin
-    if ScrollTimer.Interval <> 100 then
-      ScrollTimer.Interval := 100 // deccelerate
-  end;
-  if pt.y < 0 then
-    SendMessage(LdapTree.Handle, WM_VSCROLL, SB_LINEUP, 0)
-  else
-  if pt.y > LDAPTree.ClientHeight then
-    SendMessage(LdapTree.Handle, WM_VSCROLL, SB_LINEDOWN, 0);
+  OnScrollTimer(ScrollTimer, LdapTree, ScrollAccMargin);
 end;
 
 procedure TMainFrm.ValueListViewCustomDrawItem(Sender: TCustomListView; Item: TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
@@ -1197,17 +1179,24 @@ begin
   end;
 end;
 
-procedure TMainFrm.pbNewClick(Sender: TObject);
+procedure TMainFrm.NewClick(Sender: TObject);
 begin
-  if (Sender as TComponent).Tag = 1 then
-    with TEditEntryFrm.Create(Self, TLdapEntry(LDAPTree.Selected.Data).dn, Connection, EM_ADD) do
-    begin
-      OnWrite := EntryWrite;
-      Show;
-    end
+  with Sender as TCustomMenuItem do
+  case ActionId of
+    aidTemplate: begin
+                  NewTemplateClick(Sender);
+                  exit;
+                end;
+    aidEntry:    with TEditEntryFrm.Create(Self, TObjectInfo(LDAPTree.Selected.Data).dn, Connection, EM_ADD) do
+                begin
+                  OnWrite := EntryWrite;
+                  Show;
+                  Exit;
+                end
   else
-  if not Connection.DI.NewProperty(Self, Connection, (Sender as TComponent).Tag, TLdapEntry(LDAPTree.Selected.Data).dn) then
-    Exit;
+    if not Connection.DI.NewProperty(Self, ActionId, TObjectInfo(LDAPTree.Selected.Data).dn) then
+      Exit;
+  end;
   ActRefreshExecute(nil);
 end;
 
@@ -1240,6 +1229,7 @@ var
   Enbl: boolean;
 begin
   Enbl := Assigned(Connection) and Connection.Connected;
+  ActAlias.Visible := Enbl and Assigned(Connection.ActionMenu.GetActionItem(aidAlias));
   ActDisconnect.Enabled:= Enbl;
   ActSchema.Enabled:= Enbl and (Connection.Version >= LDAP_VERSION3);
   ActImport.Enabled:= Enbl;
@@ -1265,6 +1255,7 @@ begin
   ActMoveEntry.Enabled:=Enbl;
   ActRenameEntry.Enabled:=Enbl;
   ActDeleteEntry.Enabled:=Enbl;
+  ActAlias.Enabled := Enbl;
   ActProperties.Enabled:=Enbl and IsActPropertiesEnable;
   Enbl := Enbl and IsContainer(SelectedNode);
   mbNew.Enabled:=Enbl;
@@ -1300,11 +1291,11 @@ begin
   with TExportDlg.Create(Connection) do
   begin
     if LdapTree.Focused then
-      AddDn(TLdapEntry(SelectedNode.Data).dn)
+      AddDn(TObjectInfo(SelectedNode.Data).dn)
     else begin
       SelItem := EntryListView.Selected;
       repeat
-        AddDN(TLdapEntry(TTreeNode(SelItem.Data).Data).dn);
+        AddDN(TObjectInfo(TTreeNode(SelItem.Data).Data).dn);
         SelItem:= EntryListView.GetNextItem(SelItem, sdAll, [isSelected]);
       until SelItem = nil;
     end;
@@ -1325,7 +1316,7 @@ end;
 procedure TMainFrm.ActEditEntryExecute(Sender: TObject);
 begin
   if SelectedNode <> nil then
-    with TEditEntryFrm.Create(Self, TLdapEntry(SelectedNode.Data).dn, Connection, EM_MODIFY) do
+    with TEditEntryFrm.Create(Self, TObjectInfo(SelectedNode.Data).dn, Connection, EM_MODIFY) do
     begin
       OnWrite := EntryWrite;
       Show;
@@ -1345,7 +1336,7 @@ begin
     if EntryListView.Focused and (EntryListView.SelCount > 1) then
       msg := Format(stConfirmMultiDel, [EntryListView.SelCount])
     else
-      msg := Format(stConfirmDel, [TLdapEntry(SelectedNode.Data).dn]);
+      msg := Format(stConfirmDel, [TObjectInfo(SelectedNode.Data).dn]);
     if MessageDlg(msg, mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     with TLdapOpDlg.Create(Self, Connection) do
     begin
@@ -1355,7 +1346,7 @@ begin
         try
           if LDAPTree.Focused then
           begin
-            DeleteTree(TLdapEntry(LDAPTree.Selected.Data).dn);
+            DeleteTree(TObjectInfo(LDAPTree.Selected.Data).dn);
             if ModalResult <> mrCancel then
               LeftNode.Delete;
           end
@@ -1365,7 +1356,7 @@ begin
             try
               Show;
               repeat
-                List.Add(TLdapEntry(TTreeNode(SelItem.Data).Data).dn);
+                List.Add(TObjectInfo(TTreeNode(SelItem.Data).Data).dn);
                 SelItem:= EntryListView.GetNextItem(SelItem, sdAll, [isSelected]);
                 Application.ProcessMessages;
                 if ModalResult = mrCancel then
@@ -1398,6 +1389,8 @@ begin
   if Assigned(LDAPTree.Selected) then
   begin
     RefreshNode(LDAPTree.Selected, true);
+    if ValueListView.Visible then
+      RefreshValueListView(LDAPTree.Selected);
     if EntryListView.Visible then
       RefreshEntryListView(LDAPTree.Selected);
   end;
@@ -1406,29 +1399,43 @@ end;
 procedure TMainFrm.ActSearchExecute(Sender: TObject);
 begin
   if LDAPTree.Selected = nil then LDAPTree.Selected := LDAPTree.TopItem;
-  TSearchFrm.Create(Self, TLdapEntry(LDAPTree.Selected.Data).dn, Connection).Show;
+  TSearchFrm.Create(Self, TObjectInfo(LDAPTree.Selected.Data).dn, Connection).Show;
 end;
 
-procedure TMainFrm.EditProperty(AOwner: TControl; const Index: Integer; const dn: string);
+procedure TMainFrm.EditProperty(AOwner: TControl; ObjectInfo: TObjectInfo);
 begin
-    if not Connection.DI.EditProperty(AOwner, Connection, Index, dn) then
-    begin
-      with TTemplateForm.Create(AOwner, dn, Connection, EM_MODIFY) do
-      try
-        LoadMatching;
-        if TemplatePanels.Count > 0 then
-          ShowModal;
-      finally
-        Free;
+  case ObjectInfo.ActionId of
+    aidNone:
+      begin
+        with TTemplateForm.Create(AOwner, ObjectInfo.dn, Connection, EM_MODIFY) do
+        try
+          LoadMatching;
+          if TemplatePanels.Count > 0 then
+            ShowModal;
+        finally
+          Free;
+        end;
       end;
-    end;
+    aidTemplate:
+      begin
+        with TTemplateForm.Create(AOwner, ObjectInfo.dn, Connection, EM_MODIFY) do
+        try
+          AddTemplate(ObjectInfo.Template);
+          ShowModal;
+        finally
+          Free;
+        end;
+      end;
+  else
+    Connection.DI.EditProperty(AOwner, Connection.ActionMenu.GetActionId(ObjectInfo.ObjectId), ObjectInfo.dn);
+  end;
 end;
 
 procedure TMainFrm.ActPropertiesExecute(Sender: TObject);
 begin
-  if SelectedNode <> nil then with SelectedNode do
+  if SelectedNode <> nil then
   begin
-    EditProperty(Self, ImageIndex, TLdapEntry(Data).dn);
+    EditProperty(Self, TObjectInfo(SelectedNode.Data));
     try
       LDAPTreeChange(nil, LDAPTree.Selected);
     except
@@ -1447,15 +1454,15 @@ begin
   Node := SelectedNode;
   if Node <> nil then
   begin
-    Result := Connection.DI.SupportedPropertyObjects(Node.ImageIndex);
-    if not Result and fTemplateProperties and TTemplateForm.HasMatchingTemplates(SelectedNode.Data) then
-      Result := true;
+    Result := TObjectInfo(Node.Data).Supported;
+    if not Result and fTemplateProperties {and (TObjectInfo(Node.Data).ObjectId = oidEntry)} then
+      Result := TTemplateForm.HasMatchingTemplates(TObjectInfo(SelectedNode.Data).Entry);
   end;
 end;
 
 procedure TMainFrm.ActPasswordExecute(Sender: TObject);
 begin
-  if Connection.DI.ChangePassword(SelectedNode.Data) and ValueListView.Visible then
+  if Connection.DI.ChangePassword(TObjectInfo(SelectedNode.Data).Entry) and ValueListView.Visible then
      RefreshValueListView(SelectedNode);
 end;
 
@@ -1604,12 +1611,12 @@ end;
 procedure TMainFrm.FormShow(Sender: TObject);
 var
   aproto, auser, apassword, ahost, abase: string;
-  aport, i:     integer;
+  aport, aversion, i:     integer;
   auth: TLdapAuthMethod;
   SessionName, StorageName: string;
   AStorage: TConfigStorage;
 begin
-  DoTemplateMenu;
+  InitTemplateMenu;
   GlobalConfig.CheckProtocol;
   // ComandLine params /////////////////////////////////////////////////////////
   if ParamCount <> 0 then
@@ -1618,7 +1625,9 @@ begin
     aport:=LDAP_PORT;
     auser:='';
     apassword:='';
-    ParseURL(ParamStr(1), aproto, auser, apassword, ahost, abase, aport, auth);
+    auth:=AUTH_SIMPLE;
+    aversion:=LDAP_VERSION3;
+    ParseURL(ParamStr(1), aproto, auser, apassword, ahost, abase, aport, aversion, auth);
     fCmdLineAccount := TFakeAccount.Create(nil, ahost);
     with fCmdLineAccount do
     begin
@@ -1629,7 +1638,7 @@ begin
       Password := apassword;
       SSL := aproto='ldaps';
       AuthMethod := auth;
-      LdapVersion := LDAP_VERSION3;
+      LdapVersion := aversion;
       ServerConnect(fCmdLineAccount);
     end;
     Exit;
@@ -1741,10 +1750,18 @@ begin
 end;
 
 procedure TMainFrm.NewTemplateClick(Sender: TObject);
+var
+  i: Integer;
 begin
-  with TTemplateForm.Create(Self, TLdapEntry(LDAPTree.Selected.Data).dn, Connection, EM_ADD) do
+  with Sender as TCustomMenuItem do
+  begin
+    i := TemplateParser.IndexOf(TemplateName);
+    if i = -1 then
+      raise Exception.CreateFmt(stMenuLocateTempl, [TemplateName]);
+  end;
+  with TTemplateForm.Create(Self, TObjectInfo(LDAPTree.Selected.Data).dn, Connection, EM_ADD) do
   try
-    AddTemplate(TTemplate((Sender as TMenuItem).Tag));
+    AddTemplate(TemplateParser.Templates[i]);
     if ShowModal = mrOk then
       ActRefresh.Execute;
   finally
@@ -1754,7 +1771,7 @@ end;
 
 procedure TMainFrm.ActCopyDnExecute(Sender: TObject);
 begin
-  Clipboard.AsText := TLdapEntry(SelectedNode.Data).dn;
+  Clipboard.AsText := TObjectInfo(SelectedNode.Data).dn;
 end;
 
 function GetClipboardText(Value: TLdapAttributeData): string;
@@ -1807,13 +1824,15 @@ begin
 
   if TabSet1.TabIndex <> -1 then with TConnection(fConnections[TabSet1.TabIndex]) do
   begin
-    Selected := TLdapEntry(LDAPTree.Selected.Data).dn;
+    Selected := TObjectInfo(LDAPTree.Selected.Data).dn;
     LVSorter.ListView := nil;
   end;
 
   Connection := TConnection(fConnections[NewTab]);
   with Connection do
   begin
+    ActionMenu.AssignItems(mbNew);
+    ActionMenu.AssignItems(pbNew);
     LVSorter.ListView := ValueListView;
     fTreeHistory.Clear;
     if SearchPanel.Visible then
@@ -1863,7 +1882,7 @@ end;
 procedure TMainFrm.ActModifySetExecute(Sender: TObject);
 begin
   if LDAPTree.Selected = nil then LDAPTree.Selected := LDAPTree.TopItem;
-  TSearchFrm.Create(Self, TLdapEntry(LDAPTree.Selected.Data).dn, Connection).ShowModify;
+  TSearchFrm.Create(Self, TObjectInfo(LDAPTree.Selected.Data).dn, Connection).ShowModify;
 end;
 
 procedure TMainFrm.ListPopupPopup(Sender: TObject);
@@ -1964,7 +1983,7 @@ begin
   if ValueListView.Selected.SubItems.Count=0 then exit;
   Value := ValueListView.Selected.Data;
   s := Value.AsString;
-  if InputQuery('Edit value', 'Enter new value:', s) then
+  if InputQuery(cEditValue, cEnterNewValue, s) then
   begin
     Value.AsString := s;
     try
@@ -1975,24 +1994,29 @@ begin
   end;
 end;
 
-procedure TMainFrm.EditPopupPopup(Sender: TObject);
+procedure TMainFrm.ActAliasExecute(Sender: TObject);
 begin
-  case Connection.DirectoryType of
-    dtActiveDirectory: begin
-                         pbNewUser.Visible := false;
-                         pbNewComputer.Visible := false;
-                         pbNewGroup.Visible := false;
-                         pbNewVerteiler.Visible := false;
-                         pbNewTransportTable.Visible := false;
-                         pbGroupOfUN.Visible := false;
-                       end;
-  else
-                         pbNewUser.Visible := true;
-                         pbNewComputer.Visible := true;
-                         pbNewGroup.Visible := true;
-                         pbNewVerteiler.Visible := true;
-                         pbNewTransportTable.Visible := true;
-                         pbGroupOfUN.Visible := true;
+  with TAliasDlg.Create(Self, TObjectInfo(SelectedNode.Data).dn, Connection, EM_ADD, true) do
+  begin
+    OnWrite := EntryWrite;
+    ShowModal;
+  end;
+end;
+
+procedure TMainFrm.ActCustomizeMenuExecute(Sender: TObject);
+var
+  Selected: string;
+begin
+  if CustomizeMenu(Self, ImageList, Connection) then
+  try
+    LockControl(LdapTree, true);
+    Connection.ActionMenu.AssignItems(mbNew);
+    Connection.ActionMenu.AssignItems(pbNew);
+    Selected := TObjectInfo(LDAPTree.Selected.Data).dn;
+    RefreshTree;
+    LocateEntry(Selected, true);
+  finally
+    LockControl(LdapTree, false);
   end;
 end;
 

@@ -66,8 +66,8 @@ type
   TModifyOp = class
     LdapOperation: Integer;
     AttributeName: string;
-    Value1:         string;
-    Value2:      string;
+    Value1:        string;
+    Value2:        string;
   end;
 
   TModifyBox = class(TScrollBox)
@@ -226,7 +226,8 @@ var
 
 implementation
 
-uses EditEntry, Constant, Main, Ldif, PickAttr, Xml, Config, Dsml, Params, Misc;
+uses EditEntry, Constant, Main, Ldif, PickAttr, Xml, Config, Dsml, Params,
+     ObjectInfo, Misc;
 
 {$R *.DFM}
 
@@ -707,17 +708,12 @@ end;
 procedure TResultTabSheet.ListViewData(Sender: TObject; Item: TListItem);
 var
   i: integer;
-  ImgIndex: integer;
-  Container: boolean;
   Entry: TLdapEntry;
 begin
   with SearchList do begin
     Entry := Entries[Item.Index];
-    (Entry.Session as TConnection).DI.ClassifyLdapEntry(Entry, Container, ImgIndex);
-    Item.ImageIndex:=ImgIndex;
-
+    Item.ImageIndex := (Entry.Session as TConnection).GetImageIndex(Entry);
     Item.Caption:=Entry.dn;
-
     for i:=0 to Attributes.Count-1 do begin
       Item.SubItems.Add(Entry.AttributesByName[Attributes[i]].AsString);
     end;
@@ -948,10 +944,19 @@ begin
 end;
 
 procedure TSearchFrm.ActPropertiesExecute(Sender: TObject);
+var
+  oi: TObjectInfo;
 begin
   with ResultPages, ActiveList do
   if Assigned(ActiveList) and Assigned(Selected) then
-    MainFrm.EditProperty(Self, Selected.ImageIndex, Selected.Caption);
+  begin
+    oi := TObjectInfo.Create(ResultPages.ActivePage.SearchList.Entries[ResultPages.ActiveList.Selected.Index], false);
+    try
+      MainFrm.EditProperty(Self, oi);
+    finally
+      oi.Free;
+    end;
+  end;
 end;
 
 procedure TSearchFrm.ActSaveExecute(Sender: TObject);
@@ -1054,7 +1059,13 @@ begin
   Enbl := Enbl and ActStart.Enabled and Assigned(ResultPages.ActiveList.Selected);
   ActGoto.Enabled := Enbl;
   ActEdit.Enabled := Enbl;
-  ActProperties.Enabled := Enbl and Connection.DI.SupportedPropertyObjects(ResultPages.ActiveList.Selected.ImageIndex);
+  if Enbl then
+  with TObjectInfo.Create(ResultPages.ActivePage.SearchList.Entries[ResultPages.ActiveList.Selected.Index], false) do begin
+    ActProperties.Enabled := Supported;
+    Free;
+  end
+  else
+    ActProperties.Enabled := false;
 end;
 
 procedure TSearchFrm.FormKeyPress(Sender: TObject; var Key: Char);
@@ -1114,7 +1125,7 @@ begin
     idx := Items.IndexOf(Text);
     if idx <> -1 then
     begin
-      Connection.Account.Delete(Connection.Account.RootPath + '\' + rSearchCustFilters + Text);
+      Connection.Account.Delete(rSearchCustFilters + Text);
       Items.Delete(idx);
     end;
   end;

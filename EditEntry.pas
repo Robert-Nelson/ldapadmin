@@ -403,8 +403,10 @@ begin
   begin
     if Assigned(Objects[1, Index]) then with TInplaceAttribute(Objects[1, Index]) do
     begin
-      if Tag = NAMING_VALUE_TAG then
-        raise Exception.Create(stDelNamingAttr);
+      {if Tag = NAMING_VALUE_TAG then
+        raise Exception.Create(stDelNamingAttr);}
+      if (Tag = NAMING_VALUE_TAG) and (MessageDlg(Format(stDelNamingAttr, [Cells[0, Index]]), mtWarning, [mbYes, mbCancel], 0) <> mrYes) then
+        Abort;
       Value.Delete;
       Free;
     end;
@@ -475,7 +477,7 @@ begin
     edDn.Enabled := false;
     cbRdn.Enabled := false;
     edDn.Text := GetDirFromDn(adn);
-    cbRdn.Text := GetRdnFromDn(adn);
+    cbRdn.Text := DecodeDNString(GetRdnFromDn(adn));
     Load;
   end
   else begin
@@ -672,6 +674,7 @@ begin
         Objects[1, i + 1] := fNewRows.Objects[i];
         RowCount := RowCount + 1;
       end;
+      ColWidths[1] := ClientWidth - colWidths[0] - GridLineWidth;
       Objects[0, RowCount - 1] := AttributeCombo;
     end;
 
@@ -780,7 +783,7 @@ var
     if Assigned(Value) then
     begin
       SplitRdn(Entry.dn, attr, val);
-      if (CompareText(Value.Attribute.Name, attr) = 0) and (CompareText(Value.AsString, val) = 0) then
+      if (CompareText(Value.Attribute.Name, attr) = 0) and (CompareText(Value.AsString, DecodeDNString(val)) = 0) then
       with Result do begin
         Enabled := false;
         Tag := NAMING_VALUE_TAG;
@@ -843,6 +846,15 @@ begin
 end;
 
 procedure TEditEntryFrm.mbSaveClick(Sender: TObject);
+
+  function EncodeRdn(const rdn: string): string;
+  var
+    i: Integer;
+  begin
+    i := AnsiPos('=', rdn);
+    Result := Copy(rdn, 1, i) + EncodeDNString(Copy(rdn, i + 1, Length(rdn) - i));
+  end;
+
 begin
   if cbRdn.Text = '' then
   begin
@@ -852,7 +864,7 @@ begin
   if Assigned(ActiveControl.Parent) and Assigned(ActiveControl.Parent.Parent) then
     TInplaceAttribute(ActiveControl).Parent.Parent.SetFocus; // Force OnExit for TInplacexx and TTemplatexx controls
   if esNew in Entry.State then
-    Entry.Dn := cbRdn.Text + ',' + edDn.Text;
+    Entry.Dn := EncodeRdn(cbRdn.Text) + ',' + edDn.Text;
   Entry.Write;
   if Assigned(fOnWrite) then fOnWrite(Entry);
   Close;
@@ -1015,7 +1027,10 @@ begin
   end;
 
   ActDeleteRow.Enabled := (ActiveControl is TStringGrid) or
-                          (Assigned(ActiveControl) and (ActiveControl.Owner is TInplaceAttribute));
+                          (Assigned(ActiveControl) and (ActiveControl.Owner is TInplaceAttribute)) and
+                          (ActiveControl.Owner <> ObjectCombo) and
+                          (ActiveControl.Owner <> AttributeCombo);
+
   if ActiveControl is TCustomEdit then with TCustomEdit(ActiveControl) do
   begin
     ActUndo.Enabled := CanUndo;

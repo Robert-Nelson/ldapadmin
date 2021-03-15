@@ -172,6 +172,7 @@ begin
     WriteString (rpostfixMaildrop,    edMaildrop.Text);
     WriteInteger(rPosixGroupOfUnames, cbExtendGroups.ItemIndex + 1);
   end;
+  Action := caFree;
 end;
 
 procedure TPrefDlg.SetBtnClick(Sender: TObject);
