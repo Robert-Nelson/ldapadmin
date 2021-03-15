@@ -623,9 +623,9 @@ begin
       newdn := 'uid=' + EncodeLdapString(uid.Text) + ',' + GetDirFromDn(ParentDn);
       if newdn <> Entry.Dn then
       begin
-        //Entry.Delete; have to do it after move, in case of an error
         olddn := Entry.dn;
         Entry.Dn := newdn;
+        Entry.Write;
         Connection.DeleteEntry(olddn);
       end;
     end;
