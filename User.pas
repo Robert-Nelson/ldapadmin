@@ -267,10 +267,10 @@ var
     p: PChar;
     rg: string;
   begin
-    p1 := CharNext(p1);
-    if p1^ = '[' then
+    p := CharNext(p1);
+    if p^ = '[' then
     begin
-      p := CharNext(p1);
+      p := CharNext(p);
       p1 := p;
       while p1^ <> ']' do begin
         if p1 = #0 then

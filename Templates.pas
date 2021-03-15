@@ -1118,7 +1118,7 @@ end;
 procedure TTemplateCtrlComboList.SetValue(AValue: TTemplateAttributeValue);
 begin
   with (fControl as TComboBox) do begin
-    ItemIndex := IndexOfValue(fLdapValue.AsString);
+    ItemIndex := IndexOfValue(AValue.AsString);
     OnChange(fControl);
   end;
 end;
@@ -1496,6 +1496,7 @@ end;
 procedure TTemplateCtrlCheckBox.SetValue(AValue: TTemplateAttributeValue);
 begin
   (Control as TCheckBox).State := GetCbState(AValue.AsString);
+  Write; // explicit call to write since TCheckbox has no OnChange event
 end;
 
 procedure TTemplateCtrlCheckBox.Read;
@@ -1703,10 +1704,21 @@ end;
 
 procedure TTemplateCtrlTabbedPanel.ArrangeControls;
 var
-  i: Integer;
+  i, MaxHeight, TabHeight: Integer;
 begin
-  for i := 0 to Elements.Count - 1 do if Elements[i] is TTemplateControl then
-    TTemplateControl(Elements[i]).ArrangeControls;
+  if TPageControl(Control).PageCount = 0 then Exit;
+  MaxHeight := TPageControl(Control).Pages[0].Height;
+  TabHeight := Control.Height - MaxHeight;
+  for i := Elements.Count - 1 downto 0 do if Elements[i] is TTemplateControl then
+  with TTemplateControl(Elements[i]) do
+  begin
+    ParentControl := nil;  { allow tabsheets to resize } 
+    ArrangeControls;
+    if Control.Height > MaxHeight then
+      MaxHeight := Control.Height;
+    ParentControl := Self;
+  end;
+  Control.Height := MaxHeight + TabHeight;
 end;
 
 { TDateTimePickerFixed }
@@ -1916,7 +1928,7 @@ end;
 
 procedure TTemplateCtrlDate.SetValue(AValue: TTemplateAttributeValue);
 begin
-  AsString := fLdapValue.AsString;
+  AsString := AValue.AsString;
 end;
 
 procedure TTemplateCtrlDate.Read;
