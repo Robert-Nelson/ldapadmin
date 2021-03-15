@@ -44,7 +44,8 @@ uses
   Schema in 'Schema.pas',
   BinView in 'BinView.pas' {HexView},
   AdvSamba in 'AdvSamba.pas' {SambaAdvancedDlg},
-  TextFile in 'TextFile.pas';
+  TextFile in 'TextFile.pas',
+  md5crypt in 'md5crypt.pas';
 
 {$R *.RES}
 

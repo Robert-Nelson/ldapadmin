@@ -275,7 +275,7 @@ begin
   if not Assigned(pDomaindata) then
     SetString(eSambaSID, '')
   else
-  if IsNull(eSambaSid) then
+  if IsNull(eSambaSid) or not (asBrowse in Attributes[eSambaSid].State) then
     SetString(eSambaSID, Format('%s-%d', [pDomainData^.SID, pDomainData^.AlgorithmicRIDBase + 2 * Value]))
 end;
 

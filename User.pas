@@ -364,11 +364,10 @@ begin
     cbDomain.Enabled := true;
     if (uid.Text <> '') then
     begin
-      if RegAccount.sambaNetbiosName <> '' then
-      begin
+      if (RegAccount.sambaNetbiosName <> '') or (Pos('%n', RegAccount.sambaHomeShare) = 0) then
         SetText(sambaHomePath, FormatString(RegAccount.sambaHomeShare));
+      if (RegAccount.sambaNetbiosName <> '') or (Pos('%n', RegAccount.sambaProfilePath) = 0) then
         SetText(sambaProfilePath, FormatString(RegAccount.sambaProfilePath));
-      end;
       SetText(sambaLogonScript, FormatString(RegAccount.sambaScript));
       if sambaHomeDrive.ItemIndex = -1 then
       begin

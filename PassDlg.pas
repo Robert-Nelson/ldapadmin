@@ -60,7 +60,7 @@ uses Constant;
 constructor TPasswordDlg.Create(AOwner: TComponent; Entry: TLdapEntry);
 begin
   inherited Create(AOwner);
-  cbMethod.ItemIndex := 4;
+  cbMethod.ItemIndex := 5;
   fEntry := Entry;
   if Entry.AttributesByName['objectclass'].IndexOf('sambasamaccount') <> -1 then
   begin

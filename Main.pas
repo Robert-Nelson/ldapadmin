@@ -196,7 +196,7 @@ implementation
 
 uses EditEntry, Group, User, Computer, PassDlg, ConnList, Transport, Search, Ou,
      Host, Locality, LdapOp, Constant, Export, Import, Mailgroup, Prefs,
-     LdapCopy, Schema, uSchemaDlg, BinView, Misc, About;
+     LdapCopy, Schema, uSchemaDlg, BinView, Misc, About, Input;
 
 {$R *.DFM}
 
@@ -752,9 +752,15 @@ end;
 procedure TMainFrm.ActConnectExecute(Sender: TObject);
 begin
   with TConnListFrm.Create(Self, regAccount) do
-  begin
+  try
     if ShowModal = mrOk then
-    try
+    begin
+      if (RegAccount.ldapPassword = '') and
+         not InputDlg('Enter password', 'Password:', RegAccount.ldapPassword, '*', true) then
+      begin
+        FreeAndNil(RegAccount);
+        Abort;
+      end;
       Application.ProcessMessages;
       Screen.Cursor := crHourGlass;
       with ldapSession do
@@ -773,12 +779,12 @@ begin
       ListPopup.AutoPopup := true;
       MainFrm.Caption := cAppName + ': ' + ListView.Selected.Caption;
       RefreshTree;
-    finally
-      Screen.Cursor := crDefault;
-      Destroy;
     end;
-    InitStatusBar;
+  finally
+    Screen.Cursor := crDefault;
+    Destroy;
   end;
+  InitStatusBar;
 end;
 
 procedure TMainFrm.ActDisconnectExecute(Sender: TObject);

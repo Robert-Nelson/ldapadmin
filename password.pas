@@ -26,7 +26,7 @@ interface
 uses LdapClasses, MessageDigests;
 
 type
-  THashType = (chCrypt, chMd2, chMd4, chMd5, chSha1, chRipemd);
+  THashType = (chCrypt, chMd5Crypt, chMd2, chMd4, chMd5, chSha1, chRipemd);
 
 
 const
@@ -34,7 +34,7 @@ const
    TMD2, TMD4, TMD5, TSHA1, TRIPEMD160
   );
   IdStrings: array [chCrypt..chRipemd] of string = (
-  '{CRYPT}','{MD2}','{MD4}','{MD5}','{SHA}','{RMD160}');
+  '{CRYPT}','{CRYPT}','{MD2}','{MD4}','{MD5}','{SHA}','{RMD160}');
 
   sUserPassword: string = 'userPassword';
 
@@ -55,7 +55,19 @@ type
 
 implementation
 
-uses Sysutils, Unixpass, base64;
+uses Sysutils, Unixpass, md5crypt, base64;
+
+function GetSalt(Len: Integer): string;
+const
+  SaltChars: array[0..63] of AnsiChar =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./';
+var
+  i: Integer;
+begin
+  SetLength(Result, Len);
+  for i := 1 to Len do
+    Result[i] := SaltChars[Random(64)];
+end;
 
 function TPasswordObject.Digest(const AValue: string): string;
 var
@@ -78,11 +90,8 @@ const
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./';
 var
   Buff : array[0..30] of char;
-  Salt: array[0..1] of char;
 begin
-  Salt[0] := SaltChars[Random(64)];
-  Salt[1] := SaltChars[Random(64)];
-  UnixCrypt(Salt, StrPCopy(Buff, AValue));
+  UnixCrypt(PChar(GetSalt(2)), StrPCopy(Buff, AValue));
   Result := StrPas(Buff);
 end;
 
@@ -90,10 +99,12 @@ procedure TPasswordObject.SetPassword(AValue: string);
 var
   passwd: string;
 begin
-  if fHashType = chCrypt then
-    passwd := Crypt(AValue)
+  case fHashType of
+    chCrypt:     passwd := Crypt(AValue);
+    chMd5Crypt:  passwd := md5_crypt(PChar(AValue), PChar(GetSalt(8)));
   else
     passwd := Digest(AValue);
+  end;
   fEntry.AttributesByName[sUserPassword].AsString := IdStrings[fHashType] + passwd;
 end;
 

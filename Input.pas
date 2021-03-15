@@ -18,20 +18,25 @@ type
     { Public declarations }
   end;
 
-function InputDlg(ACaption, APrompt: string; var AValue: string): Boolean;
+function InputDlg(ACaption, APrompt: string; var AValue: string; PasswordChar: Char=#0; AcceptEmpty:Boolean=False): Boolean;
 
 implementation
 
 {$R *.DFM}
 
-function InputDlg(ACaption, APrompt: string; var AValue: string): Boolean;
+function InputDlg(ACaption, APrompt: string; var AValue: string; PasswordChar: Char=#0; AcceptEmpty:Boolean=False): Boolean;
 begin
   Result := false;
   with TInputDlg.Create(Application) do
   begin
+    if AcceptEmpty then
+      Edit.OnChange := nil
+    else
+      OKBtn.Enabled := false;
     Caption := ACaption;
     Prompt.Caption := APrompt;
     Edit.Text := AValue;
+    Edit.PasswordChar := PasswordChar;
     if ShowModal = mrOk then
     begin
       AValue := Edit.Text;
