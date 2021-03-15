@@ -19,7 +19,7 @@
   * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
     @Version 2006/03/18  v1.0.0. Initial revision.
-    @Version 2006/09/13  v1.1.0. Added TXmlNode.CoptTo function
+    @Version 2006/09/13  v1.1.0. Added TXmlNode.CopyTo function
     @Version 2007/06/29  v1.2.0. Added Utf8 write support, T.Karlovic
     @Version 2007/07/02  v1.2.1. Added callback write support, T.Karlovic
     @Version 2012/02/08  v1.2.2. Added EXmlException,

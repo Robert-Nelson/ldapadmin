@@ -53,17 +53,13 @@ procedure ParseURL(const URL: string; var proto, user, password, host, path: str
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
 function  MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
-{ LDAP helper routines }
-{function  GetUid(Session: TLdapSession): Integer;
-function  GetGid(Session: TLdapSession): Integer;}
-{procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-function  SupportedPropertyObjects(const Index: Integer): Boolean;}
 { everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
 procedure LockControl(c: TWinControl; bLock: Boolean);
 function  PeekKey: Integer;
 procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
+function CreateComponent(const ClassName: string; Owner: TComponent): TComponent;
 
 const
   mrCustom   = 1000;
@@ -72,7 +68,8 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF};
+uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF},
+     ExtCtrls, ComCtrls;
 
 { String conversion routines }
 
@@ -564,120 +561,6 @@ begin
     Result := 0;
 end;
 
-{procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-var
-  Attr: TLdapAttribute;
-  j: integer;
-  s: string;
-
-  function IsComputer(const s: string): Boolean;
-  var
-    i: Integer;
-  begin
-    i := Pos(',', s);
-    Result := (i > 1) and (s[i - 1] = '$');
-  end;
-
-begin
-  Container := true;
-  ImageIndex := bmEntry;
-  Attr := Entry.AttributesByName['objectclass'];
-  j := Attr.ValueCount - 1;
-  while j >= 0 do
-  begin
-    s := lowercase(Attr.Values[j].AsString);
-    if s = 'organizationalunit' then
-      ImageIndex := bmOu
-    else if s = 'posixaccount' then
-    begin
-      if ImageIndex = bmEntry then // if not yet assigned to Samba account
-      begin
-        ImageIndex := bmPosixUser;
-        Container := false;
-      end;
-    end
-    else if s = 'sambasamaccount' then
-    begin
-      if IsComputer(Entry.dn) then             // it's samba computer account
-        ImageIndex := bmComputer               // else
-      else                                     // it's samba user account
-        ImageIndex := bmSamba3User;
-      Container := false;
-    end
-    else if s = 'sambagroupmapping' then
-    begin
-      ImageIndex := bmSambaGroup;
-      Container := false;
-    end
-    else if s = 'mailgroup' then
-    begin
-      ImageIndex := bmMailGroup;
-      Container := false;
-    end
-    else if s = 'posixgroup' then
-    begin
-      if ImageIndex = bmEntry then // if not yet assigned to Samba group
-      begin
-        ImageIndex := bmGroup;
-        Container := false;
-      end;
-    end
-    else if s = 'groupofuniquenames' then
-    begin
-      ImageIndex := bmGrOfUnqNames;
-      Container := false;
-    end
-    else if s = 'transporttable' then
-    begin
-      ImageIndex := bmTransport;
-      Container := false;
-    end
-    else if s = 'sudorole' then
-    begin
-      ImageIndex := bmSudoer;
-      Container := false;
-    end
-    else if s = 'iphost' then
-    begin
-      ImageIndex := bmHost;
-      Container := false;
-    end
-    else if s = 'locality' then
-      ImageIndex := bmLocality
-    else if s = 'sambadomain' then
-    begin
-      ImageIndex := bmSambaDomain;
-      Container := false;
-    end
-    else if s = 'sambaunixidpool' then
-    begin
-      ImageIndex := bmIdPool;
-      //Container := false;
-    end;
-    Dec(j);
-  end;
-end;
-
-function SupportedPropertyObjects(const Index: Integer): Boolean;
-begin
-  case Index of
-    bmSamba2User,
-    bmSamba3User,
-    bmPosixUser,
-    bmGroup,
-    bmSambaGroup,
-    bmGrOfUnqNames,
-    bmMailGroup,
-    bmComputer,
-    bmTransport,
-    bmOu,
-    bmLocality,
-    bmHost: Result := true;
-  else
-    Result := false;
-  end;
-end;}
-
 function CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 var
   Form: TForm;
@@ -848,6 +731,74 @@ begin
     ToTop
   else
     ToBottom;
+end;
+
+function CreateComponent(const ClassName: string; Owner: TComponent): TComponent;
+const
+  CONTROLS_CLASSES: array[0..37] of TComponentClass = (TLabel,
+                                                       TEdit,
+                                                       TMemo,
+                                                       TButton,
+                                                       TCheckbox,
+                                                       TRadioButton,
+                                                       TListBox,
+                                                       TComboBox,
+                                                       TScrollBar,
+                                                       TGroupBox,
+                                                       TRadioGroup,
+                                                       TPanel,
+                                                       //TBitBtn,
+                                                       //TSpeedButton,
+                                                       //TMaskEdit,
+                                                       //TStringGrid,
+                                                       //TDrawGrid,
+                                                       TImage,
+                                                       TShape,
+                                                       TBevel,
+                                                       TScrollBox,
+                                                       //TCheckListBox,
+                                                       TSplitter,
+                                                       TStaticText,
+                                                       TControlBar,
+                                                       //TApplicationEvents,
+                                                       //TChart,
+                                                       TTabControl,
+                                                       //TPageControl,
+                                                       //TTabSheet,
+                                                       TImageList,
+                                                       TRichEdit,
+                                                       TTrackBar,
+                                                       TProgressBar,
+                                                       TUpDown,
+                                                       THotkey,
+                                                       TAnimate,
+                                                       TDateTimePicker,
+                                                       TMonthCalendar,
+                                                       TTreeView,
+                                                       TListView,
+                                                       THeaderControl,
+                                                       TStatusBar,
+                                                       TToolBar,
+                                                       TCoolBar,
+                                                       TPageScroller,
+                                                       TTimer,
+                                                       //TMediaPlayer,
+                                                       TPaintBox);
+
+  function ClassByName(const ClassName: string): TComponentClass;
+  var
+    i: Integer;
+  begin
+    Result := nil;
+    for i := 0 to High(CONTROLS_CLASSES) do
+      if CONTROLs_CLASSES[i].ClassName = ClassName then
+        Result := CONTROLS_CLASSES[i];
+    if not Assigned(Result) then
+      raise EClassNotFound.CreateFmt('Class %s not found!', [ClassName]);
+  end;
+
+begin
+  Result := TComponentClass(ClassByName(ClassName)).Create(Owner);
 end;
 
 end.

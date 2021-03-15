@@ -286,7 +286,7 @@ implementation
 {$I LdapAdmin.inc}
 
 uses {$IFDEF VARIANTS} variants, {$ENDIF} LdapClasses, Misc, Dialogs, Constant,
-     Connection;
+     Connection, StdCtrls;
 
 var
   lastScriptExceptionMessage: string;
@@ -786,10 +786,20 @@ end;
 
 { TScriptlet }
 
+procedure CheckArgumentCount(const Args: TArgList; Min, Max: Integer);
+begin
+  if Args.Count > Max then
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stTooManyArgs);
+  if Args.Count < Min then
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
+end;
+
 function ArgParam(const Args: TArgList; Index: Integer): OleVariant;
 begin
+  if Index < 0 then
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, Format('Ivalid Argument Index: %d', [Index]));
   if Index >= Args.Count then
-    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stTooManyArgs);
+    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
   Result := OleVariant(Args.Arguments[Args.Count - Index - 1]);
   if VarIsEmpty(Result) then
     raise EIntScriptException.Create(DISP_E_PARAMNOTOPTIONAL, stEmptyArg);
@@ -1052,7 +1062,7 @@ begin
     raise EScriptException.Create(Result, 'Error parsing ' + EventName + ' event procedure!');}
   if Result = S_OK then
   begin
-    RemoveEventHandler(Scriptlet.ObjectInstance, EventName);
+    //RemoveEventHandler(Scriptlet.ObjectInstance, EventName);
     sh := TScriptletEventHandler.Create(Self, Scriptlet, Dispatch);
     try
       sh.EventName := EventName;
@@ -1531,30 +1541,81 @@ end;
 
 type
   TWinControlScriptlet = class(TComponentScriptlet, IWinControlScriptlet)
+  private
+    function CreateControl(const Args: TArgList): IScriptlet;
   protected
     function FindComponent(const Name: string): TComponent; override;
+    function GetProperty(PropIndex: Integer; const Args: TArgList): OleVariant; override;
+    function OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant; override;
     { IControlScriptlet }
     procedure SetControl(Value: TWinControl);
     function GetControl: TWinControl;
+  public
+    constructor Create(Script: TCustomScript; Control: TWinControl);
   end;
+
+function TWinControlScriptlet.CreateControl(const Args: TArgList): IScriptlet;
+var
+  wc: TComponent;
+begin
+  CheckArgumentCount(Args, 1, 2);
+  wc := CreateComponent(ArgParam(Args, 0), _Object as TComponent);
+  if wc is TControl then
+    TControl(wc).Parent := TWinControl(_Object);
+  if Args.Count > 1 then
+    wc.Name := ArgParam(Args, 1);
+  if wc is TWinControl then
+    Result := TWinControlScriptlet.Create(FScript, TWinControl(wc)) as IScriptlet
+  else
+    Result := TComponentScriptlet.Create(FScript, wc) as IScriptlet;
+end;
 
 function TWinControlScriptlet.FindComponent(const Name: string): TComponent;
 var
-  S: string;
-  I: Integer;
-  Control: TWinControl;
+  c: TControl;
+
+  { Recursive find all sub-controls }
+  function FindControl(Control: TWinControl; const Name: string): TControl;
+  var
+    I: Integer;
+  begin
+    Result := nil;
+    for I := 0 to Control.ControlCount - 1 do
+    begin
+      c := Control.Controls[I];
+      if UpperCase(c.Name) = Name then
+      begin
+        Result := c;
+        Break;
+      end
+      else
+      if c is TWinControl then
+      begin
+        Result := FindControl(c as TWinControl, Name);
+        if Assigned(Result) then
+          break;
+      end;
+    end;
+  end;
+
 begin
   Result := nil;
   if Component = nil then
     Exit;
-  Control := Component as TWinControl;
-  S := UpperCase(Name);
-  for I := 0 to Control.ControlCount - 1 do
-    if UpperCase(Control.Controls[I].Name) = S then
-    begin
-      Result := Control.Controls[I];
-      Break;
-    end;
+  Result := FindControl(Component as TWinControl, UpperCase(Name));
+end;
+
+function TWinControlScriptlet.GetProperty(PropIndex: Integer; const Args: TArgList): OleVariant;
+var
+  PropName: string;
+  C: TComponent;
+begin
+  PropName := Properties[PropIndex];
+  C := FindComponent(PropName);
+  if C is TWinControl then
+    Result := AddPropertyScriptlet(CreateWinControlScriptlet(FScript, TWinControl(C)), PropIndex)
+  else
+    Result := inherited GetProperty(PropIndex, Args);
 end;
 
 procedure TWinControlScriptlet.SetControl(Value: TWinControl);
@@ -1565,6 +1626,20 @@ end;
 function TWinControlScriptlet.GetControl: TWinControl;
 begin
   Result := GetComponent as TWinControl;
+end;
+
+function TWinControlScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
+begin
+  VarClear(Result);
+  case MethodIndex of
+    0: Result := CreateControl(Args);
+  end;
+end;
+
+constructor TWinControlScriptlet.Create(Script: TCustomScript; Control: TWinControl);
+begin
+  inherited Create(Script, Control);
+  Methods.Add('InsertControl');
 end;
 
 { TStringsScriptlet }
@@ -1720,84 +1795,6 @@ begin
   raise EIntScriptException.Create(DISP_E_EXCEPTION, stWritePropRO);
 end;
 
-{ TLdapSessionScriptlet }
-
-type
-  TLdapSessionScriptlet = class(TObjectScriptlet, IObjectScriptlet)
-  private
-    FSession: TLdapSession;
-  function Search(const Args: TArgList): IScriptlet;
-  function Lookup(const Args: TArgList): string;
-  protected
-    function  OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant; override;
-  public
-    constructor Create(Script: TCustomScript; Session: TLdapSession);
-  end;
-
-function TLdapSessionScriptlet.Search(const Args: TArgList): IScriptlet;
-var
-  Entries: TLdapEntryList;
-  es: TLdapEntryListScriptlet;
-  attrs: PCharArray;
-  sl: TStringList;
-  len: Integer;
-begin
-  if Args.Count < 5 then
-    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
-
-  sl := TStringList.Create;
-  try
-    sl.CommaText := ArgParam(Args, 3);
-    attrs := nil;
-    len := sl.Count;
-    if Len > 0 then
-    begin
-      SetLength(attrs, len + 1);
-      attrs[len] := nil;
-      repeat
-        dec(len);
-        attrs[len] := PChar(sl[len]);
-      until len = 0;
-    end;
-    Entries := TLdapEntryList.Create;
-    FSession.Search(string(ArgParam(Args, 0)), string(ArgParam(Args, 1)), Integer(ArgParam(Args, 2)), attrs, false, Entries);
-    es := TLdapEntryListScriptlet.Create(FScript, Entries);
-    es.OwnsObject := true;
-    Result := es as IScriptlet;
-    Result.Name := 'Search';
-  finally
-    sl.Free;
-  end;
-end;
-
-function TLdapSessionScriptlet.Lookup(const Args: TArgList): string;
-begin
-  if Args.Count < 4 then
-    raise EIntScriptException.Create(DISP_E_BADPARAMCOUNT, stNotEnoughArgs);
-  Result := FSession.Lookup(string(ArgParam(Args, 0)), string(ArgParam(Args, 1)), string(ArgParam(Args, 2)), Integer(ArgParam(Args, 3)));
-end;
-
-function TLdapSessionScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
-begin
-  VarClear(Result);
-  case MethodIndex of
-    0: Result := (FSession as TConnection).GetUid;
-    1: Result := (FSession as TConnection).GetGid;
-    2: Result := Search(Args);
-    3: Result := Lookup(Args);
-  end;
-end;
-
-constructor TLdapSessionScriptlet.Create(Script: TCustomScript; Session: TLdapSession);
-begin
-  inherited Create(Script, Session);
-  FSession := Session;
-  Methods.Add('GetUid');
-  Methods.Add('GetGid');
-  Methods.Add('Search');
-  Methods.Add('Lookup');
-end;
-
 { TLdapAttributeScriptlet }
 
 type
@@ -1898,6 +1895,9 @@ type
   protected
     function PropertySearch(const PropName: string): Boolean; override;
     function GetProperty(PropIndex: Integer; const Args: TArgList): OleVariant; override;
+    function OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant; override;
+  public
+    constructor Create(Script: TCustomScript; Entry: TLdapEntry);
   end;
 
 function TLdapEntryScriptlet.PropertySearch(const PropName: string): Boolean;
@@ -1916,6 +1916,119 @@ begin
     Result := AddPropertyScriptlet(CreateLdapAttributeListScriptlet(FScript, TLdapEntry(_Object), PropName), PropIndex)
   else
     Result := inherited GetProperty(PropIndex, Args);
+end;
+
+function TLdapEntryScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
+begin
+  VarClear(Result);
+  case MethodIndex of
+    0: TLdapEntry(_Object).Read;
+    1: TLdapEntry(_Object).Write;
+    2: TLdapEntry(_Object).Delete;
+  end;
+end;
+
+constructor TLdapEntryScriptlet.Create(Script: TCustomScript; Entry: TLdapEntry);
+begin
+  inherited Create(Script, Entry);
+  Methods.Add('Read');
+  Methods.Add('Write');
+  Methods.Add('Delete');
+end;
+
+{ TLdapSessionScriptlet }
+
+type
+  TLdapSessionScriptlet = class(TObjectScriptlet, IObjectScriptlet)
+  private
+    FSession: TLdapSession;
+  function Search(const Args: TArgList): IScriptlet;
+  function Lookup(const Args: TArgList): string;
+  function CreateEntry(const Args: TArgList): IScriptlet;
+  protected
+    function  OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant; override;
+  public
+    constructor Create(Script: TCustomScript; Session: TLdapSession);
+  end;
+
+function TLdapSessionScriptlet.Search(const Args: TArgList): IScriptlet;
+var
+  Entries: TLdapEntryList;
+  es: TLdapEntryListScriptlet;
+  attrs: PCharArray;
+  sl: TStringList;
+  len: Integer;
+begin
+  CheckArgumentCount(Args, 5, 5);
+  sl := TStringList.Create;
+  try
+    sl.CommaText := ArgParam(Args, 3);
+    attrs := nil;
+    len := sl.Count;
+    if Len > 0 then
+    begin
+      SetLength(attrs, len + 1);
+      attrs[len] := nil;
+      repeat
+        dec(len);
+        attrs[len] := PChar(sl[len]);
+      until len = 0;
+    end;
+    Entries := TLdapEntryList.Create;
+    FSession.Search(string(ArgParam(Args, 0)), string(ArgParam(Args, 1)), Integer(ArgParam(Args, 2)), attrs, false, Entries);
+    es := TLdapEntryListScriptlet.Create(FScript, Entries);
+    es.OwnsObject := true;
+    Result := es as IScriptlet;
+    Result.Name := 'Search';
+  finally
+    sl.Free;
+  end;
+end;
+
+function TLdapSessionScriptlet.Lookup(const Args: TArgList): string;
+begin
+  CheckArgumentCount(Args, 4, 4);
+  Result := FSession.Lookup(string(ArgParam(Args, 0)), string(ArgParam(Args, 1)), string(ArgParam(Args, 2)), Integer(ArgParam(Args, 3)));
+end;
+
+function TLdapSessionScriptlet.CreateEntry(const Args: TArgList): IScriptlet;
+var
+  Entry: TLdapEntry;
+  es: TLdapEntryScriptlet;
+begin
+  CheckArgumentCount(Args, 1, 1);
+  Entry := TLdapEntry.Create(FSession, string(ArgParam(Args, 0)));
+  try
+    es := TLdapEntryScriptlet.Create(FScript, Entry);
+    es.OwnsObject := true;
+    Result := es as iScriptlet;
+  except
+    Entry.Free;
+    raise;
+  end;
+end;
+
+function TLdapSessionScriptlet.OnMethod(MethodIndex: Integer; const Args: TArgList): OleVariant;
+begin
+  VarClear(Result);
+  case MethodIndex of
+    0: Result := (FSession as TConnection).GetUid;
+    1: Result := (FSession as TConnection).GetGid;
+    2: Result := Search(Args);
+    3: Result := Lookup(Args);
+    4: Result := CreateEntry(Args);
+  end;
+end;
+
+constructor TLdapSessionScriptlet.Create(Script: TCustomScript; Session: TLdapSession);
+begin
+  inherited Create(Script, Session);
+  FSession := Session;
+  Methods.Add('GetUid');
+  Methods.Add('GetGid');
+  Methods.Add('Search');
+  Methods.Add('Lookup');
+  Methods.Add('CreateEntry');
 end;
 
 { Scriptlet creation routines }
@@ -1962,6 +2075,5 @@ begin
     Result := TObjectScriptlet.Create(Script, AObject) as IObjectScriptlet;
   Result.Name := Name;
 end;
-
 
 end.

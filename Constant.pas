@@ -231,7 +231,10 @@ const
   cAddAttribute     = 'Add attribute...';
   cAttributeName    = 'Attribute name:';
   cProgress         = 'Progress:';
-  cBrowse           = 'Browse...';
+  cAdd              = '&Add';
+  cBrowse           = '&Browse...';
+  cDelete           = '&Delete';
+  cEdit             = '&Edit';
   cBinary           = 'Binary';
   cImage            = 'Image';
   cText             = 'Text';
@@ -239,6 +242,8 @@ const
   cUnknown          = 'Unknown';
   cViewPic          = 'View picture: ';
   cSaveToLdap       = 'Save to LDAP';
+  cAddValue         = 'Add value';
+  cEditValue        = 'Edit value';
 
 // Messages
   stUserBreak       = 'User break!';

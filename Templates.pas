@@ -67,6 +67,7 @@ type
     fParentControl: TTemplateControl;
     fElements:    TObjectList;
     fAutoSize:    Boolean;
+    fAutoArrange: Boolean;
     fCaption:     string;
     fName:        string;
     fDataControlName: string;
@@ -109,6 +110,7 @@ type
     property      ParentControl: TTemplateControl read fParentControl write SetParentControl;
     property      Elements: TObjectList read fElements;
     property      AutoSize: Boolean read fAutoSize;
+    property      AutoArrange: Boolean read fAutoArrange write fAutoArrange {SetAutoArrange};
     property      Caption: string read fCaption;
     property      Name: string read fName;
     property      DataControlName: string read fDataControlName;
@@ -241,9 +243,7 @@ type
     procedure     Write; override;
   end;
 
-  TTemplateCtrlPasswordButton = class(TTemplateSVControl)
-  private
-    procedure     ButtonClick(Sender: TObject);
+  TTemplateCtrlButton = class(TTemplateSVControl)
   protected
     procedure     LoadProc(XmlNode: TXmlNode); override;
   public
@@ -252,6 +252,13 @@ type
     procedure     SetValue(AValue: TTemplateAttributeValue); override;
     procedure     Read; override;
     procedure     Write; override;
+  end;
+
+  TTemplateCtrlPasswordButton = class(TTemplateCtrlButton)
+  private
+    procedure     ButtonClick(Sender: TObject);
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
   end;
 
   TTemplateCtrlTextArea = class(TTemplateSVControl)
@@ -424,6 +431,64 @@ type
     procedure     Write; override;
   end;
 
+  TTemplateCtrlList = class(TTemplateMVControl)
+  private
+    function      GetItemIndex: Integer;
+    procedure     SetItemIndex(const Value: Integer);
+    function      GetLineCount: Integer;
+    function      GetLine(Index: Integer): string;
+    procedure     SetLine(Index: Integer; const Value: string);
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+    procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
+    procedure     SetValue(AValue: TTemplateAttributeValue); override;
+    procedure     Read; override;
+    procedure     Write; override;
+    procedure     Add(const Value: string);
+    procedure     Delete(Index: Integer);
+    property      ItemIndex: Integer read GetItemIndex write SetItemIndex;
+    property      Lines[Index: Integer]: string read GetLine write SetLine;
+    property      LineCount: Integer read GetLineCount;
+  end;
+
+  TTemplateCtrlListBox = class(TTemplateCtrlPanel)
+  private
+    fList:        TTemplateCtrlList;
+    fVertical:    Boolean;
+    fLeft:        Boolean;
+    fBtnWidth:    Integer;
+    fBtnHeight:   Integer;
+    fMaxBtnWidth: Integer;
+    fMaxBtnHeight:Integer;
+    fMargin:      Integer;
+    fBrowseBtn:   TTemplateCtrlPickupDlg;
+    fAddBtn:      TButton;
+    fEditBtn:     TButton;
+    fDeleteBtn:   TButton;
+    procedure     MyOnResizeProc(Sender: TObject);
+    procedure     MyOnButtonProc(Sender: TObject);
+    procedure     ActAdd(Sender: TObject);
+    procedure     ActDelete(Sender: TObject);
+    procedure     ActEdit(Sender: TObject);
+    procedure     ArrangeBox;
+    procedure     ArrangeButtons;
+    procedure     SetVertical(Value: Boolean);
+    procedure     SetLeft(Value: Boolean);
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+    procedure     SetLdapAttribute(Attribute: TLdapAttribute); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+    procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
+    procedure     SetValue(AValue: TTemplateAttributeValue); override;
+    procedure     Read; override;
+    procedure     Write; override;
+    property      Vertical: Boolean read fVertical write SetVertical;
+    property      Left: Boolean read fLeft write SetLeft;
+  end;
+
   { Template classes }
 
   TTemplateScriptEvent = class
@@ -577,12 +642,13 @@ uses
   Pickup, ParseErr;
 
 const
-  CONTROLS_CLASSES: array[0..17] of TTControl = ( TTemplateCtrlEdit,
+  CONTROLS_CLASSES: array[0..20] of TTControl = ( TTemplateCtrlEdit,
                                                   TTemplateCtrlCombo,
                                                   TTemplateCtrlComboList,
                                                   TTemplateCtrlComboLookupList,
                                                   TTemplateCtrlImage,
                                                   TTemplateCtrlGrid,
+                                                  TTemplateCtrlButton,
                                                   TTemplateCtrlPasswordButton,
                                                   TTemplateCtrlTextArea,
                                                   TTemplateCtrlCheckBox,
@@ -594,11 +660,13 @@ const
                                                   TTemplateCtrlPickupDlg,
                                                   TTemplateCtrlNumber,
                                                   TTemplateCtrlInteger,
-                                                  TTemplateCtrlLabel );
+                                                  TTemplateCtrlLabel,
+                                                  TTemplateCtrlList,
+                                                  TTemplateCtrlListBox );
   //DEFAULT_CONTROL_CLASS: TTControl = TTemplateCtrlEdit;
 
   EVENT_NAMES: string = 'ONCLICK,ONDBLCLICK,ONKEYDOWN,ONKEYPRESS,ONKEYUP,' +
-                        'ONMOUSEDOWN,ONMOUSEMOVE,ONMOUSEUP,ONRESIZE';
+                        'ONCHANGE,ONMOUSEDOWN,ONMOUSEMOVE,ONMOUSEUP,ONRESIZE';
 
 function GetXmlTypeByClass(AClass: TTControl): string;
 const
@@ -876,7 +944,7 @@ begin
   for i := 0 to Elements.Count - 1 do
     if Elements[i] is TTemplateControl then with TTemplateControl(Elements[i]) do
     begin
-      if Assigned(Control) and Assigned(Control.Parent) then
+      if AutoArrange and Assigned(Control) and Assigned(Control.Parent) then
         Control.Width := Control.Parent.ClientWidth - CT_LEFT_BORDER - CT_RIGHT_BORDER;
       AdjustSizes;
     end
@@ -939,19 +1007,6 @@ var
   var
     c: Cardinal;
   begin
-    // convert html style hex numbers to pascal hex
-    {s := Value;
-    i := Pos('#', s);
-    if i > 0 then
-      s[i] := '$';
-    try
-      c := StrToInt(s);
-    except
-      on E: EConvertError do
-        raise Exception.Create(Format(stIdentIsNotValid, [Value, stInteger]))
-      else
-        raise;
-    end;}
     c := CheckStrToInt(Value, Tag);
     //Reorder bytes to BGR as expected by TColor
     Result := (c shr 16 + c and $00FF00 + c shl 16) and $00FFFFFF;
@@ -1020,6 +1075,9 @@ begin
         fControl.Height := CheckStrToInt(Content, Name);
         fAutoSize := false;
       end
+      else
+      if Name = 'width' then
+        fControl.Width := CheckStrToInt(Content, Name)
       else
       if Name = 'color' then
         TLabel(fControl).Color := GetColor(Content, Name)
@@ -1124,9 +1182,9 @@ var
    { Position the control }
     with TemplateControl do
     begin
-      cap := '';
-      //if not AutoarrangeControls then
+      if Autoarrange then
       begin
+        cap := '';
         { Some controls have thier own captions and don't need labels }
         if not ((Control is TCheckbox) or (Control is TButton)) then
         begin
@@ -1201,6 +1259,7 @@ begin
   fElements := TObjectList.Create;
   fTemplateAttribute := Attribute;
   fAutoSize := true;
+  fAutoArrange := true;
   {$IFDEF REGEXPR}
   fRegex := TRegExpr.Create;
   {$ENDIF}
@@ -1777,6 +1836,35 @@ begin
   TEditGrid(fControl).OnExit := MyExitProc;
 end;
 
+{ TTemplateCtrlButton }
+
+procedure TTemplateCtrlButton.SetValue(AValue: TTemplateAttributeValue);
+begin
+end;
+
+procedure TTemplateCtrlButton.Read;
+begin
+end;
+
+procedure TTemplateCtrlButton.Write;
+begin
+end;
+
+procedure TTemplateCtrlButton.LoadProc(XmlNode: TXmlNode);
+begin
+  if fCaption <> '' then TButton(fControl).Caption := fCaption;
+end;
+
+procedure TTemplateCtrlButton.EventProc(Attribute: TLdapAttribute; Event: TEventType);
+begin
+end;
+
+constructor TTemplateCtrlButton.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+  fControl := TButton.Create(nil);
+end;
+
 { TTemplateCtrlPasswordButton }
 
 procedure TTemplateCtrlPasswordButton.ButtonClick(Sender: TObject);
@@ -1789,35 +1877,9 @@ begin
   end;
 end;
 
-procedure TTemplateCtrlPasswordButton.SetValue(AValue: TTemplateAttributeValue);
-begin
-
-end;
-
-procedure TTemplateCtrlPasswordButton.Read;
-begin
-
-end;
-
-procedure TTemplateCtrlPasswordButton.Write;
-begin
-
-end;
-
-procedure TTemplateCtrlPasswordButton.LoadProc(XmlNode: TXmlNode);
-begin
-  if fCaption <> '' then TButton(fControl).Caption := fCaption;
-end;
-
-procedure TTemplateCtrlPasswordButton.EventProc(Attribute: TLdapAttribute; Event: TEventType);
-begin
-
-end;
-
 constructor TTemplateCtrlPasswordButton.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
-  fControl := TButton.Create(nil);
   with TButton(fControl) do begin
     OnExit := OnExitProc;
     OnClick := ButtonClick;
@@ -2453,7 +2515,7 @@ end;
 constructor TTemplateCtrlDateTime.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
-  
+
   TPanel(fControl).OnResize := MyOnResizeProc;
   TPanel(fControl).BevelInner := bvRaised;
   TPanel(fControl).BevelOuter := bvNone;
@@ -2701,6 +2763,390 @@ constructor TTemplateCtrlLabel.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
   fControl := TLabel.Create(nil);
+end;
+
+{ TTemplateCtrlList }
+
+procedure TTemplateCtrlList.SetValue(AValue: TTemplateAttributeValue);
+begin
+  if not (Assigned(LdapAttribute) and (LdapAttribute.IndexOf(AValue.AsString) = -1)) then
+    Exit;
+  (Control as TListBox).Items.Add(AValue.AsString);
+  OnChangeProc(Self);
+end;
+
+function TTemplateCtrlList.GetLineCount: Integer;
+begin
+  Result := TListBox(Control).Items.Count;
+end;
+
+function TTemplateCtrlList.GetLine(Index: Integer): string;
+begin
+  Result := TListBox(Control).Items[Index];
+end;
+
+procedure TTemplateCtrlList.SetLine(Index: Integer; const Value: string);
+begin
+  TListBox(Control).Items[Index] := Value;
+  OnChangeProc(Control);
+end;
+
+procedure TTemplateCtrlList.Read;
+var
+  i: Integer;
+begin
+  if Assigned(fControl) then with Control as TListBox, Items do
+  begin
+    Clear;
+    if Assigned(fLdapAttribute) then with fLdapAttribute do
+    for i := 0 to ValueCount - 1 do
+      if Values[i].AsString<> '' then Add(Values[i].AsString);
+  end;
+end;
+
+procedure TTemplateCtrlList.Write;
+var
+  i: Integer;
+begin
+  if Assigned(fControl) and Assigned(fLdapAttribute) then with Control as TListBox do
+  begin
+    for i := 0 to fLdapAttribute.ValueCount - 1 do
+      fLdapAttribute.Values[i].Delete;
+    for i := 0 to Items.Count - 1 do
+      fLdapAttribute.AddValue(Items[i]);
+  end;
+end;
+
+function TTemplateCtrlList.GetItemIndex: Integer;
+begin
+  Result := TListBox(fControl).ItemIndex;
+end;
+
+procedure TTemplateCtrlList.SetItemIndex(const Value: Integer);
+begin
+  TListBox(Control).ItemIndex := Value;
+end;
+
+procedure TTemplateCtrlList.LoadProc(XmlNode: TXmlNode);
+begin
+
+end;
+
+procedure TTemplateCtrlList.EventProc(Attribute: TLdapAttribute; Event: TEventType);
+var
+  i: Integer;
+begin
+  with (fControl as TListBox), fTemplateAttribute do
+  if (Event = etChange) and (ValuesCount > 0) then
+  begin
+    Items.Clear;
+    for i := 0 to ValuesCount -  1 do
+      Items.Add(FormatValue(Values[i].AsString, Attribute.Entry));
+    Write;
+  end;
+end;
+
+constructor TTemplateCtrlList.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+  fControl := TListBox.Create(nil);
+  TListBox(fControl).OnExit := OnExitProc;
+end;
+
+procedure TTemplateCtrlList.Add(const Value: string);
+begin
+  TListBox(Control).Items.Add(Value);
+  OnChangeProc(Control);
+end;
+
+procedure TTemplateCtrlList.Delete(Index: Integer);
+begin
+  TListBox(Control).Items.Delete(Index);
+  OnChangeProc(Control);
+end;
+
+{ TTemplateCtrlListBox }
+
+procedure TTemplateCtrlListBox.MyOnButtonProc(Sender: TObject);
+var
+  Enabled: boolean;
+begin
+  Enabled := fList.ItemIndex <> -1;
+  if Assigned(fEditBtn) then
+    fEditBtn.Enabled := Enabled;
+  if Assigned(fDeleteBtn) then
+    fDeleteBtn.Enabled := Enabled;
+end;
+
+procedure TTemplateCtrlListBox.MyOnResizeProc(Sender: TObject);
+begin
+  ArrangeBox;
+  ArrangeButtons;
+end;
+
+procedure TTemplateCtrlListBox.ActAdd(Sender: TObject);
+var
+  s: string;
+begin
+  if InputQuery(cAddValue, cValue + ':', s) and (s <> '') then
+  begin
+    fList.Add(s);
+    MyOnButtonProc(Sender);
+  end;
+end;
+
+procedure TTemplateCtrlListBox.ActDelete(Sender: TObject);
+var
+  idx: Integer;
+begin
+  with fList do
+  if ItemIndex <> -1 then
+  begin
+    idx := ItemIndex;
+    Delete(idx);
+    if idx < LineCount then
+      ItemIndex := idx
+    else
+      ItemIndex := LineCount - 1;
+    MyOnButtonProc(Sender);
+  end;
+end;
+
+procedure TTemplateCtrlListBox.ActEdit(Sender: TObject);
+var
+  s: string;
+begin
+  with fList do
+  begin
+    s := Lines[ItemIndex];
+    if InputQuery(cEditValue, cValue + ':', s) then
+      Lines[ItemIndex] := s;
+  end;
+end;
+
+procedure TTemplateCtrlListBox.ArrangeBox;
+begin
+  if fVertical then
+  begin
+    if fLeft then
+      fList.Control.Left := fMaxBtnWidth + fMargin + CT_SPACING
+    else
+      fList.Control.Left := fMargin;
+    fList.Control.Height := fControl.Height - 2 * fMargin;
+    fList.Control.Width := fControl.Width - fMaxBtnWidth - 2 * fMargin - CT_SPACING;
+  end
+  else begin
+    fList.Control.Left := fMargin;
+    fList.Control.Height := fControl.Height - fMaxBtnHeight - 2 * fMargin - CT_SPACING;
+    fList.Control.Width := fControl.Width - 2 * fMargin;
+  end;
+end;
+
+procedure TTemplateCtrlListBox.ArrangeButtons;
+var
+  i: Integer;
+  vpos, hpos: Integer;
+begin
+  if Left then
+    hpos := fMargin
+  else
+    hpos := fControl.Width - fMargin;
+  if fVertical then
+  begin
+    vpos := fMargin;
+    with TPanel(fControl) do
+    for i := 0 to ControlCount - 1 do
+      if Controls[i] is TButton then with TButton(Controls[i]) do
+      begin
+        Top := vpos;
+        if fLeft then
+          Left := hpos
+        else
+          Left := hPos - Width;
+        inc(vpos, CT_SPACING + Height);
+      end;
+  end
+  else begin
+    vpos := fList.Control.Top + fList.Control.Height + CT_SPACING;
+    with TPanel(fControl) do
+    if fLeft then
+    begin
+      for i := 0 to ControlCount - 1 do
+        if Controls[i] is TButton then with TButton(Controls[i]) do
+        begin
+          Top := vpos;
+          Left := hpos;
+          inc(hpos, CT_SPACING + Width);
+        end;
+    end
+    else
+      for i := ControlCount - 1 downto 0 do
+        if Controls[i] is TButton then with TButton(Controls[i]) do
+        begin
+          Top := vpos;
+          Left := hpos - Width;
+          dec(hpos, CT_SPACING + Width);
+        end;
+  end;
+end;
+
+procedure TTemplateCtrlListBox.SetVertical(Value: Boolean);
+begin
+  fVertical := Value;
+  ArrangeBox;
+  ArrangeButtons;
+end;
+
+procedure TTemplateCtrlListBox.SetLeft(Value: Boolean);
+begin
+  fLeft := Value;
+  ArrangeBox;
+  ArrangeButtons;
+end;
+
+procedure TTemplateCtrlListBox.SetValue(AValue: TTemplateAttributeValue);
+begin
+  fList.SetValue(AValue);
+end;
+
+procedure TTemplateCtrlListBox.Read;
+begin
+  fList.Read;
+end;
+
+procedure TTemplateCtrlListBox.Write;
+begin
+  fList.Write;
+end;
+
+procedure TTemplateCtrlListBox.LoadProc(XmlNode: TXmlNode);
+var
+  i: Integer;
+
+  procedure AssignAction(btn: TButton; const Action: string);
+  begin
+    if Action = 'browse' then
+      btn.Caption := cBrowse
+    else
+    if Action = 'add' then
+    begin
+      btn.OnClick := ActAdd;
+      btn.Caption := cAdd;
+      fAddBtn := btn;
+    end
+    else
+    if Action = 'edit' then
+    begin
+      btn.OnClick := ActEdit;
+      btn.Caption := cEdit;
+      fEditBtn := btn;
+    end
+    else
+    if Action = 'delete' then
+    begin
+      btn.OnClick := ActDelete;
+      btn.Caption := cDelete;
+      fDeleteBtn := btn;
+    end;
+  end;
+
+  procedure LoadButton(Node: TXmlNode);
+  var
+    btn: TButton;
+    action: string;
+    Ctrl: TTemplateControl;
+  begin
+    action := Node.Attributes.Values['type'];
+    if action = 'browse' then
+    begin
+      fBrowseBtn := TTemplateCtrlPickupDlg.Create(nil);
+      fBrowseBtn.SetDataControl(fList);
+      Ctrl := fBrowseBtn;
+    end
+    else
+      Ctrl := TTemplateCtrlButton.Create(nil);
+
+    fElements.Add(Ctrl);
+    Ctrl.AutoArrange := false;
+    Ctrl.ParentControl := Self;
+    btn := Ctrl.Control as TButton;
+    btn.Height := fBtnHeight;
+    btn.Width := fBtnWidth;
+    if action <> '' then
+      AssignAction(btn, action);
+    Ctrl.Load(Node);
+    fBrowseBtn.fDataControlName := ''; // prevent user from redirecting the control
+
+    if btn.Width > fMaxBtnWidth then
+      fMaxBtnWidth := btn.Width;
+    if btn.Height > fMaxBtnHeight then
+      fMaxBtnHeight := btn.Height;
+  end;
+
+  procedure LoadButtons(Node: TXmlNode);
+  var
+    i: Integer;
+  begin
+    for i := 0 to Node.Count - 1 do with Node[i] do
+    begin
+      if Name = 'button' then
+        LoadButton(Node[i])
+      else
+      if Name = 'orientation' then
+        fVertical := Node[i].Content = 'vertical'
+      else
+      if Name = 'alignment' then
+        fLeft := Node[i].Content = 'left';
+    end;
+  end;
+
+begin
+  inherited;
+  for i := 0 to XmlNode.Count - 1 do with XmlNode[i] do
+    if Name = 'margin' then
+      fMargin := CheckStrToInt(Content, Name)
+    else
+    if Name = 'buttons' then
+      LoadButtons(XmlNode[i]);
+  fList.LoadProc(XmlNode);
+  fList.Control.Top := fMargin;
+  ArrangeBox;
+  ArrangeButtons;
+  MyOnButtonProc(nil);
+  if Assigned(fEditBtn) then
+    (fList.Control as TListBox).OnDblClick := ActEdit;
+end;
+
+procedure TTemplateCtrlListBox.SetLdapAttribute(Attribute: TLdapAttribute);
+begin
+  inherited;
+  fList.LdapAttribute := Attribute;
+  if Assigned(fBrowseBtn) then
+    fBrowseBtn.LdapAttribute := Attribute;
+end;
+
+procedure TTemplateCtrlListBox.EventProc(Attribute: TLdapAttribute; Event: TEventType);
+begin
+  fList.EventProc(Attribute, Event);
+end;
+
+constructor TTemplateCtrlListBox.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+
+  TPanel(fControl).OnResize := MyOnResizeProc;
+  TPanel(fControl).BevelInner := bvNone;
+  TPanel(fControl).BevelOuter := bvLowered;
+
+  fList := TTemplateCtrlList.Create(Attribute);
+  fList.ParentControl := Self;
+  fList.Control.Parent := TPanel(Control);
+  (fList.Control as TListBox).OnClick := MyOnButtonProc;
+
+  fBtnWidth := 75;
+  fBtnHeight := 25;
+  fMargin := CT_SPACING;
+
 end;
 
 { TTemplateList }
