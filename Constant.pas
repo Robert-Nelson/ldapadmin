@@ -216,11 +216,12 @@ const
   cAddAttribute     = 'Add attribute...';
   cAttributeName    = 'Attribute name:';
   cProgress         = 'Progress:';
-  
+  cBrowse           = 'Browse...';
+
 // Messages
+  stUserBreak       = 'User break!';
   stOverwrite       = 'Do you want to overwrite?';
   stLdapError       = 'LDAP error: %s!';
-  //stLdapErrorEx     = stLdapError + #10#13 + '%s.';
   stLdapErrorEx     = 'LDAP error! %s: %s.';
   stReqAttr         = 'Attribute %s may not be empty!';
   stReqNoEmpty      = '%s must have a value!';
@@ -240,6 +241,7 @@ const
   stObjnRetrvd      = 'Object not yet retrieved!';
   stSmbDomainReq    = 'You have to select samba domain to which this group should be mapped!';
   stDeleteAll       = '"%s"'#10#13'This directory entry is not empty (it contains further leaves). Delete all recursively?';
+  stDelNamingAttr   = 'You cannot delete the naming value of this entry!';
   stMoveOverlap     = 'Cannot move: Source and destination paths overlap!';
   stAskTreeCopy     = 'Copy %s to %s?';
   stAskTreeMove     = 'Move %s to %s?';
@@ -297,6 +299,13 @@ const
   stSaslSSL         = 'SASL encryption can not be used over an SSL connection!';
   stNoPosixID       = 'You should disable id creation only if you use a server side id assignment! Otherwise, you will not be able to create any users or groups.';
   stSequentialID    = 'Activating this option could cause a significant network traffic with large user databases. Unless you REALLY need sequential id''s, leave the default option (random) on!';
+  stStopTLSError    = 'Stop TLS Failed! The connection will be closed due to unrecoverable error.';
+  stScriptNotSupp   = '''%s'' does not support ''%s'' event !';
+  stScriptNotEvent  = 'Property ''%s'' is not an event!';
+  stEvTypeEvTypeErr = 'Error setting %s event: %s event type is not supported!';
+  stScriptNoProc    = 'Procedure "%s" could not be located.';
+  stScriptParamType = 'Unsupported parameter type!';
+  stScriptSetErr    = 'Could not convert set to integer!';
 
 implementation
 

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Pickup.pas
-  *      Copyright (C) 2003 - 2011 Tihomir Karlovic
+  *      Copyright (C) 2003 - 2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -24,7 +24,7 @@ unit Pickup;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Sorter;
+  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Sorter, Math;
 
 type
   TPopulateColumn = record
@@ -47,7 +47,7 @@ type
     procedure         ListViewData(Sender: TObject; Item: TListItem);
     procedure         FormClose(Sender: TObject; var Action: TCloseAction);
     procedure         ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
-    procedure FormCreate(Sender: TObject);
+    procedure         FormCreate(Sender: TObject);
   private
     FPopulates:       array of TPopulateColumns;
     FOnGetImageIndex: TOnGetImageIndex;
@@ -56,6 +56,7 @@ type
     FSorter:          TListViewSorter;
     FSelected:        TList;
     FImageIndex:      integer;
+    FColumnNames:     TStringList;
     procedure         FillListView;
     procedure         DoSort(SortColumn:  TListColumn; SortAsc: boolean);
     function          GetColumns: TListColumns;
@@ -66,6 +67,8 @@ type
     function          GetSelected(Index: integer): TLdapEntry;
     function          GetMultiSelect: boolean;
     procedure         SetMultiSelect(const Value: boolean);
+    function          GetColumnNames: string;
+    procedure         SetColumnNames(AValue: string);
   protected
     procedure         DoShow; override;
   public
@@ -81,6 +84,7 @@ type
     property          Selected[Index: integer]: TLdapEntry read GetSelected;
     property          SelCount: integer read GetSelCount;
     property          MultiSelect: boolean read GetMultiSelect write SetMultiSelect;
+    property          ColumnNames: string read GetColumnNames write SetColumnNames;
   end;
 
 implementation
@@ -98,6 +102,7 @@ begin
   FEntries:=TLdapEntryList.Create;
   FShowed:=TList.Create;
   FSelected:=TList.Create;
+  FColumnNames := TStringList.Create;
   setlength(FPopulates,0);
 end;
 
@@ -108,6 +113,7 @@ begin
   setlength(FPopulates,0);
   FEntries.Free;
   FSelected.Free;
+  FColumnNames.Free;
   inherited;
 end;
 
@@ -136,6 +142,18 @@ begin
     FPopulates[popIdx][i].Attribute:=Attributes[i];
   end;
   //////////////////////////////////////////////////////////////////////////////
+
+  with ListView, Columns do
+  try
+    BeginUpdate;
+    for i := Count to length(Attributes) - 1 do
+      Add;
+    for i := 0 to Min(FColumnNames.Count, Count) - 1 do
+      Columns[i].Caption := FColumnNames[i];
+  finally
+    EndUpdate;
+  end;
+
   attrs := nil;
   len := Length(Attributes);
   if ImageIndex = -1 then
@@ -330,6 +348,16 @@ end;
 procedure TPickupDlg.FormCreate(Sender: TObject);
 begin
   SetImages(MainFrm.ImageList);
+end;
+
+function TPickupDlg.GetColumnNames: string;
+begin
+     Result := FColumnNames.CommaTExt;
+end;
+
+procedure TPickupDlg.SetColumnNames(AValue: string);
+begin
+  FColumnNames.CommaText := AValue;
 end;
 
 end.

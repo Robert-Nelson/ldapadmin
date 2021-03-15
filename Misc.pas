@@ -1,5 +1,5 @@
   {      LDAPAdmin - Misc.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -23,36 +23,44 @@ unit Misc;
 
 interface
 
-uses LdapClasses, Classes, Windows, Forms, Dialogs, Controls;
+uses LdapClasses, Classes, SysUtils, Windows, Forms, Dialogs, Controls;
 
 type
   TStreamProcedure = procedure(Stream: TStream) of object;
 
 { String conversion routines }
-function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
-function StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
+function  UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
+function  StringToUTF8Len(const src: PChar; const Len: Cardinal): string;
+function  StringToWide(const S: string): WideString;
+function  CStrToString(cstr: String): String;
 { Time conversion routines }
 function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
 function  UnixTimeToDateTime(const AValue: Int64): TDateTime;
 function  GTZToDateTime(const Value: string): TDateTime;
 function  LocalDateTimeToUTC(DateTime: TDateTime): TDateTime;
 { String handling routines }
+function  IsNumber(const S: string): Boolean;
 procedure Split(Source: string; Result: TStrings; Separator: Char);
 function  FormatMemoInput(const Text: string): string;
 function  FormatMemoOutput(const Text: string): string;
+function  FileReadString(const FileName: TFileName): String;
+procedure FileWriteString(const FileName: TFileName; const Value: string);
 { URL handling routines }
 procedure ParseURL(const URL: string; var proto, user, password, host, path: string; var port: integer; var auth: TLdapAuthMethod);
 { Some handy dialogs }
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
-function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+function  MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+{ LDAP helper routines }
+function  GetUid(Session: TLdapSession): Integer;
+function  GetGid(Session: TLdapSession): Integer;
+procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
+function  SupportedPropertyObjects(const Index: Integer): Boolean;
 { everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
 procedure LockControl(c: TWinControl; bLock: Boolean);
 function  PeekKey: Integer;
-procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);
-function  SupportedPropertyObjects(const Index: Integer): Boolean;
 procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
 
 const
@@ -62,11 +70,21 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses SysUtils, StdCtrls, Messages, Constant {$IFDEF VARIANTS} ,variants {$ENDIF};
+uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF};
 
 { String conversion routines }
 
 { Note: these functions ignore conversion errors }
+function StringToWide(const S: string): WideString;
+var
+  DestLen: Integer;
+begin
+  DestLen := MultiByteToWideChar(0, 0, PChar(S), Length(S), nil, 0) + 1;
+  SetLength(Result, DestLen);
+  MultiByteToWideChar(0, 0, PChar(S), Length(S), PWideChar(Result), DestLen);
+  Result[DestLen] := #0;
+end;
+
 function UTF8ToStringLen(const src: PChar; const Len: Cardinal): widestring;
 var
   l: Integer;
@@ -94,6 +112,94 @@ begin
     if bsiz > 0 then dec(bsiz);
     SetLength(Result, bsiz);
   end;
+end;
+
+function CStrToString(cstr: String): String;
+var  lpesc:      Array [0..2] of Byte;
+     cbytes:     Integer;
+     cesc:       Integer;
+     l:          Integer;
+     i:          Integer;
+begin
+
+  // Set the length of result, this will keep us from having to append. Result could never be longer than input
+  SetLength(result, Length(cstr));
+
+  // Set starting defaults
+  cbytes:=0;
+  l:=Length(cstr)+1;
+  i:=1;
+
+  // Iterate the c style string
+  while (i < l) do
+  begin
+     // Check for escape sequence
+     if (cstr[i] = '\') then
+     begin
+        // Get next byte
+        Inc(i);
+        if (i = l) then break;
+        // Set next write pos
+        Inc(cbytes);
+        case cstr[i] of
+           'a'   :  result[cbytes]:=#7;
+           'b'   :  result[cbytes]:=#8;
+           'f'   :  result[cbytes]:=#12;
+           'n'   :  result[cbytes]:=#10;
+           'r'   :  result[cbytes]:=#13;
+           't'   :  result[cbytes]:=#9;
+           'v'   :  result[cbytes]:=#11;
+           '\'   :  result[cbytes]:=#92;
+           ''''  :  result[cbytes]:=#39;
+           '"'   :  result[cbytes]:=#34;
+           '?'   :  result[cbytes]:=#63;
+        else
+           // Going to be either octal or hex
+           cesc:=-1;
+           // Loop to get the next 3 bytes
+           while (i < l) do
+           begin
+              Inc(cesc);
+              case cstr[i] of
+                 '0'..'9' :  lpesc[cesc]:=Ord(cstr[i])-48;
+                 'A'..'F' :  lpesc[cesc]:=Ord(cstr[i])-55;
+                 'X'      :  lpesc[cesc]:=255;
+                 'a'..'f' :  lpesc[cesc]:=Ord(cstr[i])-87;
+                 'x'      :  lpesc[cesc]:=255;
+              else
+                 break;
+              end;
+              if (cesc = 2) then break;
+              Inc(i);
+           end;
+           // Make sure we got 3 bytes
+           if (cesc < 2) then
+           begin
+              // Raise an error if you wish
+              Dec(cbytes);
+              break;
+           end;
+           // Check for hex or octal
+           if (lpesc[0] = 255) then
+              result[cbytes]:=Chr(lpesc[1] * 16 + lpesc[2])
+           else
+              result[cbytes]:=Chr(lpesc[0] * 64 + lpesc[1] * 8 + lpesc[2]);
+        end;
+        // Increment the next byte from the input
+        Inc(i);
+     end
+     else
+     begin
+        // Increment the write buffer pos
+        Inc(cbytes);
+        result[cbytes]:=cstr[i];
+        Inc(i);
+     end;
+  end;
+
+  // Set the final length on the result
+  SetLength(result, cbytes);
+
 end;
 
 { Time conversion routines }
@@ -322,6 +428,20 @@ end;
 
 { String handling routines }
 
+function IsNumber(const S: string): Boolean;
+var
+  P: PChar;
+begin
+  P  := PChar(S);
+  Result := False;
+  while P^ <> #0 do
+  begin
+    if not (P^ in ['0'..'9']) then Exit;
+    Inc(P);
+  end;
+  Result := True;
+end;
+
 procedure Split(Source: string; Result: TStrings; Separator: Char);
 var
   p0, p: PChar;
@@ -377,6 +497,31 @@ begin
   end;
 end;
 
+function FileReadString(const FileName: TFileName): String;
+var
+  sl: TStringList;
+begin
+    sl := TStringList.Create;
+    try
+      sl.LoadFromFile(FileName);
+      Result := sl.text;
+    finally
+      sl.Free;
+    end;
+end;
+
+procedure FileWriteString(const FileName: TFileName; const Value: string);
+var
+  sl: TStringList;
+begin
+    sl := TStringList.Create;
+    try
+      sl.SaveToFile(FileName);
+    finally
+      sl.Free;
+    end;
+end;
+
 procedure StreamCopy(pf, pt: TStreamProcedure);
 var
   Stream: TMemoryStream;
@@ -413,6 +558,30 @@ begin
     Result := msg.WParam
   else
     Result := 0;
+end;
+
+function GetUid(Session: TLdapSession): Integer;
+var
+  IdType: Integer;
+begin
+  Result := -1;
+  idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+  if idType <> POSIX_ID_NONE then
+    Result := Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
+                                       AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
+                                       IdType = POSIX_ID_SEQUENTIAL);
+end;
+
+function GetGid(Session: TLdapSession): Integer;
+var
+  IdType: Integer;
+begin
+  Result := -1;
+  idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+  if idType <> POSIX_ID_NONE then
+    Result := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, FIRST_GID),
+                                       AccountConfig.ReadInteger(rposixLastGID, LAST_GID),
+                                       IdType = POSIX_ID_SEQUENTIAL);
 end;
 
 procedure ClassifyLdapEntry(Entry: TLdapEntry; out Container: Boolean; out ImageIndex: Integer);

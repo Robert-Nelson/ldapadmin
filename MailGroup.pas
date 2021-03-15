@@ -175,7 +175,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption:=cPickAccounts;
-    Columns[1].Caption:='Description';
+    ColumnNames := 'Name,Description';
     Populate(Session, sMAILACCNT,  ['uid', ''{, 'objectClass'}]);
     Populate(Session, sMAILGROUPS, ['cn',  'Description'{, 'objectClass'}]);
 

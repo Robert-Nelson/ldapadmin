@@ -86,6 +86,7 @@ type
     procedure     SetServer(const Value: string); virtual;
     procedure     SetUser(const Value: string); virtual;
     procedure     SetSSL(const Value: boolean); virtual;
+    procedure     SetTLS(const Value: boolean); virtual;
     procedure     SetLdapVersion(const Value: integer); virtual;
     function      GetName: string; virtual;
     procedure     SetName(const Value: string); virtual;
@@ -96,6 +97,7 @@ type
     function      GetServer: string; virtual;
     function      GetUser: string; virtual;
     function      GetSSL: boolean; virtual;
+    function      GetTLS: boolean; virtual;
     procedure     SetAuthMethod(const Value: TLdapAuthMethod); virtual;
     function      GetAuthMethod: TLdapAuthMethod; virtual;
     function      GetTimeLimit: Integer;
@@ -122,6 +124,7 @@ type
     procedure     Assign(const Source: TAccount);
     property      Name: string read GetName write SetName;
     property      SSL: boolean read GetSSL write SetSSL;
+    property      TLS: boolean read GetTLS write SetTLS;
     property      Port: integer read GetPort write SetPort;
     property      LdapVersion: integer read GetLdapVersion write SetLdapVersion;
     property      User: string read GetUser write SetUser;
@@ -309,6 +312,7 @@ const
   CONNECT_PORT                 = CONNECT_PREFIX + 'Port';
   CONNECT_VERSION              = CONNECT_PREFIX + 'Version';
   CONNECT_SSL                  = CONNECT_PREFIX + 'SSL';
+  CONNECT_TLS                  = CONNECT_PREFIX + 'TLS';
   CONNECT_AUTH_METHOD          = CONNECT_PREFIX + 'AuthMethod';
   CONNECT_TIME_LIMIT           = CONNECT_PREFIX + 'TimeLimit';
   CONNECT_SIZE_LIMIT           = CONNECT_PREFIX + 'SizeLimit';
@@ -667,9 +671,19 @@ begin
   result:=ReadBool(CONNECT_SSL, false);
 end;
 
+function TAccount.GetTLS: boolean;
+begin
+  result:=ReadBool(CONNECT_TLS, false);
+end;
+
 procedure TAccount.SetSSL(const Value: boolean);
 begin
   WriteBool(CONNECT_SSL, Value);
+end;
+
+procedure TAccount.SetTLS(const Value: boolean);
+begin
+  WriteBool(CONNECT_TLS, Value);
 end;
 
 procedure TAccount.SetAuthMethod(const Value: TLdapAuthMethod);
@@ -1209,21 +1223,23 @@ end;
 
 procedure TRegistryConfigStorage.SetAccountName(Parent, OldName, NewName: string);
 begin
+  { Removed 28.02.2012 T.Karlovic
   // Compat - TODO - Remove later
   FRegistry.OpenKey(FrootPath+Norm(Parent), false);
   FRegistry.RenameValue(OldName, NewName);
   FRegistry.CloseKey;
-  // Compat ends
+  // Compat ends }
   FRegistry.MoveKey(FrootPath+Norm(Parent)+Norm(OldName), FrootPath+Norm(Parent)+Norm(NewName), true);
 end;
 
 procedure TRegistryConfigStorage.Delete(Ident: string);
 begin
+  {Removed 28.02.2012 T.Karlovic
   // Compat - TODO - Remove later
   FRegistry.OpenKey(FrootPath+GetKeyName(Ident), false);
   FRegistry.DeleteValue(GetValName(Ident));
   FRegistry.CloseKey;
-  // Compat ends
+  // Compat ends }
   FRegistry.DeleteKey(FRootPath+Norm(Ident));
 end;
 

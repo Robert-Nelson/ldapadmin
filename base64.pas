@@ -245,7 +245,7 @@ end;
 
 function Base64Decode(const InBuf: string; var OutBuf): Integer;
 begin
-  Result := Base64Decode(InBuf[1], Base64DecSize(InBuf), Outbuf);
+  Result := Base64Decode(InBuf[1], Length(InBuf), Outbuf);
 end;
 
 ////////////////////////////////////////////////////////////////////////////////

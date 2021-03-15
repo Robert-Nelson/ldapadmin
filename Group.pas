@@ -329,7 +329,8 @@ end;
 
 procedure TGroupDlg.Save;
 var
-  idType: Integer;
+  //idType: Integer;
+  gidNr: Integer;
 begin
   if edName.Text = '' then
     raise Exception.Create(stGroupNameReq);
@@ -337,12 +338,16 @@ begin
     raise Exception.Create(Format(stReqNoEmpty, [cSambaDomain]));
   if Assigned(PosixGroup) and (esNew in Entry.State) then
   begin
-    idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+    {idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
     if idType <> POSIX_ID_NONE then
     begin
       PosixGroup.GidNumber := Session.GetFreeGidNumber(AccountConfig.ReadInteger(rposixFirstGid, FIRST_GID),
                                                        AccountConfig.ReadInteger(rposixLastGID, LAST_GID),
-                                                       IdType = POSIX_ID_SEQUENTIAL);
+                                                       IdType = POSIX_ID_SEQUENTIAL);}
+    gidNr := GetGid(Session);
+    if gidNr <> -1 then
+    begin
+      PosixGroup.GidNumber := gidNr;
       edRidChange(nil);  // Update sambaSid
     end;
   end;
@@ -369,6 +374,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickAccounts;
+    ColumnNames := 'Name,DN';
     Populate(Session, sUSERS, ['uid', PSEUDOATTR_PATH]);
     ShowModal;
 

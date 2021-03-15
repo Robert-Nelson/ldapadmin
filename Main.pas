@@ -1,5 +1,5 @@
   {      LDAPAdmin - Main.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -280,7 +280,7 @@ type
     fQuickSearchFilter: string;
     fTemplateProperties: Boolean;
     fTreeHistory: TTreeHistory;
-    fDisableImages :TBetaDisabledImageList;
+    fDisabledImages :TBetaDisabledImageList;
     procedure EntrySortProc(Entry1, Entry2: TLdapEntry; Data: pointer; out Result: Integer);
     procedure SearchCallback(Sender: TLdapEntryList; var AbortSearch: Boolean);
     procedure DoTemplateMenu;
@@ -306,10 +306,12 @@ type
     procedure ServerConnect(Account: TAccount);
     procedure ServerDisconnect;
     procedure ReadConfig;
+    property  DisabledImages: TBetaDisabledImageList read fDisabledImages;
   end;
 
 type
   TSessionNode = class
+  public
     Account: TAccount;
     Session: TLdapSession;
     LVSorter: TListViewSorter;
@@ -539,6 +541,7 @@ begin
     User               := Account.User;
     Password           := Account.Password;
     SSL                := Account.SSL;
+    TLS                := Account.TLS;
     Port               := Account.Port;
     Version            := Account.LdapVersion;
     TimeLimit          := Account.TimeLimit;
@@ -891,9 +894,9 @@ end;
 
 procedure TMainFrm.FormCreate(Sender: TObject);
 begin
-  fDisableImages := TBetaDisabledImageList.Create(self);
-  fDisableImages.MasterImages := ImageList;
-  ToolBar.DisabledImages := fDisableImages;
+  fDisabledImages := TBetaDisabledImageList.Create(self);
+  fDisabledImages.MasterImages := ImageList;
+  ToolBar.DisabledImages := fDisabledImages;
   fLdapSessions := TObjectList.Create;
   fSearchList := TLdapEntryList.Create;
   fLocateList := TLdapEntryList.Create;
@@ -910,7 +913,7 @@ begin
   GlobalConfig.WriteInteger(rMwShowValues, Ord(ActValues.Checked));
   GlobalConfig.WriteInteger(rMwViewSplit, ViewSplitter.Top);
   GlobalConfig.WriteInteger(rEvViewStyle, Ord(EntryListView.ViewStyle));
-  fDisableImages.Free;
+  fDisabledImages.Free;
   fLdapSessions.Free;
   fSearchList.Free;
   fLocateList.Free;
@@ -1449,7 +1452,7 @@ end;
 
 procedure TMainFrm.StatusBarDrawPanel(StatusBar: TStatusBar; Panel: TStatusPanel; const Rect: TRect);
 begin
-  if (ldapSession<>nil) and (ldapSession.Connected) and ldapSession.SSL then
+  if (ldapSession<>nil) and (ldapSession.Connected) and (ldapSession.SSL or ldapSession.TLS) then
     ImageList.Draw(StatusBar.Canvas,Rect.Left+2,Rect.Top, bmLocked)
   else
     ImageList.Draw(StatusBar.Canvas,Rect.Left+2,Rect.Top,bmUnlocked);

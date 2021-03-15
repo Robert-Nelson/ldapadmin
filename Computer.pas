@@ -54,7 +54,7 @@ var
 
 implementation
 
-uses WinLDAP;
+uses Misc;
 
 {$R *.DFM}
 
@@ -101,8 +101,8 @@ end;
 
 procedure TComputerDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 var
-  //uidnr: Integer;
-  idType: Integer;
+  uidnr: Integer;
+  //idType: Integer;
 begin
   if ModalResult = mrOk then
   begin
@@ -115,11 +115,14 @@ begin
         ComputerName := edComputername.Text;
         DomainData := DomList.Items[cbDomain.ItemIndex];
         // Acquire next available uidNumber
-        idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
+        {idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
         if idType <> POSIX_ID_NONE then
           UidNumber := Entry.Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
                                                       AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
-                                                      IdType = POSIX_ID_SEQUENTIAL);
+                                                      IdType = POSIX_ID_SEQUENTIAL);}
+        uidnr := GetUid(Entry.Session);
+        if uidnr <> -1 then
+          UidNumber := uidnr;
         GidNumber := COMPUTER_GROUP;
         Entry.dn := 'uid=' + ComputerName + ',' + Entry.dn;
       end;

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Search.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -93,7 +93,7 @@ type
     procedure     New;
     procedure     Run;
     procedure     SaveResults(const Filename: string);
-    property      SearchList: TSearchList read fSearchList write fSearchList;//SetSearchList;
+    property      SearchList: TSearchList read fSearchList write fSearchList;
     property      State: TModBoxState read fState;
   end;
 
@@ -123,6 +123,7 @@ type
     procedure     Change; override;
   public
     function      AddPage: TResultTabSheet;
+    procedure     RemovePage(Page: TResultTabSheet);
     property      ActiveList: TListView read GetActiveListView;
     property      ActivePage: TResultTabSheet read GetActivePage write SetActivePage;
   end;
@@ -144,18 +145,12 @@ type
     N1: TMenuItem;
     SaveDialog: TSaveDialog;
     ResultPanel: TPanel;
-    PickListBox: TListBox;
     Panel2: TPanel;
-    Panel3: TPanel;
     Panel40: TPanel;
     Panel41: TPanel;
     Label5: TLabel;
     cbBasePath: TComboBox;
     PathBtn: TButton;
-    StartBtn: TBitBtn;
-    GotoBtn: TBitBtn;
-    SaveBtn: TBitBtn;
-    CloseBtn: TBitBtn;
     Bevel1: TBevel;
     Panel4: TPanel;
     PageControl: TPageControl;
@@ -178,11 +173,21 @@ type
     edAttrBtn: TButton;
     cbSearchLevel: TComboBox;
     cbDerefAliases: TComboBox;
-    ImageList: TImageList;
+    Panel3: TPanel;
+    StartBtn: TBitBtn;
+    ToolBar1: TToolBar;
+    btnSearch: TToolButton;
+    btnModify: TToolButton;
+    ToolButton3: TToolButton;
+    ToolButton4: TToolButton;
+    ToolButton5: TToolButton;
+    ToolButton6: TToolButton;
+    ToolButton7: TToolButton;
+    ToolButton8: TToolButton;
+    ToolButton9: TToolButton;
+    ActClearAll: TAction;
+    ClearAllBtn: TButton;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure PickListBoxDrawItem(Control: TWinControl; Index: Integer;
-      Rect: TRect; State: TOwnerDrawState);
-    procedure PickListBoxClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure PathBtnClick(Sender: TObject);
     procedure ActStartExecute(Sender: TObject);
@@ -201,6 +206,8 @@ type
     procedure cbFiltersDropDown(Sender: TObject);
     procedure FormDeactivate(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure btnSearchModifyClick(Sender: TObject);
+    procedure ActClearAllExecute(Sender: TObject);
   private
     Session: TLDAPSession;
     ResultPages: TResultPageControl;
@@ -643,15 +650,16 @@ begin
   result.PageControl:=self;
 end;
 
-procedure TResultPageControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-var
-  Tab: TResultTabSheet;
+procedure TResultPageControl.RemovePage(Page: TResultTabSheet);
 begin
-  if (ssDouble in Shift) then begin
-    Tab:=TResultTabSheet(ActivePage);
-    Tab.PageControl:=nil;
-    Tab.Free;
-  end;
+  Page.PageControl:=nil;
+  Page.Free;
+end;
+
+procedure TResultPageControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (ssDouble in Shift) then
+    RemovePage(ActivePage);
   inherited;
 end;
 
@@ -819,7 +827,6 @@ begin
     cbBasePath.Text := dn
   else
     cbBasePath.Text := Session.Base;
-  PickListBox.ItemIndex := 0;
   ResultPages := TResultPageControl.Create(self);
   ResultPages.Align := alClient;
   ResultPages.Parent := ResultPanel;
@@ -835,6 +842,7 @@ begin
   Self.Session.OnDisconnect.Add(SessionDisconnect);
   StatusBar.Panels[0].Text := Format(cServer, [Session.Server]);
   StatusBar.Panels[0].Width := StatusBar.Canvas.TextWidth(StatusBar.Panels[0].Text) + 16;
+  ToolBar1.DisabledImages := MainFrm.DisabledImages;
 end;
 
 procedure TSearchFrm.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -856,54 +864,9 @@ end;
 
 procedure TSearchFrm.ShowModify;
 begin
-  PickListBox.ItemIndex := 1;
-  PickListBoxClick(nil);
+  btnModify.Down := true;
+  btnSearchModifyClick(nil);
   Show;
-end;
-
-procedure TSearchFrm.PickListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
-begin
-  with PickListBox do begin
-    Canvas.Brush.Color:=Color;
-    Canvas.FillRect(Rect);
-    InflateRect(Rect, -2, -2);
-    if odSelected in State then begin
-      Canvas.Brush.Color:=clBtnFace;
-      Canvas.Font.Color:=clBtnText;
-      Frame3D(Canvas, Rect, clBtnShadow, clBtnHighLight, BevelWidth);
-    end
-    else begin
-      Canvas.Brush.Color:=Color;
-      Canvas.Font.Color:=Font.Color;
-    end;
-    Canvas.FillRect(Rect);
-    DrawText(Canvas.Handle, pchar(Items[Index]), -1, Rect, DT_SINGLELINE or DT_CENTER or DT_VCENTER );
-  end;
-end;
-
-procedure TSearchFrm.PickListBoxClick(Sender: TObject);
-begin
-
-  case PickListBox.ItemIndex of
-    0: begin
-         if Assigned(ModifyBox) then ModifyBox.Visible := false;
-         ResultPanel.Visible := true;
-       end;
-    1: begin
-         if not Assigned(ModifyBox) then
-         begin
-           ModifyBox := TModifyBox.Create(Self, Session);
-           ModifyBox.Align := alClient;
-           ModifyBox.Parent := Self;
-           ModifyBox.New;
-         end;
-         ResultPanel.Visible := false;
-         ModifyBox.Visible := true;
-       end;
-  end;
-
-  StartBtn.Glyph := nil;
-  ImageList.GetBitmap(PickListBox.ItemIndex, StartBtn.Glyph);
 end;
 
 procedure TSearchFrm.FormDestroy(Sender: TObject);
@@ -968,7 +931,7 @@ begin
   end
   else
     s := Prepare(Memo1.Text);
-  if PickListBox.ItemIndex = 0 then
+  if btnSearch.Down then
     Search(s)
   else
     Modify(s);
@@ -1040,7 +1003,7 @@ procedure TSearchFrm.ActSaveExecute(Sender: TObject);
   end;
 
 begin
-  if PickListBox.ItemIndex= 0 then
+  if btnSearch.Down then
   begin
     with ResultPages, ActivePage do
     if Assigned(ActivePage) and (SearchList.Entries.Count > 0) then
@@ -1082,6 +1045,7 @@ var
   Enbl: Boolean;
 begin
   ActStart.Enabled := (not (Assigned(ModifyBox) and ModifyBox.Visible) or (ModifyBox.State = mbxReady)) and (PageControl.ActivePageIndex <> 2);
+  ActClearAll.Enabled := Assigned(ResultPages.ActivePage) and Assigned(ResultPages.ActivePage.SearchList);
   Enbl := Assigned(ResultPages.ActiveList) and (ResultPages.ActiveList.Items.Count > 0);
   ActSave.Enabled := Enbl or (Assigned(ModifyBox) and ModifyBox.Visible and (ModifyBox.State = mbxDone));
   Enbl := Enbl and ActStart.Enabled and Assigned(ResultPages.ActiveList.Selected);
@@ -1180,6 +1144,43 @@ end;
 procedure TSearchFrm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
   CanClose := not (Assigned(ModifyBox) and (ModifyBox.State = mbxRunning));
+end;
+
+procedure TSearchFrm.btnSearchModifyClick(Sender: TObject);
+begin
+  StartBtn.Glyph := nil;
+  if btnSearch.Down then
+  begin
+    if Assigned(ModifyBox) then ModifyBox.Visible := false;
+      ResultPanel.Visible := true;
+    MainFrm.ImageList.GetBitmap(20, StartBtn.Glyph);
+  end
+  else begin
+    if not Assigned(ModifyBox) then
+    begin
+      ModifyBox := TModifyBox.Create(Self, Session);
+      ModifyBox.Align := alClient;
+      ModifyBox.Parent := Self;
+      ModifyBox.New;
+    end;
+    ResultPanel.Visible := false;
+    ModifyBox.Visible := true;
+    MainFrm.ImageList.GetBitmap(38, StartBtn.Glyph);
+  end;
+end;
+
+procedure TSearchFrm.ActClearAllExecute(Sender: TObject);
+begin
+  LockControl(ResultPages, true);
+  with ResultPages do
+  try
+    while PageCount > 0 do
+      RemovePage(ActivePage);
+    ResultPages.AddPage;
+    ResultPages.ActivePage.Caption := cSearchResults;
+  finally
+    LockControl(ResultPages, false);
+  end;
 end;
 
 end.

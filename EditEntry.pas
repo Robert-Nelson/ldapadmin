@@ -394,7 +394,7 @@ begin
     if Assigned(Objects[1, Index]) then with TInplaceAttribute(Objects[1, Index]) do
     begin
       if Tag = NAMING_VALUE_TAG then
-        raise Exception.Create('You cannot delete the naming value of this entry!');
+        raise Exception.Create(stDelNamingAttr);
       Value.Delete;
       Free;
     end;
@@ -918,9 +918,10 @@ begin
   fOcSorter.Free;
   ObjectCombo.Free;
   AttributeCombo.Free;
-  Entry.Free;
+  //Entry.Free;
   fBold.Free;
   fTemplateScrollBox.Free;
+  Entry.Free;
   for i := 0 to attrStringGrid.Cols[1].Count - 1 do
     attrStringGrid.Cols[1].Objects[i].Free;
 end;

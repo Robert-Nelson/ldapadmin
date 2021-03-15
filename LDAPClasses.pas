@@ -1,5 +1,5 @@
   {      LDAPAdmin - LDAPClasses.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -20,6 +20,8 @@
   }
 
 unit LDAPClasses;
+
+{$M+}
 
 interface
 
@@ -128,9 +130,10 @@ type
     procedure Delete;
     function IndexOf(const AValue: string): Integer; overload;
     function IndexOf(const AData: Pointer; const ADataSize: Cardinal): Integer; overload;
+    property Values[Index: Integer]: TLdapAttributeData read GetValue; default;
+  published
     property State: TLdapAttributeStates read fState;
     property Name: string read fName;
-    property Values[Index: Integer]: TLdapAttributeData read GetValue; default;
     property ValueCount: Integer read GetCount;
     property AsString: string read GetString write SetString;
     property Entry: TLdapEntry read fEntry;
@@ -162,6 +165,7 @@ type
     ldapVersion: Integer;
     ldapBase: string;
     ldapSSL: Boolean;
+    ldapTLS: Boolean;
     ldapAuthMethod: TLdapAuthMethod;
     fTimeLimit: Integer;
     fSizeLimit: Integer;
@@ -180,7 +184,8 @@ type
     procedure SetPort(Port: Integer);
     procedure SetVersion(Version: Integer);
     procedure SetConnect(DoConnect: Boolean);
-    procedure SetSSL(SSL: Boolean);
+    procedure SetSSL(Value: Boolean);
+    procedure SetTLS(Value: Boolean);
     procedure SetLdapAuthMethod(Method: TLdapAuthMethod);
     procedure SetTimeLimit(const Value: Integer);
     procedure SetSizeLimit(const Value: Integer);
@@ -192,9 +197,8 @@ type
     function  ISConnected: Boolean;
     procedure ProcessSearchEntry(const plmEntry: PLDAPMessage; Attributes: TLdapAttributeList);
     procedure ProcessSearchMessage(const plmSearch: PLDAPMessage; const NoValues: LongBool; Result: TLdapEntryList);
-  published
-    function GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
-    function GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+    function  GetFreeNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
+    function  GetSequentialNumber(const Min, Max: Integer; const Objectclass, id: string): Integer;
   public
     constructor Create;
     destructor Destroy; override;
@@ -207,6 +211,7 @@ type
     property Port: Integer read ldapPort write SetPort;
     property Version: Integer read ldapVersion write SetVersion;
     property SSL: Boolean read ldapSSL write SetSSL;
+    property TLS: Boolean read ldapTLS write SetTLS;
     property AuthMethod: TLdapAuthMethod read ldapAuthMethod write SetLdapAuthMethod;
     property Base: string read ldapBase write ldapBase;
     property TimeLimit: Integer read fTimeLimit write SetTimeLimit;
@@ -245,23 +250,28 @@ type
     fOperationalAttributes: TLdapAttributeList;
     fState: TLdapEntryStates;
     fOnChangeProc: TDataNotifyEvent;
+    fOnRead: TNotifyEvent;
+    fOnWrite: TNotifyEvent;
     function GetNamedAttribute(const AName: string): TLdapAttribute;
   protected
     procedure SetDn(const adn: string);
   public
     Tag: Integer;
     property Session: TLDAPSession read fSession;
-    property dn: string read fdn write SetDn;
     constructor Create(const ASession: TLDAPSession; const adn: string); virtual;
     destructor Destroy; override;
     procedure Read; virtual;
     procedure Write; virtual;
     procedure Delete; virtual;
-    property State: TLdapEntryStates read fState;
     property Attributes: TLdapAttributeList read fAttributes;
     property AttributesByName[const Name: string]: TLdapAttribute read GetNamedAttribute;
     property OperationalAttributes: TLdapAttributeList read fOperationalAttributes;
+  published
+    property dn: string read fdn write SetDn;
+    property State: TLdapEntryStates read fState;
     property OnChange: TDataNotifyEvent read fOnChangeProc write fOnChangeProc;
+    property OnRead: TNotifyEvent read fOnRead write fOnRead;
+    property OnWrite: TNotifyEvent read fOnWrite write fOnWrite;
   end;
 
   TLdapEntryList = class
@@ -914,10 +924,26 @@ begin
   ldapVersion := Version;
 end;
 
-procedure TLDAPSession.SetSSL(SSL: Boolean);
+procedure TLDAPSession.SetSSL(Value: Boolean);
 begin
   Disconnect;
-  ldapSSL := SSL;
+  ldapSSL := Value;
+end;
+
+procedure TLDAPSession.SetTLS(Value: Boolean);
+begin
+  if Connected and (Value <> ldapTLS) then
+  begin
+    if Value then
+      LdapCheck(ldap_start_tls_s(ldappld, nil, nil, nil, nil))
+    else
+    if not ldap_stop_tls_s(ldappld) then
+    begin
+      MessageDlg(stStopTLSError, mtError, [mbOk], 0);
+      Disconnect;
+    end;
+  end;
+  ldapTLS := Value;
 end;
 
 procedure TLDAPSession.SetLdapAuthMethod(Method: TLdapAuthMethod);
@@ -1080,7 +1106,7 @@ begin
   if Assigned(pld) then
   try
     LdapCheck(ldap_set_option(pld,LDAP_OPT_PROTOCOL_VERSION,@ldapVersion));
-    if ldapSSL then
+    if ldapSSL or ldapTLS then
     begin
       res := ldap_set_option(pld, LDAP_OPT_SERVER_CERTIFICATE, @VerifyCert);
       if (res <> LDAP_SUCCESS) and (res <> LDAP_LOCAL_ERROR) then
@@ -1088,6 +1114,8 @@ begin
       CertServerName := PChar(ldapServer);
     end;
     CertUserAbort := false;
+    if ldapTLS then
+      LdapCheck(ldap_start_tls_s(ldappld, nil, nil, nil, nil));
     case ldapAuthMethod of
       AUTH_SIMPLE:   res := ldap_simple_bind_s(ldappld, PChar(ldapUser), PChar(ldapPassword));
       AUTH_GSS,
@@ -1110,7 +1138,6 @@ begin
       raise Exception.Create('Invalid authentication method!');
     end;
 
-    //res := ldap_simple_bind_s(ldappld, PChar(ldapUser), PChar(ldapPassword));
     if CertUserAbort then
       Abort;
     LdapCheck(res);
@@ -1572,7 +1599,6 @@ begin
       dec(i);
     end;
     fState := [esNew];
-    { added *TEST* }
     if Attributes.Count > 0 then
       fState := fState + [esModified];
   end;
@@ -1606,6 +1632,7 @@ begin
   finally
     fState := fState - [esReading];
   end;
+  if Assigned(fOnRead) then fOnRead(Self);
 end;
 
 procedure TLDAPEntry.Write;
@@ -1614,6 +1641,7 @@ var
 begin
   if esModified in fState then
   begin
+    if Assigned(fOnWrite) then fOnWrite(Self);
     Session.WriteEntry(Self);
     { added 05.07.2007 - reset all flags to read state}
     fState := fState - [esModified];

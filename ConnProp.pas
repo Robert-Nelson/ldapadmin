@@ -1,5 +1,5 @@
   {      LDAPAdmin - Connprop.pas
-  *      Copyright (C) 2003-2007 Tihomir Karlovic
+  *      Copyright (C) 2003-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -79,6 +79,7 @@ type
     rbGssApi: TRadioButton;
     cbSSL: TCheckBox;
     cbSASL: TCheckBox;
+    cbTLS: TCheckBox;
     procedure     MethodChange(Sender: TObject);
     procedure     cbAnonymousClick(Sender: TObject);
     procedure     FetchDnBtnClick(Sender: TObject);
@@ -92,6 +93,7 @@ type
     procedure     btnRemoveClick(Sender: TObject);
     procedure     cbSSLClick(Sender: TObject);
     procedure cbSASLClick(Sender: TObject);
+    procedure cbTLSClick(Sender: TObject);
   private
     FUser:        string;
     FPass:        string;
@@ -112,6 +114,8 @@ type
     procedure     SetServer(const Value: string);
     function      GetSSL: boolean;
     procedure     SetSSL(const Value: boolean);
+    function      GetTLS: boolean;
+    procedure     SetTLS(const Value: boolean);
     function      GetName: string;
     function      GetTimeLimit: Integer;
     procedure     SetTimeLimit(const Value: Integer);
@@ -137,6 +141,7 @@ type
     constructor   Create(AOwner: TComponent); override;
     property      Name: string read GetName write SetConnectionName;
     property      SSL: boolean read GetSSL write SetSSL;
+    property      TLS: boolean read GetTLS write SetTLS;
     property      Port: integer read GetPort write SetPort;
     property      LdapVersion: integer read GetLdapVersion write SetLdapVersion;
     property      AuthMethod: TLdapAuthMethod read GetAuthMethod write SetAuthMethod;
@@ -287,9 +292,19 @@ begin
   result:= cbSSL.Checked;
 end;
 
+function TConnPropDlg.GetTLS: boolean;
+begin
+  result:= cbTLS.Checked;
+end;
+
 procedure TConnPropDlg.SetSSL(const Value: boolean);
 begin
   cbSSL.Checked:=Value;
+end;
+
+procedure TConnPropDlg.SetTLS(const Value: boolean);
+begin
+  cbTLS.Checked:=Value;
 end;
 
 function TConnPropDlg.GetTimeLimit: Integer;
@@ -429,7 +444,9 @@ begin
   Asession.SSL:=SSL;
   ASession.AuthMethod:=AuthMethod;
   ASession.Port:= Port;
-  ASession.Version:=3;
+  ASession.Version:=LDAP_VERSION3;
+  ASession.User := UserEd.Text;
+  ASession.Password := PasswordEd.Text;
 
   try
     ASession.Connect;
@@ -566,18 +583,28 @@ end;
 procedure TConnPropDlg.cbSSLClick(Sender: TObject);
 begin
   if SSL then
-  begin
-    PortEd.Text := IntToStr(LDAP_SSL_PORT);
-    cbSASL.Checked := false;
-  end
+    PortEd.Text := IntToStr(LDAP_SSL_PORT)
   else
     PortEd.Text := IntToStr(LDAP_PORT);
+  cbTLS.Enabled := not SSL;
+  cbSasl.Enabled := not SSL;
 end;
 
 procedure TConnPropDlg.cbSASLClick(Sender: TObject);
 begin
   if cbSASL.Checked then
-    cbSSL.Checked := false
+  begin
+    cbSSL.Checked := false;
+    cbTLS.Checked := false;
+  end;
+  cbSSL.Enabled := not cbSASL.Checked;
+  cbTLS.Enabled := cbSSL.Enabled;
+end;
+
+procedure TConnPropDlg.cbTLSClick(Sender: TObject);
+begin
+  cbSSL.Enabled := not TLS;
+  cbSASL.Enabled := not TLS;
 end;
 
 end.

@@ -229,7 +229,7 @@ object UserDlg: TUserDlg
         Items.Strings = (
           'Never'
           'On:')
-        TabOrder = 0
+        TabOrder = 1
         OnClick = RadioGroup1Click
       end
       object DateTimePicker: TDateTimePicker
@@ -246,7 +246,7 @@ object UserDlg: TUserDlg
         Enabled = False
         Kind = dtkDate
         ParseInput = False
-        TabOrder = 1
+        TabOrder = 2
         OnChange = DateTimePickerChange
       end
       object ShadowPropertiesGroup: TGroupBox
@@ -255,7 +255,7 @@ object UserDlg: TUserDlg
         Width = 353
         Height = 233
         Caption = 'Shadow Properties'
-        TabOrder = 2
+        TabOrder = 0
         object Label35: TLabel
           Left = 32
           Top = 40
@@ -312,7 +312,7 @@ object UserDlg: TUserDlg
           Top = 176
           Width = 121
           Height = 21
-          TabOrder = 2
+          TabOrder = 4
           OnChange = EditChange
         end
         object ShadowLastChange: TEdit
@@ -328,7 +328,7 @@ object UserDlg: TUserDlg
           Top = 112
           Width = 121
           Height = 21
-          TabOrder = 4
+          TabOrder = 2
           OnChange = EditChange
         end
       end
@@ -451,7 +451,7 @@ object UserDlg: TUserDlg
         Width = 353
         Height = 21
         Style = csDropDownList
-        ItemHeight = 0
+        ItemHeight = 13
         TabOrder = 0
         OnChange = cbDomainChange
       end
@@ -479,7 +479,7 @@ object UserDlg: TUserDlg
         Width = 75
         Height = 25
         Caption = '&Advanced...'
-        TabOrder = 8
+        TabOrder = 9
         OnClick = BtnAdvancedClick
       end
       object cbAccntDisabled: TCheckBox
@@ -488,7 +488,7 @@ object UserDlg: TUserDlg
         Width = 265
         Height = 17
         Caption = 'Account is &disabled'
-        TabOrder = 9
+        TabOrder = 8
         OnClick = cbAccntDisabledClick
       end
     end
@@ -635,7 +635,7 @@ object UserDlg: TUserDlg
         Top = 224
         Width = 161
         Height = 21
-        TabOrder = 8
+        TabOrder = 9
         OnChange = EditChange
       end
       object postalAddress: TMemo
@@ -659,7 +659,7 @@ object UserDlg: TUserDlg
         Top = 128
         Width = 161
         Height = 21
-        TabOrder = 6
+        TabOrder = 7
         OnChange = EditChange
       end
       object postalCode: TEdit
@@ -675,7 +675,7 @@ object UserDlg: TUserDlg
         Top = 80
         Width = 161
         Height = 21
-        TabOrder = 5
+        TabOrder = 6
         OnChange = EditChange
       end
       object o: TEdit
@@ -691,7 +691,7 @@ object UserDlg: TUserDlg
         Top = 176
         Width = 161
         Height = 21
-        TabOrder = 7
+        TabOrder = 8
         OnChange = EditChange
       end
       object l: TEdit
@@ -707,7 +707,7 @@ object UserDlg: TUserDlg
         Top = 32
         Width = 161
         Height = 21
-        TabOrder = 9
+        TabOrder = 5
         OnChange = EditChange
       end
     end

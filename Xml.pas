@@ -22,6 +22,8 @@
     @Version 2006/09/13  v1.1.0. Added TXmlNode.CoptTo function
     @Version 2007/06/29  v1.2.0. Added Utf8 write support, T.Karlovic
     @Version 2007/07/02  v1.2.1. Added callback write support, T.Karlovic
+    @Version 2012/02/08  v1.2.2. Added EXmlException,
+                                 Added script tag support, T.Karlovic
   }
 
 unit Xml;
@@ -32,6 +34,25 @@ uses windows, sysutils, Classes, Contnrs;
 
 type
   TTagType=(tt_Open, tt_Close, tt_Single);
+
+  EXmlException = class(Exception)
+  private
+    FPosition: Integer;
+    FLine: Integer;
+    FTagName: string;
+    FMessage: string;
+    FMessage2: string;
+    FText: string;
+  public
+    constructor Create(Stream: TStream; const TagName, ErrMsg: string);
+    property Line: Integer read FLine;
+    property Position: Integer read FPosition;
+    property Tag: string read FTagName;
+    property Message: string read FMessage;
+    property Message2: string read FMessage2;
+    property XmlText: string read FText;
+  end;
+
 
   TXmlNode=class
   private
@@ -59,9 +80,9 @@ type
     procedure   Delete(Index: integer);
     function    NodeByName(AName: string; CaseSensitive: boolean=true; Lang: string=''): TXmlNode;
     property    CaseSensitive: boolean read GetCaseSens;
-   end;
+  end;
 
-   TStreamCallback = procedure (Node: TXmlNode) of object;
+  TStreamCallback = procedure (Node: TXmlNode) of object;
 
   TXmlTree=class
   private
@@ -94,11 +115,45 @@ implementation
 uses Misc;
 
 const
-  BAD_XML_DOCUMENT='Not well formed XML.';
-  XML_BAD_CLOSE_TAG=BAD_XML_DOCUMENT+#10+'The "%s" is expected, but the "%s" is received';
-  XML_UNEXPECTED_CLOSE_TAG=BAD_XML_DOCUMENT+#10+'Unexpected closing tag "%s"';
-  TAB='  ';//#9;
-  CRLF=#13#10;
+  BAD_XML_DOCUMENT         = 'Not well formed XML.';
+  XML_BAD_CLOSE_TAG        = 'The "%s" is expected, but the "%s" is received';
+  XML_UNEXPECTED_CLOSE_TAG = 'Unexpected closing tag "%s"';
+  TAB                      = '  ';//#9;
+  CRLF                     = #13#10;
+
+{ EXmlException }
+
+constructor EXmlException.Create(Stream: TStream; const TagName, ErrMsg: string);
+  procedure CountLines(var Lines, Pos: Integer);
+  var
+    i, il, iend: Integer;
+  begin
+    SetLength(FText, Stream.Size);
+    iend := Stream.Position;
+    Stream.Position := 0;
+    Stream.Read(FText[1], Stream.Size);
+    i := 1;
+    il := 1;
+    Lines := 0;
+    while i < iEnd do
+    begin
+      if FText[i] = #13 then
+      begin
+        inc(Lines);
+        il := i;
+      end;
+      inc(i);
+    end;
+    while FText[il] in [#13,#10] do inc(il);
+    Pos := iend - il - Length(Tag);
+  end;
+begin
+  inherited Create(ErrMsg);
+  FTagName := TagName;
+  FMessage := BAD_XML_DOCUMENT;
+  FMessage2 := ErrMsg;
+  CountLines(FLine, FPosition);
+end;
 
 { TXmlNode }
 
@@ -214,7 +269,7 @@ end;
 
 function TXmlTree.GetNextTag(Stream: TStream; var PrevContent, TagName, Attrs: string; var TagType: TTagType): boolean;
 type
-  TState=(tsContent, tsTag, tsAttrs, tsEnd, tsSkip, tsComment);
+  TState=(tsContent, tsScriptContent, tsTag, tsScriptTag, tsAttrs, tsEnd, tsSkip, tsComment);
 var
   c: char;
   State: TState;
@@ -223,10 +278,14 @@ var
 begin
   result:=false;
   PrevContent:='';
+  if (TagType = tt_Open) and (TagName='script') then
+    State := tsScriptContent
+  else
+    State:=tsContent;
+
   TagName:='';
   attrs:='';
   TagType:=tt_Open;
-  State:=tsContent;
   quota:=false;
   CommentState:=0;
   while (Stream.Position<Stream.Size) do begin
@@ -236,6 +295,24 @@ begin
       tsContent:  case c of
                     '<':  State:=tsTag;
                     else  PrevContent:=PrevContent+c;
+                  end;
+      //////////////////////////////////////////////////////////////////////////
+      tsScriptContent:
+                  case c of
+                    '<':  State:=tsScriptTag;
+                    else  PrevContent:=PrevContent+c;
+                  end;
+      tsScriptTag:
+                  case c of
+                    '/': begin
+                           if TagName='' then TagType:=tt_Close
+                           else TagType:=tt_Single;
+                           State:=tsTag;
+                         end;
+                    else begin
+                      PrevContent:=PrevContent+'<'+c;
+                      State := tsScriptContent;
+                    end;
                   end;
       //////////////////////////////////////////////////////////////////////////
       tsTag:      case c of
@@ -275,7 +352,7 @@ begin
      tsComment:   case c of
                     '-':  inc(CommentState);
                     '>':  if CommentState=2 then State:=tsContent;
-                    else  CommentState:=0;  
+                    else  CommentState:=0;
                   end;
     ////////////////////////////////////////////////////////////////////////////
     end;
@@ -315,8 +392,8 @@ begin
                   end;
         //////////////////////////////////////////////////////////////////////////
         tt_Close: begin
-                    if Node=nil then raise Exception.Create(format(XML_UNEXPECTED_CLOSE_TAG,[TagName]));
-                    if Node.Name<>TagName then raise Exception.Create(format(XML_BAD_CLOSE_TAG, [Node.Name, TagName]));
+                    if Node=nil then raise EXmlException.Create(Stream, TagName, format(XML_UNEXPECTED_CLOSE_TAG,[TagName]));
+                    if Node.Name<>TagName then raise EXmlException.Create(Stream, TagName, format(XML_BAD_CLOSE_TAG, [Node.Name, TagName]));
 
                     Node.Content:=ClearContent(Node.Content+PrevContent);
                     Node:=Node.Parent;
@@ -386,10 +463,6 @@ begin
 end;
 
 procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil);
-  {procedure WriteString(Value: string);
-  begin
-    Stream.WriteBuffer(Value[1], length(Value));
-  end;}
   procedure WriteString(Value: string);
   var
     s: string;

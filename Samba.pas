@@ -201,7 +201,9 @@ type
 
 implementation
 
-uses md4, smbdes, Sysutils, Misc;
+{$I LdapAdmin.inc}
+
+uses {$IFDEF VARIANTS} variants, {$ENDIF} md4, smbdes, Sysutils, Misc;
 
 { This function is ported from mkntpwd.c written by Anton Roeckseisen (anton@genua.de) }
 

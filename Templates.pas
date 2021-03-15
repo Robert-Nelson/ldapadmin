@@ -1,5 +1,5 @@
   {      LDAPAdmin - Templates.pas
-  *      Copyright (C) 2006-2008 Tihomir Karlovic
+  *      Copyright (C) 2006-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -26,13 +26,12 @@ interface
 {$DEFINE REGEXPR}
 
 uses ComCtrls, LdapClasses, Classes, Contnrs, Controls, StdCtrls, ExtCtrls, Xml, Windows,
-     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask
+     Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask, Script
     {$IFDEF REGEXPR}
     { Note: If you want to compile templates with regex support you'll need }
     { Regexpr.pas unit from TRegeExpr library (http://www.regexpstudio.com) }
     , Regexpr
-    {$ENDIF}
-     ;
+    {$ENDIF};
 
 
 const
@@ -116,6 +115,7 @@ type
   end;
 
   TTemplateSVControl = class(TTemplateControl)
+  private
     fLdapValue:   TLdapAttributeData;
     fParams:      TStringList;
   protected
@@ -126,7 +126,7 @@ type
   end;
 
   TTemplateMVControl = class(TTemplateControl)
-    fLdapValue:   TLdapAttributeData;
+  private
     fParams:      TStringList;
   protected
     {$IFDEF REGEXPR}
@@ -410,7 +410,33 @@ type
     procedure     Validate; override;
   end;
 
+  TTemplateCtrlLabel = class(TTemplateSVControl)
+  private
+    fFixedText:   Boolean;
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+    procedure     EventProc(Attribute: TLdapAttribute; Event: TEventType); override;
+    procedure     SetValue(AValue: TTemplateAttributeValue); override;
+    procedure     Read; override;
+    procedure     Write; override;
+  end;
+
   { Template classes }
+
+  TTemplateScriptEvent = class
+  private
+    fControl: TTemplateControl;
+    fNode:      TXmlNode;
+    function    GetEventName: string;
+    function    GetCode: string;
+  public
+    constructor Create(Control: TTemplateControl; Node: TXmlNode);
+    property    Control: TTemplateControl read fControl;
+    property    Name: string read GetEventName;
+    property    Code: string read GetCode;
+  end;
 
   TTemplateControlList = class(TObjectList)
   private
@@ -424,6 +450,13 @@ type
     function      GetAttribute(Index: Integer): TTemplateAttribute;
   public
     property      Attributes[Index: integer]: TTemplateAttribute read GetAttribute; default;
+  end;
+
+  TTemplateScriptEventList = class(TObjectList)
+  private
+    function      GetEvent(Index: Integer): TTemplateScriptEvent;
+  public
+    property      Events[Index: integer]: TTemplateScriptEvent read GetEvent; default;
   end;
 
   TTemplateAttributeValue = class
@@ -477,13 +510,12 @@ type
     FIcon:        TBitmap;
     function      GetObjectclasses(Index: Integer): string;
     function      GetObjectclassCount: Integer;
-  protected
   public
     constructor   Create(const AFileName: string); reintroduce;
     function      Matches(ObjectClass: TLdapAttribute): Boolean;
     destructor    Destroy; override;
     property      Name: string read FName;
-    procedure     Parse(AElements: TObjectList);
+    procedure     Parse(Control: TTemplateControl; out Script: TCustomScript);
     property      Description: string read FDescription;
     property      Objectclasses[Index: Integer]: string read GetObjectclasses;
     property      ObjectclassCount: Integer read GetObjectclassCount;
@@ -541,10 +573,10 @@ implementation
 uses
   {$IFDEF VARIANTS} variants, {$ENDIF}
   commctrl, base64, SysUtils, Misc, Params, Config, PassDlg, Constant, WinLdap,
-  Pickup;
+  Pickup, ParseErr;
 
 const
-  CONTROLS_CLASSES: array[0..16] of TTControl = ( TTemplateCtrlEdit,
+  CONTROLS_CLASSES: array[0..17] of TTControl = ( TTemplateCtrlEdit,
                                                   TTemplateCtrlCombo,
                                                   TTemplateCtrlComboList,
                                                   TTemplateCtrlComboLookupList,
@@ -560,8 +592,12 @@ const
                                                   TTemplateCtrlDateTime,
                                                   TTemplateCtrlPickupDlg,
                                                   TTemplateCtrlNumber,
-                                                  TTemplateCtrlInteger );
+                                                  TTemplateCtrlInteger,
+                                                  TTemplateCtrlLabel );
   //DEFAULT_CONTROL_CLASS: TTControl = TTemplateCtrlEdit;
+
+  EVENT_NAMES: string = 'ONCLICK,ONDBLCLICK,ONKEYDOWN,ONKEYPRESS,ONKEYUP,' +
+                        'ONMOUSEDOWN,ONMOUSEMOVE,ONMOUSEUP,ONRESIZE';
 
 function GetXmlTypeByClass(AClass: TTControl): string;
 const
@@ -656,6 +692,30 @@ begin
   Result := true;
 end;
 
+function CreateScript(XmlNode: TXmlNode): TCustomScript;
+var
+  XmlType: string;
+  FileName: string;
+begin
+  XmlType := XmlNode.Attributes.Values['type'];
+
+  if (XmlType = '') or (XmlType='text/javascript') then
+    Result := TJavaScript.Create
+  else
+  if (XmlType = '') or (XmlType='text/vbscript') then
+    Result := TVisualBasicScript.Create
+  else
+    raise Exception.Create('Unsupported script type: ' + XmlType);
+
+  Filename := XmlNode.Attributes.Values['src'];
+  if FileName <> '' then
+    Result.Lines.Text := FileReadString(FileName)
+  else
+    Result.Lines.Text := XmlNode.Content;
+
+  Result.AddScriptlet(CreateHostScriptlet(Result, nil, nil));
+end;
+
 function CreateControl(ControlTemplate: TXmlNode; Attribute: TTemplateAttribute): TTemplateControl;
 var
   AClass: TTControl;
@@ -673,7 +733,6 @@ begin
   else
     Result := nil;
 end;
-
 
 { TTemplateMVControl }
 function TTemplateMVControl.GetParams: TStringList;
@@ -738,8 +797,6 @@ var
   i: Integer;
 begin
   fLdapAttribute := Attribute;
-  {if fLdapAttribute.ValueCount = 0 then
-    fLdapAttribute.AddValue;}
   if UseDefaults then
     for i := 0 to TemplateAttribute.ValuesCount - 1 do
     begin
@@ -820,7 +877,7 @@ begin
         Control.Width := Control.Parent.ClientWidth - CT_LEFT_BORDER - CT_RIGHT_BORDER;
       AdjustSizes;
     end
-    else with TTemplateAttribute(Elements[i]) do
+    else if Elements[i] is TTemplateAttribute then with TTemplateAttribute(Elements[i]) do
       for j := 0 to Controls.Count - 1 do with Controls[j] do
       begin
         if Assigned(Control) and Assigned(Control.Parent) then
@@ -874,6 +931,46 @@ var
   AAttribute: TTemplateAttribute;
   AControl: TTemplateControl;
   Node: TXmlNode;
+
+  function GetColor(const Value: string): TColor;
+  var
+    i: Integer;
+    c: Cardinal;
+    s: string;
+  begin
+    // convert html style hex numbers to pascal hex
+    s := Value;
+    i := Pos('#', s);
+    if i > 0 then
+      s[i] := '$';
+    try
+      c := StrToInt(s);
+    except
+      on E: EConvertError do
+        raise Exception.Create(Format(stIdentIsNotValid, [Value, stInteger]))
+      else
+        raise;
+    end;
+    //Reorder bytes to BGR as expected by TColor
+    Result := (c shr 16 + c and $00FF00 + c shl 16) and $00FFFFFF;
+  end;
+
+  procedure ParseStyle(const Value: string);
+  var
+    style: TFontStyles;
+  begin
+    style := TLabel(fControl).Font.Style;
+    if Pos('bold', Value) > 0 then
+       style := style + [fsBold];
+    if Pos('italic', Value) > 0 then
+       style := style + [fsItalic];
+    if Pos('underline', Value) > 0 then
+       style := style + [fsUnderline];
+    if Pos('strikeout', Value) > 0 then
+       style := style + [fsStrikeOut];
+    TLabel(fControl).Font.Style := style;
+  end;
+
 begin
 
   if Assigned(XmlNode) then
@@ -910,29 +1007,50 @@ begin
         end;
       end
       else
-      if Name = 'height' then
-      begin
-        fControl.Height := CheckStrToInt(Content, Name);
-        fAutoSize := false;
-      end
-      else
       if Name = 'caption' then
       begin
         if XmlLanguageMatch(XmlNode[i]) then
           fCaption := Content
       end
       else
+      if Name = 'height' then
+      begin
+        fControl.Height := CheckStrToInt(Content, Name);
+        fAutoSize := false;
+      end
+      else
+      if Name = 'color' then
+        TLabel(fControl).Color := GetColor(Content)
+      else
+      if Name = 'fontcolor' then
+        TLabel(fControl).Font.Color := GetColor(Content)
+      else
+      if Name = 'fontstyle' then
+        ParseStyle(Content)
+      else
+      if Name = 'enabled' then
+      begin
+        if Content='false' then
+          fControl.Enabled := false;
+      end
+      else
       if Name = 'name' then
-        fName := Content
+      begin
+        fName := Content;
+        fControl.Name := fName;
+      end
       else
       if Name = 'datacontrol' then
-        fDataControlName := Content;
+        fDataControlName := Content
+      else
+      if Pos(Uppercase(Name), EVENT_NAMES) > 0 then
+        fElements.Add(TTemplateScriptEvent.Create(Self, XmlNode[i]));
      end;
 
     NotParented:=(fControl.Parent=nil);
 
     if NotParented then begin
-      //If parent is not set and we try to set Items have exception "Control has no parent window" .
+      // Prevent "Control has no parent window" exception when Items are set
       fControl.Visible:=false;
       fControl.Parent:=Application.MainForm;
     end;
@@ -1642,7 +1760,7 @@ begin
     for i := 0 to ValuesCount -  1 do
     begin
       s := FormatValue(Values[i].AsString, Attribute.Entry);
-      if not IsParametrized(s) then
+      if s <> Cells[0, i] then
         Cells[0, i] := s;
     end;
     Write;
@@ -1653,7 +1771,6 @@ constructor TTemplateCtrlGrid.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
   fControl := TEditGrid.Create(nil);
-  //TEditGrid(fControl).OnExit := OnExitProc;
   TEditGrid(fControl).OnExit := MyExitProc;
 end;
 
@@ -1740,8 +1857,11 @@ constructor TTemplateCtrlTextArea.Create(Attribute: TTemplateAttribute);
 begin
   inherited;
   fControl := TMemo.Create(nil);
-  Tmemo(fControl).OnChange := OnChangeProc;
-  TMemo(fControl).OnExit := OnExitProc;
+  with TMemo(fControl) do begin
+    Scrollbars := ssVertical;
+    OnChange := OnChangeProc;
+    OnExit := OnExitProc;
+  end;
 end;
 
 { TTemplateCtrlCheckBox }
@@ -2358,13 +2478,15 @@ var
   i, j: Integer;
   Value: TTemplateAttributeValue;
   Attr: TLdapAttribute;
+  s: string;
 begin
   if Assigned(fLdapAttribute) and Assigned(fLdapAttribute.Entry) and Assigned(fLdapAttribute.Entry.Session) then
   with TPickupDlg.Create(Sender as TControl) do
   try
     Caption := fCaption;
     for i := 0 to High(fColNames) do
-      Columns[i].Caption := fColNames[i];
+      s := s + '"' + fColNames[i] + '"' + ',';
+    ColumnNames := s;
     Populate(fLdapAttribute.Entry.Session, fFilter, fColumns);
     if (ShowModal = mrOK) and Assigned(fDataControl) then
     begin
@@ -2492,7 +2614,7 @@ begin
   with TButton(fControl) do begin
     OnExit := OnExitProc;
     OnClick := ButtonClick;
-    Caption := 'Browse...';
+    Caption := cBrowse;
   end;
 end;
 
@@ -2528,6 +2650,51 @@ begin
       raise Exception.Create(Format(stIdentIsNotValid, [TEdit(fControl).Text, stInteger]));
     end;
   end;
+end;
+
+{ TTemplateCtrlLabel }
+
+procedure TTemplateCtrlLabel.SetValue(AValue: TTemplateAttributeValue);
+begin
+
+end;
+
+procedure TTemplateCtrlLabel.Read;
+begin
+  if not fFixedText and Assigned(fControl) and Assigned(fLdapValue) then
+    (fControl as TLabel).Caption := fLdapValue.AsString;
+end;
+
+procedure TTemplateCtrlLabel.Write;
+begin
+
+end;
+
+procedure TTemplateCtrlLabel.LoadProc(XmlNode: TXmlNode);
+var
+  Node: TXmlNode;
+begin
+  Node:=XmlNode.NodeByName('text');
+  if Assigned(Node) then
+  begin
+    TLabel(fControl).Caption := Node.Content;
+    fFixedText := true;
+  end;
+end;
+
+procedure TTemplateCtrlLabel.EventProc(Attribute: TLdapAttribute; Event: TEventType);
+begin
+  if not fFixedText then // Control setting has priority over attribute setting
+    with (fControl as TLabel), fTemplateAttribute do
+      if Event = etChange then
+        if ValuesCount > 0 then
+          Caption := FormatValue(Values[0].AsString, Attribute.Entry);
+end;
+
+constructor TTemplateCtrlLabel.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+  fControl := TLabel.Create(nil);
 end;
 
 { TTemplateList }
@@ -2595,6 +2762,31 @@ begin
   Result := TTemplateControl(TObjectList(Self)[Index]);
 end;
 
+{ TTemplateScriptEventList }
+
+function TTemplateScriptEventList.GetEvent(Index: Integer): TTemplateScriptEvent;
+begin
+  Result := TTemplateScriptEvent(TObjectList(Self)[Index]);
+end;
+
+{ TTemplateScriptEvent }
+
+function TTemplateScriptEvent.GetEventName: string;
+begin
+  Result := fNode.Name;
+end;
+
+function TTemplateScriptEvent.GetCode: string;
+begin
+  Result := fNode.Content;
+end;
+
+constructor TTemplateScriptEvent.Create(Control: TTemplateControl; Node: TXmlNode);
+begin
+  fControl := Control;
+  fNode := Node;
+end;
+
 { TTemplateParser }
 
 constructor TTemplateParser.Create;
@@ -2634,7 +2826,17 @@ var
     Template: TTemplate;
     i: Integer;
   begin
-    Template := TTemplate.Create(name);
+    try
+      Template := TTemplate.Create(name);
+    except
+      on E:EXmlException do
+      begin
+        ParseError(mtError, Application.MainForm, sr.Name, E.Message, E.Message2, E.XmlText, E.Tag, E.Line, E.Position);
+        Exit;
+      end;
+      on E:Exception do
+        raise Exception.Create(Name +': ' + #13#10 + E.Message);
+    end;
     fTemplateFiles.AddObject(name, Template);
     for i := 0 to Template.Extends.Count - 1 do
       fExtensionList.Add(Template.Extends[i], Template);
@@ -2763,7 +2965,7 @@ begin
     end
     else
     if Name = 'icon' then
-      LoadIcon(fIcon, FXmlTree.Root[i]);
+      LoadIcon(fIcon, FXmlTree.Root[i])
   end;
 end;
 
@@ -2791,12 +2993,12 @@ begin
     Result := 0;
 end;
 
-procedure TTemplate.Parse(AElements: TObjectList);
+procedure TTemplate.Parse(Control: TTemplateControl; out Script: TCustomScript);
 var
   Node: TXmlNode;
-  i: Integer;
+  i, j: Integer;
   AAttribute: TTemplateAttribute;
-
+  AControl: TTemplateControl;
 begin
   for i:=0 to FXmlTree.Root.Count-1 do
   begin
@@ -2804,11 +3006,29 @@ begin
     if Node.Name = 'attribute' then
     begin
       AAttribute := TTemplateAttribute.Create(Node);
-      AElements.Add(AAttribute);
+      Control.Elements.Add(AAttribute);
+      for j := 0 to AAttribute.Controls.Count - 1 do
+        AAttribute.Controls[j].ParentControl := Control;
     end
     else
     if Node.Name = 'control' then
-      AElements.Add(CreateControl(Node, nil));
+    begin
+      AControl := CreateControl(Node, nil);
+      if Assigned(AControl) then
+      begin
+        Control.Elements.Add(AControl);
+        AControl.ParentControl := Control;
+      end;
+    end
+    else
+    if Node.Name = 'script' then
+    begin
+      if not Assigned(Script) then
+        Script := CreateScript(FXmlTree.Root[i])
+      else
+        Script.Lines.Text := Script.Lines.Text + #10#13 + Node.Content;
+    end;
+
   end;
 end;
 

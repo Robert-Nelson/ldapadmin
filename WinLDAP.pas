@@ -2578,6 +2578,20 @@ function ldap_conn_from_msg(PrimaryConn: PLDAP; res: PLDAPMessage): PLDAP; cdecl
 //  Do we reference the connection for each message so that we can safely get
 //  the connection pointer back by calling ldap_conn_from_msg?
 //
+
+{$EXTERNALSYM ldap_start_tls_s}
+function ldap_start_tls_sA( ExternalHandle: PLDAP; ServerReturnValue: PULONG;
+                           result: PPLDAPMessage; ServerControls: PPLDAPControl;
+                           ClientControls: PPLDAPControl): ULONG; cdecl;
+function ldap_start_tls_sW( ExternalHandle: PLDAP; ServerReturnValue: PULONG;
+                           result: PPLDAPMessage; ServerControls: PPLDAPControl;
+                           ClientControls: PPLDAPControl): ULONG; cdecl;
+function ldap_start_tls_s( ExternalHandle: PLDAP; ServerReturnValue: PULONG;
+                           result: PPLDAPMessage; ServerControls: PPLDAPControl;
+                           ClientControls: PPLDAPControl): ULONG; cdecl;
+{$EXTERNALSYM ldap_stop_tls_s}
+function ldap_stop_tls_s( ExternalHandle: PLDAP): BOOLEAN; cdecl;
+
 const
   {$EXTERNALSYM LDAP_OPT_REF_DEREF_CONN_PER_MSG}
   LDAP_OPT_REF_DEREF_CONN_PER_MSG = $94;
@@ -2816,8 +2830,10 @@ function ldap_close_extended_op; external LDAPLib name 'ldap_close_extended_op';
 function LdapGetLastError; external LDAPLib name 'LdapGetLastError';
 function LdapMapErrorToWin32; external LDAPLib name 'LdapMapErrorToWin32';
 function ldap_conn_from_msg; external LDAPLib name 'ldap_conn_from_msg';
-
-
+function ldap_start_tls_sA; external LDAPLib name 'ldap_start_tls_sA';
+function ldap_start_tls_sW; external LDAPLib name 'ldap_start_tls_sW';
+function ldap_start_tls_s; external LDAPLib name 'ldap_start_tls_sA';
+function ldap_stop_tls_s; external LDAPLib name 'ldap_stop_tls_s';
 
 // Macros.
 function LDAP_IS_CLDAP(ld: PLDAP): boolean;

@@ -320,6 +320,7 @@ begin
     Name               := Account.Name;
     Base               := Account.Base;
     SSL                := Account.SSl;
+    TLS                := Account.TLS;
     Port               := Account.Port;
     LdapVersion        := Account.LdapVersion;
     User               := Account.User;
@@ -340,6 +341,7 @@ begin
       Account.Name               := Name;
       Account.Base               := Base;
       Account.SSL                := SSl;
+      Account.TLS                := TLS;
       Account.Port               := Port;
       Account.LdapVersion        := LdapVersion;
       Account.User               := User;

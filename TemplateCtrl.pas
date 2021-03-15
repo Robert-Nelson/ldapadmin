@@ -1,5 +1,5 @@
   {      LDAPAdmin - TemplateCtrl.pas
-  *      Copyright (C) 2006-2008 Tihomir Karlovic
+  *      Copyright (C) 2006-2012 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -24,7 +24,7 @@ unit TemplateCtrl;
 interface
 
 uses Classes, Forms, Controls, ComCtrls, StdCtrls, ExtCtrls, Templates, LdapClasses,
-     Graphics, Windows, Contnrs, Constant;
+     Graphics, Windows, Contnrs, Constant, Script;
 
 type
   TEventHandler = class
@@ -42,18 +42,22 @@ type
     fPanel: TTemplateCtrlPanel;
     fControls: TTemplateControlList;
     fAttributes: TTemplateAttributeList;
+    fEvents: TTemplateScriptEventList;
     fEntry: TLdapEntry;
     fTemplate: TTemplate;
+    fScript: TCustomScript;
     fEventHandler: TEventHandler;
     fHandlerInstalled: Boolean;
     fLeftBorder, fRightBorder: Integer;
     fFixTop: Integer;
     fSpacing, fGroupSpacing: Integer;
+    fBreakRequested: Boolean;
     procedure SetTemplate(Template: TTemplate);
     procedure SetEventHandler(AHandler: TeventHandler);
     procedure SetEntry(AEntry: TLdapEntry);
     procedure OnControlChange(Sender: TObject);
     procedure OnControlExit(Sender: TObject);
+    procedure ScriptQueryContinue(Sender: TObject; var Allow: Boolean);
   protected
     procedure InstallHandlers;
     procedure RemoveHandlers;
@@ -148,7 +152,7 @@ type
 
 implementation
 
-uses SysUtils, Misc, Config, Grids;
+uses SysUtils, Misc, Config, Grids, ParseErr, Dialogs;
 
 { TEventHandler }
 
@@ -263,6 +267,15 @@ begin
   end;
 end;
 
+procedure TTemplatePanel.ScriptQueryContinue(Sender: TObject; var Allow: Boolean);
+begin
+  if (GetAsyncKeyState(VK_CANCEL) <> 0) and (MessageBox(Handle, 'Do you want to abort the script?', 'Confirm', MB_ICONQUESTION + MB_YESNO) = mrYes) then
+  begin
+    fBreakRequested := true;
+    Allow := false;
+  end;
+end;
+
 procedure TTemplatePanel.InstallHandlers;
 var
   i: Integer;
@@ -339,7 +352,10 @@ var
       begin
         fControls.Add(Element);
         HandleElements(TTemplateControl(Element).Elements);
-      end;
+      end
+      else
+      if Element is TTemplateScriptEvent then
+        fEvents.Add(Element);
     end;
   end;
 
@@ -374,7 +390,7 @@ begin
     Parent := Application.MainForm;
   end;
   try
-    fPanel.Load(Template.XmlTree.Root);
+    fTemplate.Parse(fPanel, fScript);
     Self.Height := fPanel.Control.Height;
     Self.Width := fPanel.Control.Width;
 
@@ -394,6 +410,38 @@ begin
     AdjustControls;
 
     if not Active then InstallHandlers;
+
+    if Assigned(fScript) then
+    try
+      fScript.OnQueryContinue := ScriptQueryContinue;    
+      fScript.AddScriptlet(CreateWinControlScriptlet(fScript, fPanel.Control as TWinControl, 'form'));
+      fScript.AddScriptlet(CreateScriptlet(fScript, fEntry.Session, 'session'));
+      fScript.AddScriptlet(CreateScriptlet(fScript, fEntry, 'entry'));
+      fScript.Execute;
+      for i := 0 to fEvents.Count - 1 do with fEvents[i] do
+      try
+        FScript.AddEventHandlerCode(CreateComponentScriptlet(FScript, Control.Control) as IObjectScriptlet, Name, Code);
+      except
+        on E: EScriptException do
+          ParseError(mtError, Application.MainForm, Name, E.Message, E.Message2, Code, E.Identifier, E.Line, E.Position);
+        on E: Exception do
+          raise;
+      end;
+      { If there is OnRead event installed by the script we trigger it again since }
+      { the original OnRead event was triggered before the script was activated. }
+      if Assigned(fEntry.OnRead) then fEntry.OnRead(fEntry);
+    except
+      on E: EScriptException do
+      begin
+        if fBreakRequested then
+          ParseError(mtInformation, Application.MainForm, fTemplate.Name, stUserBreak, '', E.Code, E.Identifier, E.Line, E.Position)
+        else
+          ParseError(mtError, Application.MainForm, fTemplate.Name, E.Message, E.Message2, E.Code, E.Identifier, E.Line, E.Position);
+        Abort;
+      end;
+      on E: Exception do
+        raise;
+    end;
 
   finally
     if NotParented then
@@ -421,6 +469,8 @@ begin
   fControls.OwnsObjects := false;
   fAttributes := TTemplateAttributeList.Create;
   fAttributes.OwnsObjects := false;
+  fEvents := TTemplateScriptEventList.Create;
+  fEvents.OwnsObjects := false;
   fLeftBorder := CT_LEFT_BORDER;
   fRightBorder := CT_RIGHT_BORDER;
   fFixTop := CT_FIX_TOP;
@@ -430,7 +480,9 @@ end;
 
 destructor TTemplatePanel.Destroy;
 begin
+  fScript.Free;
   fPanel.Free;
+  fEvents.Free;
   fAttributes.Free;
   fControls.Free;
   inherited;
@@ -817,18 +869,16 @@ end;
 
 destructor TTemplateForm.Destroy;
 begin
-  fEntry.Free;
-  while PageControl.PageCount > 0 do
-    PageControl.Pages[0].Free;
+  inherited;
+  {while ComponentCount > 0 do
+    Components[0].Free;}
   fEventHandler.Free;
   fTemplatePanels.Free;
-
+  fEntry.Free;
   try
     GlobalConfig.WriteInteger(rTemplateFormHeight, Height);
     GlobalConfig.WriteInteger(rTemplateFormWidth, Width);
   except end; // just in case
-
-  inherited;
 end;
 
 procedure TTemplateForm.AddTemplate(ATemplate: TTemplate);

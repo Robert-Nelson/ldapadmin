@@ -178,7 +178,7 @@ procedure TPrefDlg.SetBtnClick(Sender: TObject);
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
-    Columns[1].Caption:='Description';
+    ColumnNames := 'Name,Description';
     Populate(Session, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;

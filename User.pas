@@ -593,7 +593,6 @@ procedure TUserDlg.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 var
   uidnr: Integer;
   newdn: string;
-  idType: Integer;
 begin
   if ModalResult = mrOk then
   begin
@@ -605,12 +604,9 @@ begin
         PosixAccount.Cn := InetOrgPerson.DisplayName
       else
         PosixAccount.Cn := PosixAccount.Uid;
-      idType := AccountConfig.ReadInteger(rPosixIDType, POSIX_ID_RANDOM);
-      if idType <> POSIX_ID_NONE then
+      uidnr := GetUid(Session);
+      if uidnr <> -1 then
       begin
-        uidnr := Session.GetFreeUidNumber(AccountConfig.ReadInteger(rposixFirstUID, FIRST_UID),
-                                          AccountConfig.ReadInteger(rposixLastUID, LAST_UID),
-                                          IdType = POSIX_ID_SEQUENTIAL);
         if cbSamba.Checked then
           SambaAccount.UidNumber := uidnr
         else
@@ -959,7 +955,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
-    Columns[1].Caption:='Description';
+    ColumnNames := 'Name,Description';
     Populate(Session, GetGroupQuery(true), ['cn', 'description']);
 
     if ShowModal=MrOK then begin
@@ -1073,7 +1069,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickGroups;
-    Columns[1].Caption:='Description';
+    ColumnNames := 'Name,Description';
     Populate(Session, sPOSIXGROUPS, ['cn', 'description']);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmGroup;

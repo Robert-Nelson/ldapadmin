@@ -186,6 +186,7 @@ var
 begin
   with TPickupDlg.Create(self) do begin
     Caption := cPickAccounts;
+    ColumnNames := 'Name,DN';
     Populate(fSession, sCOMPUTERS, ['uid', PSEUDOATTR_DN]);
     Images:=MainFrm.ImageList;
     ImageIndex:=bmComputer;

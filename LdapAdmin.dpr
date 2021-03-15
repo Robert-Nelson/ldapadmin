@@ -63,7 +63,10 @@ uses
   Params in 'Params.pas',
   PicView in 'PicView.pas' {ViewPicFrm},
   Sorter in 'Sorter.pas',
-  ShaCrypt in 'ShaCrypt.pas';
+  ShaCrypt in 'ShaCrypt.pas',
+  ParseErr in 'ParseErr.pas' {ParseErrDlg},
+  ScriptIntf in 'ScriptIntf.pas',
+  Script in 'Script.pas';
 
 {$R *.RES}
 
