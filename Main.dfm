@@ -22,8 +22,8 @@ object MainFrm: TMainFrm
   TextHeight = 13
   object TreeSplitter: TSplitter
     Left = 257
-    Top = 29
-    Height = 520
+    Top = 32
+    Height = 517
     Beveled = True
     ExplicitTop = 34
     ExplicitHeight = 527
@@ -32,7 +32,6 @@ object MainFrm: TMainFrm
     Left = 0
     Top = 0
     Width = 855
-    Height = 29
     AutoSize = True
     BorderWidth = 1
     ButtonHeight = 28
@@ -165,14 +164,12 @@ object MainFrm: TMainFrm
   end
   object ListViewPanel: TPanel
     Left = 260
-    Top = 29
+    Top = 32
     Width = 595
-    Height = 520
+    Height = 517
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitTop = 32
-    ExplicitHeight = 517
     object ViewSplitter: TSplitter
       Left = 0
       Top = 182
@@ -250,19 +247,17 @@ object MainFrm: TMainFrm
   end
   object TreeViewPanel: TPanel
     Left = 0
-    Top = 29
+    Top = 32
     Width = 257
-    Height = 520
+    Height = 517
     Align = alLeft
     BevelOuter = bvNone
     TabOrder = 3
-    ExplicitTop = 32
-    ExplicitHeight = 517
     object LDAPTree: TTreeView
       Left = 0
       Top = 0
       Width = 257
-      Height = 481
+      Height = 478
       Align = alClient
       DragCursor = crDefault
       DragMode = dmAutomatic
@@ -286,18 +281,16 @@ object MainFrm: TMainFrm
       OnEndDrag = LDAPTreeEndDrag
       OnExpanding = LDAPTreeExpanding
       OnStartDrag = LDAPTreeStartDrag
-      ExplicitHeight = 478
     end
     object SearchPanel: TPanel
       Left = 0
-      Top = 481
+      Top = 478
       Width = 257
       Height = 39
       Align = alBottom
       BevelOuter = bvNone
       TabOrder = 1
       Visible = False
-      ExplicitTop = 478
       DesignSize = (
         257
         39)
@@ -341,7 +334,7 @@ object MainFrm: TMainFrm
     Left = 336
     Top = 488
     Bitmap = {
-      494C010132003600740010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
+      494C0101320036007C0010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       000000000000360000002800000040000000D0000000010020000000000000D0
       00000000000000000000000000000000000000000000008CBD00008CBD00008C
       BD00008CBD00008CBD00008CBD00008CBD00008CBD00008CBD00008CBD00008C

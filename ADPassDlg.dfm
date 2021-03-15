@@ -15,14 +15,14 @@ object ADPassDlg: TADPassDlg
   object Label1: TLabel
     Left = 8
     Top = 12
-    Width = 73
+    Width = 74
     Height = 13
     Caption = '&New password:'
   end
   object Label2: TLabel
     Left = 8
     Top = 44
-    Width = 86
+    Width = 90
     Height = 13
     Caption = '&Confirm password:'
   end

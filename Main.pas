@@ -373,10 +373,11 @@ begin
       finally
         LdapTree.Items.EndUpdate;
       end;
-    end
-    else
-    if ValueListView.Visible and (TObjectInfo(Node.Data).dn = Entry.dn) then
-        RefreshValueListView(Node);
+    end;
+    if ValueListView.Visible then
+      RefreshValueListView(LDAPTree.Selected);
+    if EntryListView.Visible then
+      RefreshEntryListView(LDAPTree.Selected);
   end;
 end;
 
@@ -1381,7 +1382,8 @@ procedure TMainFrm.ValueListViewCustomDrawItem(Sender: TCustomListView; Item: TL
 var
   i: Integer;
 begin
-  with ValueListView.Canvas do begin
+  with ValueListView.Canvas do
+  try
     if odd(Item.Index) then Brush.Color:=$00f0f0f0;
     with TLdapAttributeData(Item.Data), Font do
     begin
@@ -1407,6 +1409,9 @@ begin
            end;
         end;
     end;
+  except
+  { Ignore errors. Any errors here would be non-critical and in case of an eror
+    we would have to exit the app or otherwise never come out of the exception loop.}
   end;
 end;
 

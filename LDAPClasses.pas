@@ -109,7 +109,7 @@ type
     property DataSize: Cardinal read fBerval.Bv_Len;
     property Data: PBytes read fBerval.Bv_Val;
     property Berval: PLdapBerval read BervalAddr;
-    property ModOp: Cardinal read fModOp;
+    property ModOp: Cardinal read fModOp write fModOp;
     property Attribute: TLdapAttribute read fAttribute;
   end;
 
@@ -568,15 +568,29 @@ procedure TLdapSession.LDAPCheck(const err: ULONG; const Critical: Boolean = tru
 var
   ErrorEx: PChar;
   msg: string;
+  c: ULONG;
 begin
   if (err = LDAP_SUCCESS) then exit;
-  if ((ldap_get_option(pld, LDAP_OPT_SERVER_ERROR, @ErrorEx)=LDAP_SUCCESS) and Assigned(ErrorEx)) then
+
+  {msg := '';
+  if (ldap_get_option(pld, LDAP_OPT_SERVER_EXT_ERROR, @c) = LDAP_SUCCESS) then
+    msg := SysErrorMessage(c);
+
+  if msg = '' then}
   begin
-    msg := Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]);
-    ldap_memfree(ErrorEx);
-  end
-  else
-    msg := Format(stLdapError, [ldap_err2string(err)]);
+    if ((ldap_get_option(pld, LDAP_OPT_SERVER_ERROR, @ErrorEx)=LDAP_SUCCESS) and Assigned(ErrorEx)) then
+    begin
+      msg := Format(stLdapErrorEx, [ldap_err2string(err), ErrorEx]);
+      ldap_memfree(ErrorEx);
+    end
+    else
+      msg := Format(stLdapError, [ldap_err2string(err)]);
+    // TODO check with OpenLdap
+    if (ldap_get_option(pld, LDAP_OPT_SERVER_EXT_ERROR, @c) = LDAP_SUCCESS) then
+      msg := msg + #10 + SysErrorMessage(c);
+    //
+  end;
+
   if Critical then
     raise ErrLDAP.Create(msg);
   MessageDlg(msg, mtError, [mbOk], 0);

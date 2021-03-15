@@ -1,5 +1,5 @@
   {      LDAPAdmin - CustomMenus.pas
-  *      Copyright (C) 2013 Tihomir Karlovic
+  *      Copyright (C) 2013-2016 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -211,7 +211,7 @@ const
                     aidNone,
                     aidNone,
                     aidNone,
-                    aidNone,
+                    aidUser,
                     aidNone,
                     aidNone,
                     aidNone,
@@ -662,6 +662,7 @@ begin
   AddMenuItem(mcOU, aidOu, @scCtrlO);
   AddMenuItem(mcHost, aidHost);
   AddMenuItem(mcLocality, aidLocality);
+  AddMenuItem(mcUser, aidUser, @scCtrlU);
 end;
 
 end.

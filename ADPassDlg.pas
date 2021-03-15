@@ -36,6 +36,7 @@ type
     Label2: TLabel;
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
   private
+    fEntry: TLdapEntry;
     fLdapPath: WideString;
     fUsername: wideString;
     fPassword: WideString;
@@ -49,21 +50,27 @@ var
 implementation
 
 {$R *.DFM}
+{$DEFINE USE_ADSIE}
 
-uses ActiveDs_TLB, adsie, Constant;
+uses {$IFDEF USE_ADSIE} ActiveDs_TLB, adsie, {$ELSE} AdObjects, {$ENDIF}
+     Constant {$IFNDEF UNICODE}, Misc{$ENDIF};
 
 constructor TADPassDlg.Create(AOwner: TComponent; Entry: TLdapEntry);
 begin
   inherited Create(AOwner);
+  fEntry := Entry;
+  {$IFDEF USE_ADSIE}
   with Entry.Session do
   begin
     fLdapPath := 'LDAP://' + Server + '/' + Entry.dn;
     fUserName := User;
     fPassword := Password;
   end;
+  {$ENDIF}
 end;
 
 procedure TADPassDlg.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+{$IFDEF USE_ADSIE}
 var
   User: IADSUser;
 begin
@@ -79,6 +86,20 @@ begin
     end;
   end;
 end;
+{$ELSE}
+var
+  Pwd: Widestring;
+  val: TLdapAttributeData;
+begin
+  if (ModalResult = mrOk) then
+  begin
+    if Password.Text <> Password2.Text then
+      raise Exception.Create(stPassDiff);
+    fEntry.SetPassword(Password.Text);
+    fEntry.Write;
+  end;
+end;
+{$ENDIF}
 
 end.
 
