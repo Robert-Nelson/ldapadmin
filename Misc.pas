@@ -131,7 +131,7 @@ var
 begin
   if Len > 0 then
   begin
-    bsiz := Len * 3;
+    bsiz := Len * 4;
     SetLength(Result, bsiz);
     {$IFNDEF UNICODE}
     SetLength(Temp, bsiz);
@@ -151,7 +151,7 @@ function WideStringToUtf8Len(const src: PWideChar; const Len: Integer): AnsiStri
 var
   bsiz: Integer;
 begin
-  bsiz := Len * 3;
+  bsiz := Len * 4;
   SetLength(Result, bsiz);
   bsiz := WideCharToMultiByte(CP_UTF8, 0, src, Len, PAnsiChar(Result), bsiz, nil, nil);
   SetLength(Result, bsiz);

@@ -42,7 +42,7 @@ object CustomMenuDlg: TCustomMenuDlg
       Anchors = [akTop, akRight]
       Caption = '&Cancel'
       ModalResult = 2
-      TabOrder = 1
+      TabOrder = 2
     end
     object btnOK: TButton
       Left = 519
@@ -51,8 +51,18 @@ object CustomMenuDlg: TCustomMenuDlg
       Height = 25
       Anchors = [akTop, akRight]
       Caption = '&OK'
+      Enabled = False
       ModalResult = 1
+      TabOrder = 1
+    end
+    object btnReset: TButton
+      Left = 439
+      Top = 12
+      Width = 75
+      Height = 25
+      Caption = '&Reset'
       TabOrder = 0
+      OnClick = btnResetClick
     end
   end
   object Panel4: TPanel
@@ -206,6 +216,7 @@ object CustomMenuDlg: TCustomMenuDlg
           Width = 97
           Height = 21
           TabOrder = 0
+          OnChange = cbCtrlClick
         end
         object cbCtrl: TCheckBox
           Left = 24
@@ -214,6 +225,7 @@ object CustomMenuDlg: TCustomMenuDlg
           Height = 17
           Caption = 'Ctrl'
           TabOrder = 1
+          OnClick = cbCtrlClick
         end
         object cbShift: TCheckBox
           Left = 80
@@ -222,6 +234,7 @@ object CustomMenuDlg: TCustomMenuDlg
           Height = 17
           Caption = 'Shift'
           TabOrder = 2
+          OnClick = cbCtrlClick
         end
         object cbAlt: TCheckBox
           Left = 136
@@ -230,6 +243,7 @@ object CustomMenuDlg: TCustomMenuDlg
           Height = 17
           Caption = 'Alt'
           TabOrder = 3
+          OnClick = cbCtrlClick
         end
       end
     end
@@ -289,5 +303,10 @@ object CustomMenuDlg: TCustomMenuDlg
     OnTimer = ScrollTimerTimer
     Left = 32
     Top = 352
+  end
+  object ApplicationEvents1: TApplicationEvents
+    OnIdle = ApplicationEvents1Idle
+    Left = 152
+    Top = 416
   end
 end

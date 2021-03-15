@@ -25,7 +25,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Constant,
+  StdCtrls, ExtCtrls, ComCtrls, LDAPClasses, WinLDAP, ImgList, Constant, NetUtil,
   ExtDlgs, TemplateCtrl, CheckLst, ShellApi, Connection, AdObjects, Vcl.AppEvnts;
 
 //{$DEFINE MIDNIGHT_TO_ZERO_DAY_ADJUST}
@@ -277,7 +277,6 @@ begin
     if TimePicker.Checked then
     begin
       TimePicker.Checked := false;
-      //TimePickerChange(nil);
       HandleTimePickersCheckboxes;
     end;
     {$ELSE}
@@ -290,10 +289,8 @@ begin
     else
     if not FTimeCheckedState and (Frac(TimePicker.Time) = 0) then
       DatePicker.Date := DatePicker.Date + 1; // Handle change from midnight to 00:00:00 next day
-    //TimePickerChange(nil);
     HandleTimePickersCheckboxes;
     {$ENDIF}
-    Value := Value - 1;
   end
   else
     TimePicker.DateTime := Value;
@@ -558,6 +555,44 @@ begin
 end;
 
 procedure TADUserDlg.Save;
+
+  procedure TrustRetry(ErrorMsg: string);
+  var
+    cName, Msg: string;
+    Trust: TTrustConnection;
+    Cursor: TCursor;
+  begin
+    CName := WrapGetComputerNameEx(ComputerNameDnsFullyQualified);
+    Msg := Format(stInvalidSid, [ErrorMsg, CName, fADH.NTDomain]);
+    Msg := Msg + #10#10 + Format(stRetryWithTrust, [CName]);
+    if MessageDlg(Msg, mtConfirmation, mbYesNo, 0) = mrYes then
+    begin
+      Cursor := Screen.Cursor;
+      Screen.Cursor := crHourGlass;
+      try
+        Trust := TTrustConnection.Create(Connection);
+        try
+          if Trust.ErrorCode = NO_ERROR then
+            SetUserCannotChangePassword(Entry, clbxAccountOptions.Checked[afCanNotChangePwd]); // Retry
+        finally
+          Screen.Cursor := Cursor;
+          Trust.Free;
+        end;
+      except
+        on E: Exception do
+        begin
+          Screen.Cursor := Cursor;
+          raise Exception.CreateFmt(stTrustConnFailed, [CName, E.Message]);
+        end;
+      end;
+        Screen.Cursor := Cursor;
+    end
+    else begin
+      MessageDlg(Format(stTrustConnManual, [CName]), mtInformation, [mbOk], 0);
+      Abort;
+    end;
+  end;
+
 begin
   CheckSchema;
   if esNew in Entry.State then
@@ -586,7 +621,7 @@ begin
   end;
 
   with clbxAccountOptions do
-  try
+  begin
     if Checked[afCanNotChangePwd] <> fCanNotChangePwd then
     begin
       try
@@ -595,19 +630,17 @@ begin
         on E: EOleException do
         begin
           if (ResultCode(E.ErrorCode) = ERROR_INVALID_SID) and (fADH.NTDomain <> GetNetBIOSDomain) then
-            raise Exception.CreateFmt(stInvalidSid, [E.Message,
-                  WrapGetComputerNameEx(ComputerNameDnsFullyQualified), fADH.NTDomain]);
+            TrustRetry(E.Message)
+          else
+            raise;
         end
         else
           raise;
       end;
       fCanNotChangePwd := Checked[afCanNotChangePwd];
     end;
-  except
-    fCanNotChangePwd := GetUserCanNotChangePassword(Entry);
-    Checked[afCanNotChangePwd] := fCanNotChangePwd;
-    raise;
   end;
+
 end;
 
 procedure TADUserDlg.Load;

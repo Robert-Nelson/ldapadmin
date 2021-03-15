@@ -1,5 +1,5 @@
   {      LDAPAdmin - CustMenuDlg.pas
-  *      Copyright (C) 2013 Tihomir Karlovic
+  *      Copyright (C) 2013-2017 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -26,7 +26,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   ComCtrls, Menus, ImgList, ActnList, ExtCtrls, StdCtrls, CustomMenus,
-  ToolWin, Connection;
+  ToolWin, Connection, Vcl.AppEvnts;
 
 const
   CB_ICON_INDENT =  4;
@@ -48,6 +48,8 @@ const
 
 
 type
+  TSaveStatus = set of (ssModified, ssReset);
+
   TCustomMenuDlg = class(TForm)
     MainMenu: TMainMenu;
     Panel2: TPanel;
@@ -81,6 +83,8 @@ type
     cbCtrl: TCheckBox;
     cbShift: TCheckBox;
     cbAlt: TCheckBox;
+    btnReset: TButton;
+    ApplicationEvents1: TApplicationEvents;
     procedure TreeViewChange(Sender: TObject; Node: TTreeNode);
     procedure rbClick(Sender: TObject);
     procedure edCaptionChange(Sender: TObject);
@@ -112,18 +116,24 @@ type
     procedure TreeViewCustomDrawItem(Sender: TCustomTreeView;
       Node: TTreeNode; State: TCustomDrawState; var DefaultDraw: Boolean);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure btnResetClick(Sender: TObject);
+    procedure ApplicationEvents1Idle(Sender: TObject; var Done: Boolean);
+    procedure cbCtrlClick(Sender: TObject);
   private
     fImageList: TImageList;
     fActMenu: TCustomActionMenu;
+    fSaveStatus: TSaveStatus;
     procedure ActionItemToTreeView(ActionItem: TCustomActionItem; TreeView: TTreeview);
     procedure AddItem(const ActionIndex: Integer; const Caption: string);
     procedure SetNodeIcon(Node: TTreeNode; Item: TCustomActionItem);
     procedure SetOverlayImage(node: TTreeNode; const OverlayIndex: Integer);
     function  ValidateInput: Boolean;
+    function  GetShortcut: TShortCut;
   public
     constructor Create(AOwner: TComponent; AImageList: TImageList; AActionMenu: TCustomActionMenu); reintroduce;
     destructor  Destroy; override;
-    procedure AlignMenu;
+    procedure   AlignMenu;
+    property    SaveStatus: TSaveStatus read fSaveStatus;
   end;
 
 function CustomizeMenu(AOwner: TComponent; AImageList: TImageList; Connection: TConnection): Boolean;
@@ -144,8 +154,12 @@ begin
   dlg := TCustomMenuDlg.Create(AOwner, AImageList, Connection.ActionMenu);
   if dlg.ShowModal = mrOk then
   begin
-    dlg.fActMenu.Clone(Connection.ActionMenu);
-    dlg.fActMenu.Save;
+    if dlg.fActMenu.DefaultMenu and not (ssModified in dlg.SaveStatus) then
+      Connection.ActionMenu.Reset(true)
+    else begin
+      dlg.fActMenu.Clone(Connection.ActionMenu);
+      dlg.fActMenu.Save;
+    end;
     Result := true;
   end;
   dlg.Free;
@@ -189,6 +203,7 @@ begin
   SetNodeIcon(Node, NewItem);
   Node.Text := NewItem.Caption;
   Node.Selected := true;
+  fSaveStatus := fSaveStatus + [ssModified];
 end;
 
 procedure TCustomMenuDlg.SetNodeIcon(Node: TTreeNode; Item: TCustomActionItem);
@@ -266,10 +281,7 @@ begin
         exit;
       end;
 
-     AShortCut := TextToShortcut(cbShortcutKey.Text);
-     if cbCtrl.Checked then AShortCut := AShortCut or scCtrl;
-     if cbShift.Checked then AShortCut := AShortCut or scShift;
-     if cbAlt.Checked then AShortCut := AShortCut or scAlt;
+     AShortcut := GetShortcut;
 
      if AShortcut <> ShortCut then
      begin
@@ -284,6 +296,13 @@ begin
   end;
 end;
 
+function TCustomMenuDlg.GetShortcut: TShortcut;
+begin
+  Result := TextToShortcut(cbShortcutKey.Text);
+  if cbCtrl.Checked then Result := Result or scCtrl;
+  if cbShift.Checked then Result := Result or scShift;
+  if cbAlt.Checked then Result := Result or scAlt;
+end;
 
 constructor TCustomMenuDlg.Create(AOwner: TComponent; AImageList: TImageList; AActionMenu: TCustomActionMenu);
 var
@@ -293,8 +312,7 @@ begin
 
   TSizeGrip.Create(Panel3);
 
-  fActMenu := TCustomActionMenu.Create(nil);
-  AActionMenu.Clone(fActMenu);
+  fActMenu := AActionMenu.Clone;
 
   fImageList := TImageList.Create(Self);
   fImageList.AddImages(AImageList);
@@ -405,7 +423,8 @@ var
   end;
 
 begin
-
+  if Enabled = rbDisabled.Checked then
+    fSaveStatus := fSaveStatus + [ssModified];
   with TCustomActionItem(TreeView.Selected.Data) do
   try
     LockControl(Self, true);
@@ -443,7 +462,10 @@ begin
       else
         ActionId := DefaultAction;
       if ax <> ActionId then
+      begin
         SetNodeIcon(TreeView.Selected, TCustomActionItem(TreeView.Selected.Data));
+        fSaveStatus := fSaveStatus + [ssModified];
+      end;
     end;
     fActMenu.AssignItems(mbTest);
     AlignMenu;
@@ -455,9 +477,12 @@ end;
 procedure TCustomMenuDlg.edCaptionChange(Sender: TObject);
 begin
   if Assigned(TreeView.Selected) then
-  with TCustomActionItem(TreeView.Selected.Data) do begin
+  with TCustomActionItem(TreeView.Selected.Data) do
+  if Caption <> edCaption.Text then
+  begin
     Caption := edCaption.Text;
     TreeView.Selected.Text := Caption;
+    fSaveStatus := fSaveStatus + [ssModified];
   end;
 end;
 
@@ -482,6 +507,29 @@ begin
   // Force menu bar to redraw
   Menu := nil;
   Menu := MainMenu;
+end;
+
+procedure TCustomMenuDlg.ApplicationEvents1Idle(Sender: TObject;
+  var Done: Boolean);
+begin
+  btnOk.Enabled := (ssModified in SaveStatus) or (ssReset in SaveStatus);
+  btnReset.Enabled := (ssModified in SaveStatus) or not fActMenu.DefaultMenu;
+end;
+
+procedure TCustomMenuDlg.btnResetClick(Sender: TObject);
+begin
+  if MessageDlg(stResetToDefault, mtConfirmation, mbYesNo, 0) = mrYes then
+  begin
+    fActMenu.Reset;
+    fSaveStatus := fSaveStatus + [ssReset] - [ssModified];
+    ActionItemToTreeView(fActMenu.Items, TreeView);
+    fActMenu.AssignItems(mbTest);
+    AlignMenu;
+    TreeView.Items[0].Selected := true;  // Select root (there's always one)
+    {GroupBox1.Visible := false;
+    GroupBox2.Visible := false;
+    Panel5.Visible := false;}
+  end;
 end;
 
 procedure TCustomMenuDlg.TreeViewContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
@@ -572,6 +620,7 @@ begin
       fActMenu.AssignItems(mbTest);
       AlignMenu;
       TreeView.Selected.Delete;
+      fSaveStatus := fSaveStatus + [ssModified];
     end;
   end;
 end;
@@ -634,6 +683,12 @@ begin
   cbDefaultAction.Canvas.FillRect(Rect);
   fImageList.Draw(cbDefaultAction.Canvas, Rect.Left + CB_ICON_INDENT, Rect.Top, GetActionImage(Index + aidEntry));
   cbDefaultAction.Canvas.Textout(Rect.Left + fImageList.Width + CB_TEXT_INDENT, Rect.Top, cbDefaultAction.Items[Index]);
+end;
+
+procedure TCustomMenuDlg.cbCtrlClick(Sender: TObject);
+begin
+  if TCustomActionItem(TreeView.Selected.Data).Shortcut <> GetShortcut then
+    fSaveStatus := fSaveStatus + [ssModified];
 end;
 
 procedure TCustomMenuDlg.cbDefaultActionChange(Sender: TObject);
