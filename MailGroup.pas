@@ -76,7 +76,6 @@ type
     function FindDataString(dstr: PChar): Boolean;
     procedure Save;
     procedure MailButtons(Enable: Boolean);
-    //procedure PickupGetImgIndex(const Entry: TLdapEntry; var ImageIndex: integer);
   public
     constructor Create(AOwner: TComponent; dn: string; Session: TLDAPSession; Mode: TEditMode); reintroduce;
   end;
@@ -162,12 +161,6 @@ begin
     end;
 end;
 
-{procedure TMailGroupDlg.PickupGetImgIndex(const Entry: TLdapEntry; var ImageIndex: integer);
-begin
-  if Entry.AttributesByName['objectclass'].IndexOf('mailGroup')>-1 then ImageIndex:=bmMailGroup
-  else ImageIndex:=bmPosixUser;
-end;}
-
 procedure TMailGroupDlg.AddUserBtnClick(Sender: TObject);
 var
   UserItem: TListItem;
@@ -176,11 +169,9 @@ begin
   with TPickupDlg.Create(self) do begin
     Caption:=cPickAccounts;
     ColumnNames := 'Name,Description';
-    Populate(Session, sMAILACCNT,  ['uid', ''{, 'objectClass'}]);
-    Populate(Session, sMAILGROUPS, ['cn',  'Description'{, 'objectClass'}]);
+    Populate(Session, sMAILACCNT,  ['uid', '']);
+    Populate(Session, sMAILGROUPS, ['cn',  'Description']);
 
-    {Images:=MainFrm.ImageList;
-    OnGetImageIndex:=PickupGetImgIndex;}
     ShowModal;
 
     for i:=0 to SelCount-1 do  begin

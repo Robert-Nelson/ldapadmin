@@ -30,7 +30,7 @@ const
   SafeInitChar: set of Char = [#$01..#09, #$0B..#$0C, #$0E..#$1F, #$21..#$39, #$3B, #$3D..#$7F];
 
 type
-  TLdifMode = (fmRead, fmWrite, fmAppend);
+  TLdifMode =        (fmRead, fmWrite, fmAppend);
   TAttributeOpMode = (amAdd, amModify, amDelete);
   TValueOpMode     = (vmSep, vmAdd, vmReplace, vmDelete);
 
@@ -424,7 +424,7 @@ end;
 
 function TLDIFFile.GetNumRead: Integer;
 begin
-  Result := F.Pos;
+  Result := F.Position;
 end;
 
 function TLDIFFile.GetUnixWrite: Boolean;

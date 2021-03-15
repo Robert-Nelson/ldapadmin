@@ -292,6 +292,7 @@ type
     constructor   Create(AOwnsObjects: Boolean = true);
     destructor    Destroy; override;
     procedure     Add(Entry: TLdapEntry);
+    procedure     Delete(Index: Integer);
     procedure     Clear;
     property      Items[Index: Integer]: TLdapEntry read GetNode; default;
     property      Count: Integer read GetCount;
@@ -303,6 +304,7 @@ type
 { Name handling routines }
 function  DecodeDNString(const Src: string; const Escape: Char ='\'): string;
 function  EncodeDNString(const Src: string; const Escape: Char ='\'): string;
+function  IsValidDn(Value: string): Boolean;
 function  CanonicalName(dn: string): string;
 procedure SplitRdn(const dn: string; var attrib, value: string);
 function  GetAttributeFromDn(const dn: string): string;
@@ -384,6 +386,24 @@ begin
       p := CharNext(p);
   end;
   Result := Result + Copy(p0, 1, Length(Src));
+end;
+
+function IsValidDn(Value: string): Boolean;
+var
+  i: Integer;
+  comp: PPChar;
+begin
+  i := 0;
+  comp := ldap_explode_dn(PChar(Value), 0);
+  if Assigned(comp) then
+  while PCharArray(comp)[i] <> nil do
+  begin
+    if StrScan(PCharArray(comp)[i], '=') = nil then
+      break;
+    inc(i);
+  end;
+  Result := PCharArray(comp)[i] = nil;
+  ldap_value_free(comp);
 end;
 
 function CanonicalName(dn: string): string;
@@ -1225,25 +1245,28 @@ begin
     case ldapAuthMethod of
       AUTH_SIMPLE:   res := ldap_simple_bind_s(ldappld, PChar(ldapUser), PChar(ldapPassword));
       AUTH_GSS,
-      AUTH_GSS_SASL: if (ldapUser <> '') or (ldapPassword <> '') then
-                     begin
-                       ident.User := PChar(ldapUser);
-                       ident.UserLength := Length(ldapUser);
-                       ident.Domain := '';
-                       ident.DomainLength := 0;
-                       ident.Password := PChar(ldapPassword);
-                       ident.PasswordLength := Length(Password);
-                       {$IFDEF UNICODE}
-                       ident.Flags := SEC_WINNT_AUTH_IDENTITY_UNICODE;
-                       {$ELSE}
-                       ident.Flags := SEC_WINNT_AUTH_IDENTITY_ANSI;
-                       {$ENDIF}
+      AUTH_GSS_SASL: begin
+                       if (ldapUser <> '') or (ldapPassword <> '') then
+                       begin
+                         ident.User := PChar(ldapUser);
+                         ident.UserLength := Length(ldapUser);
+                         ident.Domain := '';
+                         ident.DomainLength := 0;
+                         ident.Password := PChar(ldapPassword);
+                         ident.PasswordLength := Length(ldapPassword);
+                         {$IFDEF UNICODE}
+                         ident.Flags := SEC_WINNT_AUTH_IDENTITY_UNICODE;
+                         {$ELSE}
+                         ident.Flags := SEC_WINNT_AUTH_IDENTITY_ANSI;
+                         {$ENDIF}
+                         v := @ident;
+                       end
+                       else
+                         v := nil;
                        if ldapAuthMethod = AUTH_GSS_SASL then
                          LdapCheck(ldap_set_option(pld,LDAP_OPT_ENCRYPT, LDAP_OPT_ON));
-                       res := ldap_bind_s(ldappld, nil, @ident, LDAP_AUTH_NEGOTIATE);
-                     end
-                     else
-                       res := ldap_bind_s(ldappld, nil, nil, LDAP_AUTH_NEGOTIATE);
+                       res := ldap_bind_s(ldappld, nil, v, LDAP_AUTH_NEGOTIATE);
+                     end;
     else
       raise Exception.Create('Invalid authentication method!');
     end;
@@ -1872,6 +1895,11 @@ end;
 procedure TLdapEntryList.Add(Entry: TLdapEntry);
 begin
   fList.Add(Entry);
+end;
+
+procedure TLdapEntryList.Delete(Index: Integer);
+begin
+  fList.Delete(Index)
 end;
 
 procedure TLdapEntryList.Clear;

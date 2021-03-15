@@ -26,7 +26,7 @@ interface
 uses Forms, Xml, XmlLoader, Classes;
 
 const
-  MAX_STRING_ID = 560;
+  MAX_STRING_ID = 580;
   LANG_EXT      = 'llf';
 
 type
@@ -886,7 +886,7 @@ begin
   fStringTable[$10000 - PResStringRec(@ComConst.SVarNotObject   ).Identifier] := 489;
   fStringTable[$10000 - PResStringRec(@ComConst.SNoMethod       ).Identifier] := 488;
   fStringTable[$10000 - PResStringRec(@ComConst.SOleError       ).Identifier] := 487;
-  fStringTable[$10000 - PResStringRec(@Constant.SAVE_MODIFY_FILTER).Identifier] := 107;
+  fStringTable[$10000 - PResStringRec(@Constant.SAVE_MODIFY_LOG_FILTER).Identifier] := 107;
   fStringTable[$10000 - PResStringRec(@OleConst.sNoRunningObject).Identifier] := 499;
   {SysConst_SAccessViolation
 SysConst_SWin32Error
@@ -1045,7 +1045,7 @@ SysConst_SUnkWin32Error}
   fStringTable[$10000 - PResStringRec(@Constant.stUserBreak).Identifier] := 104;
   fStringTable[$10000 - PResStringRec(@Constant.stWritePropRO).Identifier] := 105;
   fStringTable[$10000 - PResStringRec(@Constant.SAVE_SEARCH_FILTER).Identifier] := 106;
-  fStringTable[$10000 - PResStringRec(@Constant.SAVE_MODIFY_FILTER).Identifier] := 107;
+  fStringTable[$10000 - PResStringRec(@Constant.SAVE_MODIFY_LOG_FILTER).Identifier] := 107;
   fStringTable[$10000 - PResStringRec(@Constant.stReqNoEmpty).Identifier] := 108;
   fStringTable[$10000 - PResStringRec(@Constant.stRequired).Identifier] := 109;
   fStringTable[$10000 - PResStringRec(@Constant.stResetAutolock).Identifier] := 110;

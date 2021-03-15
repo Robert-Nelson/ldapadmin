@@ -77,7 +77,10 @@ uses
   CustMenuDlg in 'CustMenuDlg.pas' {CustomMenuDlg},
   ObjectInfo in 'ObjectInfo.pas',
   XmlLoader in 'XmlLoader.pas',
-  Lang in 'Lang.pas';
+  Lang in 'Lang.pas',
+  VCLFixes in 'VCLFixes.pas',
+  ListViewDlg in 'ListViewDlg.pas' {ListViewDlg},
+  Bookmarks in 'Bookmarks.pas' {BookmarkDlg};
 
 {$R *.RES}
 

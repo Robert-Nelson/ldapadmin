@@ -245,109 +245,6 @@ object PrefDlg: TPrefDlg
     object tsSamba: TTabSheet
       Caption = '&Samba'
       ImageIndex = 1
-      object gbSambaDefaults: TGroupBox
-        Left = 16
-        Top = 138
-        Width = 513
-        Height = 196
-        Caption = 'Default settings:'
-        TabOrder = 1
-        object lblScript: TLabel
-          Left = 72
-          Top = 99
-          Width = 30
-          Height = 13
-          Alignment = taRightJustify
-          Caption = 'Script:'
-        end
-        object lblHomeShare: TLabel
-          Left = 48
-          Top = 35
-          Width = 60
-          Height = 13
-          Alignment = taRightJustify
-          Caption = 'Home share:'
-        end
-        object lblProfilePath: TLabel
-          Left = 48
-          Top = 131
-          Width = 56
-          Height = 13
-          Alignment = taRightJustify
-          Caption = 'Profile path:'
-        end
-        object lblHomeDrive: TLabel
-          Left = 48
-          Top = 67
-          Width = 57
-          Height = 13
-          Alignment = taRightJustify
-          Caption = 'Home drive:'
-        end
-        object edScript: TEdit
-          Left = 112
-          Top = 95
-          Width = 353
-          Height = 21
-          TabOrder = 2
-        end
-        object edHomeShare: TEdit
-          Left = 112
-          Top = 31
-          Width = 353
-          Height = 21
-          TabOrder = 0
-        end
-        object edProfilePath: TEdit
-          Left = 112
-          Top = 127
-          Width = 353
-          Height = 21
-          TabOrder = 3
-        end
-        object cbHomeDrive: TComboBox
-          Left = 112
-          Top = 63
-          Width = 65
-          Height = 21
-          Style = csDropDownList
-          ItemHeight = 13
-          TabOrder = 1
-          Items.Strings = (
-            'C:'
-            'D:'
-            'E:'
-            'F:'
-            'G:'
-            'H:'
-            'I:'
-            'J:'
-            'K:'
-            'L:'
-            'M:'
-            'N:'
-            'O:'
-            'P:'
-            'Q:'
-            'R:'
-            'S:'
-            'T:'
-            'U:'
-            'V:'
-            'W:'
-            'X:'
-            'Y:'
-            'Z:')
-        end
-        object cbxLMPasswords: TCheckBox
-          Left = 112
-          Top = 160
-          Width = 225
-          Height = 17
-          Caption = 'LANMAN Passwords'
-          TabOrder = 4
-        end
-      end
       object gbServer: TGroupBox
         Left = 16
         Top = 16
@@ -386,6 +283,135 @@ object PrefDlg: TPrefDlg
           Style = csDropDownList
           ItemHeight = 0
           TabOrder = 1
+        end
+      end
+      object PageControl1: TPageControl
+        Left = 16
+        Top = 136
+        Width = 513
+        Height = 201
+        ActivePage = TabSheet1
+        TabOrder = 1
+        object TabSheet1: TTabSheet
+          Caption = 'Default &paths'
+          object lblScript: TLabel
+            Left = 72
+            Top = 91
+            Width = 30
+            Height = 13
+            Alignment = taRightJustify
+            Caption = 'Script:'
+          end
+          object lblHomeShare: TLabel
+            Left = 43
+            Top = 27
+            Width = 60
+            Height = 13
+            Alignment = taRightJustify
+            Caption = 'Home share:'
+          end
+          object lblProfilePath: TLabel
+            Left = 48
+            Top = 123
+            Width = 56
+            Height = 13
+            Alignment = taRightJustify
+            Caption = 'Profile path:'
+          end
+          object lblHomeDrive: TLabel
+            Left = 48
+            Top = 59
+            Width = 57
+            Height = 13
+            Alignment = taRightJustify
+            Caption = 'Home drive:'
+          end
+          object edScript: TEdit
+            Left = 112
+            Top = 87
+            Width = 353
+            Height = 21
+            TabOrder = 0
+          end
+          object edHomeShare: TEdit
+            Left = 112
+            Top = 23
+            Width = 353
+            Height = 21
+            TabOrder = 1
+          end
+          object edProfilePath: TEdit
+            Left = 112
+            Top = 119
+            Width = 353
+            Height = 21
+            TabOrder = 2
+          end
+          object cbHomeDrive: TComboBox
+            Left = 112
+            Top = 55
+            Width = 65
+            Height = 21
+            Style = csDropDownList
+            ItemHeight = 13
+            TabOrder = 3
+            Items.Strings = (
+              'C:'
+              'D:'
+              'E:'
+              'F:'
+              'G:'
+              'H:'
+              'I:'
+              'J:'
+              'K:'
+              'L:'
+              'M:'
+              'N:'
+              'O:'
+              'P:'
+              'Q:'
+              'R:'
+              'S:'
+              'T:'
+              'U:'
+              'V:'
+              'W:'
+              'X:'
+              'Y:'
+              'Z:')
+          end
+        end
+        object TabSheet2: TTabSheet
+          Caption = '&Options'
+          ImageIndex = 1
+          object Bevel1: TBevel
+            Left = 24
+            Top = 112
+            Width = 465
+            Height = 42
+            Shape = bsFrame
+          end
+          object cbxLMPasswords: TCheckBox
+            Left = 40
+            Top = 125
+            Width = 249
+            Height = 17
+            Caption = 'LANMAN Passwords'
+            TabOrder = 0
+          end
+          object rgRid: TRadioGroup
+            Left = 24
+            Top = 16
+            Width = 465
+            Height = 81
+            Caption = 'RID method'
+            ItemIndex = 0
+            Items.Strings = (
+              'Use algorithmic RID assignment'
+              'Use sambaNextRid for RID generation')
+            TabOrder = 1
+          end
         end
       end
     end

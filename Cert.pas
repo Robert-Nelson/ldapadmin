@@ -1,5 +1,5 @@
   {      LDAPAdmin - Cert.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -273,12 +273,40 @@ begin
 
 end;
 
+function AddStore(Collection: HCERTSTORE; pvSystemStore: PChar): Boolean;
+var
+  Store: HCERTSTORE;
+begin
+  Result := false;
+  Store := CertOpenSystemStore(0, pvSystemStore);
+  if Store <> nil then
+  begin
+    Result := CertAddStoreToCollection(Collection, Store, 0, 0);
+    CertCloseStore(Store, 0);
+  end
+end;
+
+{ Enumerate calback function }
+
+function EnumSysCallback(pvSystemStore: Pointer; dwFlags: DWORD; pStoreInfo: PCERT_SYSTEM_STORE_INFO;
+                         pvReserved: Pointer; pvArg: Pointer): BOOL; stdcall;
+var
+  s: string;
+begin
+  {$IFNDEF UNICODE}
+   s := WideCharToString(pvSystemStore);
+   pvSystemStore := PChar(s);
+  {$ENDIF}
+  if not AddStore(HCERTSTORE(pvArg), pvSystemStore) then
+    ShowMessageFmt(stCertOpenStoreErr, [WideCharToString(pvSystemStore), SysErrorMessage(GetLastError)]);
+  Result := true;
+end;
+
 { VERIFYSERVERCERT callback function }
 
 function VerifyCert(Connection: PLDAP; pServerCert: PCCERT_CONTEXT): BOOLEAN; cdecl ;
 var
   Collect: HCERTSTORE;
-  MyStore, CaStore, RootStore: HCERTSTORE;
   flags: DWORD;
   iCert, pSub: PCCERT_CONTEXT;
   err: Cardinal;
@@ -287,26 +315,17 @@ var
 begin
   Result := false;
   psub := PCCERT_CONTEXT(Pointer(pServerCert)^);
-  Collect:= CertOpenStore ({CERT_STORE_PROV_COLLECTION}LPCSTR(11), 0, 0, 0, nil);
-  MyStore:= CertOpenSystemStore (0, 'MY');
-  if MyStore <> nil then
+  Collect := CertOpenStore ({CERT_STORE_PROV_COLLECTION}LPCSTR(11), 0, 0, 0, nil);
+  if Collect = nil then
+    RaiseLastWin32Error;
+  if not CertEnumSystemStore(CERT_SYSTEM_STORE_CURRENT_USER, nil, Collect, EnumSysCallback) then
   begin
-    CertAddStoreToCollection(Collect, MyStore, 0, 0);
-    CertCloseStore(MyStore, 0);
+    AddStore(Collect, 'MY');
+    AddStore(Collect, 'CA');
+    AddStore(Collect, 'ROOT');
+    AddStore(Collect, 'SPC');
+    AddStore(Collect, 'TRUST');
   end;
-  CaStore:= CertOpenSystemStore (0, 'CA');
-  if CaStore <> nil then
-  begin
-    CertAddStoreToCollection (Collect, CaStore, 0, 2);
-    CertCloseStore(CaStore, 0);
-  end;
-  RootStore:= CertOpenSystemStore (0, 'ROOT');
-  if RootStore <> nil then
-  begin
-    CertAddStoreToCollection (Collect, RootStore, 0, 1);
-    CertCloseStore(RootStore, 0);
-  end;
-
   flags:= CERT_STORE_SIGNATURE_FLAG or CERT_STORE_TIME_VALIDITY_FLAG;
   iCert:= CertGetIssuerCertificateFromStore(collect, pSub, nil, @flags);
   if icert = nil then

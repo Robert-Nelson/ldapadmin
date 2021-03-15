@@ -7552,14 +7552,12 @@ type
     nStartPage: DWORD;
    end;
 
-function CertAddStoreToCollection(
-                                  hCollectionStore: HCERTSTORE;
+function CertAddStoreToCollection(hCollectionStore: HCERTSTORE;
                                   hSiblingStore: HCERTSTORE;
                                   dwUpdateFlag: DWORD;
                                   dwPriority: DWORD): BOOL; stdcall;
 
-function CertGetNameString(
-                           pCertContext: PCCERT_CONTEXT;
+function CertGetNameString(pCertContext: PCCERT_CONTEXT;
                            dwType: DWORD;
                            dwFlags: DWORD;
                            pvTypePara: Pointer;
@@ -7571,6 +7569,23 @@ function CertGetNameString(
                            pfPropertiesChanged: PBOOL
                            ): DWORD; stdcall;}
 
+// added 18.02.2014
+type
+  CERT_SYSTEM_STORE_INFO = record
+    cbSize: DWORD;
+  end;
+  //{$EXTERNALSYM _CERT_SYSTEM_STORE_INFO}
+  PCERT_SYSTEM_STORE_INFO = ^CERT_SYSTEM_STORE_INFO;
+  //{$EXTERNALSYM PCERT_SYSTEM_STORE_INFO}
+
+
+  PFN_CERT_ENUM_SYSTEM_STORE = function(pvSystemStore: Pointer;
+    dwFlags: DWORD; pStoreInfo: PCERT_SYSTEM_STORE_INFO; pvReserved: Pointer;
+    pvArg: Pointer): BOOL; stdcall;
+  //{$EXTERNALSYM PFN_CERT_ENUM_SYSTEM_STORE}
+
+function CertEnumSystemStore(dwFlags: DWORD; pvSystemStoreLocationPara: Pointer;
+  pvArg: Pointer; pfnEnum: PFN_CERT_ENUM_SYSTEM_STORE): BOOL; stdcall;
 
 
 //////////////////////////// VERSION 2 ////////////////////////////////////////////////////////////////////
@@ -7927,5 +7942,6 @@ function CryptUIDlgViewCertificate; external CRYPTUI name 'CryptUIDlgViewCertifi
 {$ELSE}
 function CryptUIDlgViewCertificate; external CRYPTUI name 'CryptUIDlgViewCertificateA';
 {$ENDIF} // !UNICODE*)
+function CertEnumSystemStore; external crypt32 name 'CertEnumSystemStore';
 end.
 

@@ -458,7 +458,7 @@ object UserDlg: TUserDlg
       object cbPwdMustChange: TCheckBox
         Left = 24
         Top = 320
-        Width = 265
+        Width = 353
         Height = 17
         Caption = 'User &must change the password on next logon'
         TabOrder = 7
@@ -475,7 +475,7 @@ object UserDlg: TUserDlg
       end
       object BtnAdvanced: TButton
         Left = 296
-        Top = 296
+        Top = 293
         Width = 75
         Height = 25
         Caption = '&Advanced...'
@@ -485,7 +485,7 @@ object UserDlg: TUserDlg
       object cbAccntDisabled: TCheckBox
         Left = 24
         Top = 344
-        Width = 265
+        Width = 345
         Height = 17
         Caption = 'Account is &disabled'
         TabOrder = 8

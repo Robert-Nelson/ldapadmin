@@ -78,6 +78,7 @@ type
       ARow: Integer; const Value: String);
     procedure btnAddLangClick(Sender: TObject);
     procedure btnDelLangClick(Sender: TObject);
+    procedure ListMouseMove(Sender: TObject; Shift: TShiftState; X,Y: Integer);
   private
     cbStartupConnection: TLAComboBox;
     procedure cbStartupConnectionDrawItem(Control: TWinControl;
@@ -321,6 +322,20 @@ begin
   with LanguageList do
   if ItemIndex <> -1 then
     Items.Delete(ItemIndex);
+end;
+
+procedure TConfigDlg.ListMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+var
+  i: Integer;
+begin
+  if Sender is TListBox then with TListBox(Sender) do
+  begin
+    i := ItemAtPos(Point(x, y), true);
+    if i <> -1 then
+      Hint := Items[i]
+    else
+      Hint := '';
+  end;
 end;
 
 end.

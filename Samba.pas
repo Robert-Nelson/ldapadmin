@@ -1,5 +1,5 @@
   {      LDAPAdmin - Samba.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,7 +23,7 @@ unit Samba;
 
 interface
 
-uses Classes, PropertyObject, Posix, LDAPClasses, WinLDAP, Constant;
+uses Classes, PropertyObject, Posix, LDAPClasses, WinLDAP, Constant, Connection;
 
 const
   WKRids: array[0..4] of Integer  = (
@@ -40,20 +40,28 @@ const
 { TDomainList }
 
 type
-  PDomainRec = ^TDomainRec;
-  TDomainRec = record
-      AlgorithmicRIDBase: Integer;
-      DomainName: string;
-      SID: string;
+  TDomainRec = class
+  private
+    fSession: TConnection;
+  public
+    DomainDn: string;
+    AlgorithmicRIDBase: Integer;
+    DomainName: string;
+    SID: string;
+    constructor Create(Session: TConnection);
+    function    GetNextUnixIdPoolRid: Integer;
+    function    GetRidFromUid(uid: Integer): Integer;
   end;
 
   TDomainList = class(TList)
-    private
-      function Get(Index: Integer): PDomainRec;
-    public
-      constructor Create(Session: TLDAPSession);
-      property Items[Index: Integer]: PDomainRec read Get;
-    end;
+  private
+    fSession:   TLdapSession;
+    function    Get(Index: Integer): TDomainRec;
+  public
+    constructor Create(Session: TLDAPSession);
+    destructor  Destroy; override;
+    property    Items[Index: Integer]: TDomainRec read Get;
+  end;
 
 
 { TSambaAccount }
@@ -115,7 +123,7 @@ const
 type
   TSamba3Account = class(TPropertyObject)
   private
-    pDomainData: PDomainRec;
+    fDomainData: TDomainRec;
     fPosixAccount: TPosixAccount;
     fNew: Boolean;
     fSavePwdLastSet: Variant;
@@ -127,7 +135,7 @@ type
     function  GetGidNumber: Integer;
     procedure SetPwdMustChange(Value: Boolean);
     function  GetPwdMustChange: Boolean;
-    procedure SetDomainRec(pdr: PDomainRec);
+    procedure SetDomainRec(tdr: TDomainRec);
     procedure SetFlag(Index: Integer; Value: Boolean);
     function  GetFlag(Index: Integer): Boolean;
     function  GetDomainSid: string;
@@ -138,7 +146,7 @@ type
     procedure New; override;
     procedure Remove; override;
     procedure SetUserPassword(const Password: string); virtual;
-    property DomainData: PDomainRec write SetDomainRec;
+    property DomainData: TDomainRec write SetDomainRec;
     property UidNumber: Integer read GetUidNumber write SetUidNumber;
     property GidNumber: Integer read GetGidNumber write SetGidNumber;
     property Sid: string index eSambaSID read GetString;// write SetString;
@@ -203,7 +211,11 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses {$IFDEF VARIANTS} variants, {$ENDIF} md4, smbdes, Sysutils, Misc;
+uses {$IFDEF VARIANTS} variants, {$ENDIF} md4, smbdes, Sysutils, Misc, Config;
+
+const
+  CT_ALGORITHMIC_RID   = 0;
+  CT_SAMBA_NEXT_RID    = 1;
 
 { This function is ported from mkntpwd.c written by Anton Roeckseisen (anton@genua.de) }
 
@@ -237,16 +249,80 @@ begin
     Result := Result + IntToHex(Hash[i], 2);
 end;
 
+{ TDomainRec }
+
+constructor TDomainRec.Create(Session: TConnection);
+begin
+  inherited Create;;
+  fSession := Session;
+end;
+
+function TDomainRec.GetNextUnixIdPoolRid: Integer;
+var
+  Entry: TLdapEntry;
+  i, nur, ngr: Integer;
+begin
+  Result := 999;
+  nur := -1;
+  ngr := -1;
+
+  Entry := TLdapEntry.Create(fSession, DomainDn);
+  with Entry do
+  try
+    Read; //TODO Read(attr,attr,...);
+
+    for i := 0 to Attributes.Count - 1 do with Attributes[i] do
+      if (Values[0].DataSize > 0) then
+      try
+        if (CompareText('sambaNextRid', Name) = 0) then
+          Result := StrToInt(AsString)
+        else
+        if CompareText('sambaNextRid', Name) = 0 then
+          nur := StrToInt(AsString)
+        else
+        if CompareText('sambaNextRid', Name) = 0 then
+          ngr := StrToInt(AsString);
+      except
+        on E:EConvertError do
+        begin
+          e.Message := stConvErrSambaRid + #10#13 + e.Message;
+          raise;
+        end;
+      end;
+
+      if nur > Result then
+        Result := nur;
+      if ngr > Result then
+        Result := ngr;
+
+      Inc(Result, 1);
+      AttributesByName['sambaNextRid'].AsString := IntToStr(Result);
+      Write;
+  finally
+    Entry.Free;
+  end;
+
+end;
+
+function TDomainRec.GetRidFromUid(uid: Integer): Integer;
+begin
+  if fSession.Account.ReadInteger(rSambaRidMethod) = CT_ALGORITHMIC_RID then
+    Result := AlgorithmicRIDBase + 2 * uid
+  else
+    Result := GetNextUnixIdPoolRid;
+end;
+
 { TDomainList}
 
 constructor TDomainList.Create(Session: TLDAPSession);
 var
-  pDom: PDomainRec;
+  tDom: TDomainRec;
   attrs: PCharArray;
   EntryList: TLdapEntryList;
   i: Integer;
 begin
   inherited Create;
+  fSession := Session;
   // set result fields
   SetLength(attrs, 4);
   attrs[0] := 'sambaDomainName';
@@ -259,10 +335,11 @@ begin
                    attrs, false, EntryList);
     for i := 0 to EntryList.Count - 1 do with EntryList[i] do
     begin
-      New(pDom);
-      Add(pDom);
-      with pDom^ do
+      tDom := TDomainRec.Create(Session as TConnection);
+      Add(tDom);
+      with tDom do
       begin
+        DomainDn := dn;
         DomainName := AttributesByName[attrs[0]].AsString;
         try
           AlgorithmicRidBase := StrToInt(AttributesByName[attrs[1]].AsString);
@@ -278,7 +355,17 @@ begin
     EntryList.Free;
   end;
 end;
-function TDomainList.Get(Index: Integer): PDomainRec;
+
+destructor TDomainList.Destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to Count - 1 do
+    Items[i].Free;
+  inherited Destroy;
+end;
+
+function TDomainList.Get(Index: Integer): TDomainRec;
 begin
   Result := inherited Items[Index];
 end;
@@ -287,19 +374,19 @@ end;
 
 procedure TSamba3Account.SetSid(Value: Integer);
 begin
-  if not Assigned(pDomaindata) then
+  if not Assigned(fDomaindata) then
     SetString(eSambaSID, '')
   else
   if IsNull(eSambaSid) or not (asBrowse in Attributes[eSambaSid].State) then
-    SetString(eSambaSID, Format('%s-%d', [pDomainData^.SID, pDomainData^.AlgorithmicRIDBase + 2 * Value]))
+    SetString(eSambaSID, Format('%s-%d', [fDomainData.SID, fDomainData.GetRidFromUid(Value)]))
 end;
 
-procedure TSamba3Account.SetDomainRec(pdr: PDomainRec);
+procedure TSamba3Account.SetDomainRec(tdr: TDomainRec);
 begin
-  pDomainData := pdr;
-  if fNew and Assigned(pDomaindata) then
+  fDomainData := tdr;
+  if fNew and Assigned(fDomaindata) then
   begin
-    SetString(eSambaDomainName, pDomainData^.DomainName);
+    SetString(eSambaDomainName, fDomainData.DomainName);
     if not fPosixAccount.IsNull(eUidNumber) then
       SetSid(UidNumber);
     if IsNull(eSambaPrimaryGroupSID) and not fPosixAccount.IsNull(eGidNumber) then
@@ -319,17 +406,9 @@ begin
 end;
 
 procedure TSamba3Account.SetGidNumber(Value: Integer);
-var
-  gsid: string;
 begin
-  if Assigned(pDomainData) then
-  begin
-    gsid := fEntry.Session.Lookup(fEntry.Session.Base, Format(sGROUPBYGID, [Value]), 'sambasid', LDAP_SCOPE_SUBTREE);
-    if gsid <> '' then
-      SetString(eSambaPrimaryGroupSID, gsid)
-    else
-      SetString(eSambaPrimaryGroupSID, Format('%s-%d', [pDomainData^.SID, 2 * Value + 1001]))
-  end
+  if Assigned(fDomainData) then
+     SetString(eSambaPrimaryGroupSID, fEntry.Session.Lookup(fEntry.Session.Base, Format(sGROUPBYGID, [Value]), 'sambasid', LDAP_SCOPE_SUBTREE))
   else
     SetString(eSambaPrimaryGroupSID, '');
   fPosixAccount.GidNumber := Value;
@@ -384,8 +463,6 @@ function TSamba3Account.GetDomainName: string;
 var
   i: Integer;
 begin
-  // TODO use pDomainData
-  //if not IsNull(eSambaDomainName) then
   Result := GetString(eSambaDomainName);
   if Result = '' then // try to get domain name from sid
   begin
@@ -422,7 +499,7 @@ begin
   SetAsUnixTime(eSambaPwdLastSet, LocalDateTimeToUTC(Now));
 end;
 
-{ There is a change in behaviour Since Samba 3.0.25. To force the user to }
+{ There is a change in behaviour Since Samba 3.0.25. To force a user to }
 { change a password the attribute sambaPwdLastSet must be set to 0 }
 procedure TSamba3Account.SetPwdMustChange(Value: Boolean);
 begin

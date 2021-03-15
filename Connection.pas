@@ -174,8 +174,10 @@ begin
   Result := TDirectoryType(Account.ReadInteger(rDirectoryType, Integer(dtAutodetect)));
   if (Result = dtAutodetect) and Connected then
   begin
-    if Lookup('', sAnyClass,'defaultNamingContext', LDAP_SCOPE_BASE) <> '' then
-      Result := dtActiveDirectory;
+    if Lookup('', sAnyClass,'isGlobalCatalogReady', LDAP_SCOPE_BASE) <> '' then
+      Result := dtActiveDirectory
+    else
+      Result := dtPosix;
     Account.WriteInteger(rDirectoryType, Integer(Result));
   end;
 end;
@@ -385,7 +387,7 @@ begin
     else if s = 'sambasamaccount' then
     begin
       if IsComputer(Entry.dn) then             // it's samba computer account
-        Result := oidComputer               // else
+        Result := oidComputer                  // else
       else                                     // it's samba user account
         Result := oidSambaUser;
     end

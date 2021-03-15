@@ -1,5 +1,5 @@
   {      LDAPAdmin - Prefs.pas
-  *      Copyright (C) 2003-2011 Tihomir Karlovic
+  *      Copyright (C) 2003-2013 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -39,15 +39,6 @@ type
     lblLoginShell: TLabel;
     edHomeDir: TEdit;
     edLoginShell: TEdit;
-    gbSambaDefaults: TGroupBox;
-    lblScript: TLabel;
-    lblHomeShare: TLabel;
-    lblProfilePath: TLabel;
-    lblHomeDrive: TLabel;
-    edScript: TEdit;
-    edHomeShare: TEdit;
-    edProfilePath: TEdit;
-    cbHomeDrive: TComboBox;
     gbMailDefaults: TGroupBox;
     lblMD: TLabel;
     lblMA: TLabel;
@@ -65,7 +56,6 @@ type
     lblUsername: TLabel;
     lblDisplayname: TLabel;
     BtnWizard: TButton;
-    cbxLMPasswords: TCheckBox;
     tsID: TTabSheet;
     gbUserLimits: TGroupBox;
     lblFirstUId: TLabel;
@@ -84,6 +74,20 @@ type
     cbxExtendGroups: TCheckBox;
     cbExtendGroups: TComboBox;
     gbID: TRadioGroup;
+    PageControl1: TPageControl;
+    TabSheet1: TTabSheet;
+    TabSheet2: TTabSheet;
+    cbxLMPasswords: TCheckBox;
+    lblScript: TLabel;
+    lblHomeShare: TLabel;
+    lblProfilePath: TLabel;
+    lblHomeDrive: TLabel;
+    edScript: TEdit;
+    edHomeShare: TEdit;
+    edProfilePath: TEdit;
+    cbHomeDrive: TComboBox;
+    Bevel1: TBevel;
+    rgRid: TRadioGroup;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure SetBtnClick(Sender: TObject);
     procedure PageControlChange(Sender: TObject);
@@ -134,6 +138,7 @@ begin
     edScript.Text          := ReadString(rsambaScript, '');
     edProfilePath.Text     := ReadString(rsambaProfilePath, '');
     cbxLMPasswords.Checked := ReadBool(rSambaLMPasswords);
+    rgRid.ItemIndex        := ReadInteger(rSambaRidMethod);
     edMailAddress.Text     := ReadString(rpostfixMailAddress, '');
     edMaildrop.Text        := ReadString(rpostfixMaildrop, '');
     idx := ReadInteger(rPosixGroupOfUnames, 0) - 1;
@@ -168,6 +173,7 @@ begin
     WriteString (rsambaScript,        edScript.Text);
     WriteString (rsambaProfilePath,   edProfilePath.Text);
     WriteBool   (rSambaLMPasswords,   cbxLMPasswords.Checked);
+    WriteInteger (rsambaRidMethod,    rgRid.ItemIndex);
     WriteString (rpostfixMailAddress, edMailAddress.Text);
     WriteString (rpostfixMaildrop,    edMaildrop.Text);
     WriteInteger(rPosixGroupOfUnames, cbExtendGroups.ItemIndex + 1);

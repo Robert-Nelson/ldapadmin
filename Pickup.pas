@@ -1,5 +1,5 @@
   {      LDAPAdmin - Pickup.pas
-  *      Copyright (C) 2003 - 2012 Tihomir Karlovic
+  *      Copyright (C) 2003 - 2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -24,7 +24,8 @@ unit Pickup;
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Sorter, Math;
+  Buttons, ExtCtrls, ComCtrls, LDAPClasses, ImgList, Sorter, Math,
+  ListViewDlg;
 
 type
   TPopulateColumn = record
@@ -36,40 +37,25 @@ type
 
   TOnGetImageIndex= procedure(const Entry: TLdapEntry; var ImageIndex: integer) of object;
 
-  TPickupDlg = class(TForm)
-    Panel1: TPanel;
+  TPickupDlg = class(TListViewDlg)
     FilterLbl: TLabel;
-    ListView: TListView;
     FilterEdit: TEdit;
-    OKBtn: TButton;
-    CancelBtn: TButton;
-    procedure         ListViewDblClick(Sender: TObject);
     procedure         FilterEditChange(Sender: TObject);
     procedure         ListViewData(Sender: TObject; Item: TListItem);
     procedure         FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure         ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
     procedure         FormCreate(Sender: TObject);
   private
     FPopulates:       array of TPopulateColumns;
     FOnGetImageIndex: TOnGetImageIndex;
     FEntries:         TLdapEntryList;
     FShowed:          TList;
-    FSorter:          TListViewSorter;
     FSelected:        TList;
     FImageIndex:      integer;
-    FColumnNames:     TStringList;
     procedure         FillListView;
     procedure         DoSort(SortColumn:  TListColumn; SortAsc: boolean);
-    function          GetColumns: TListColumns;
     function          GetText(Index: integer; Entry: TLdapEntry): string;
-    function          GetImages: TCustomImageList;
-    procedure         SetImages(const Value: TCustomImageList);
     function          GetSelCount: integer;
     function          GetSelected(Index: integer): TLdapEntry;
-    function          GetMultiSelect: boolean;
-    procedure         SetMultiSelect(const Value: boolean);
-    function          GetColumnNames: string;
-    procedure         SetColumnNames(AValue: string);
   protected
     procedure         DoShow; override;
   public
@@ -79,13 +65,9 @@ type
 
     property          Entries:  TLdapEntryList read FEntries;
     property          ImageIndex: integer read FImageIndex write FImageIndex;
-    property          Images: TCustomImageList read GetImages write SetImages;
-    property          Columns: TListColumns read GetColumns;
     property          OnGetImageIndex: TOnGetImageIndex read FOnGetImageIndex write FOnGetImageIndex;
     property          Selected[Index: integer]: TLdapEntry read GetSelected;
     property          SelCount: integer read GetSelCount;
-    property          MultiSelect: boolean read GetMultiSelect write SetMultiSelect;
-    property          ColumnNames: string read GetColumnNames write SetColumnNames;
   end;
 
 implementation
@@ -94,8 +76,6 @@ implementation
 
 uses WinLDAP, Constant, Main, Connection, SizeGrip;
 
-////////////////////////////////////////////////////////////////////////////////
-
 constructor TPickupDlg.CreateNew(AOwner: TComponent; Dummy: Integer);
 begin
   inherited;
@@ -103,29 +83,23 @@ begin
   FEntries:=TLdapEntryList.Create;
   FShowed:=TList.Create;
   FSelected:=TList.Create;
-  FColumnNames := TStringList.Create;
   setlength(FPopulates,0);
 end;
 
 destructor TPickupDlg.Destroy;
 begin
-  FSorter.Free;
   FShowed.Free;
   setlength(FPopulates,0);
   FEntries.Free;
   FSelected.Free;
-  FColumnNames.Free;
   inherited;
 end;
 
 procedure TPickupDlg.DoShow;
 begin
-  TSizeGrip.Create(Panel1);
   FillListView;
-  FSorter:=TListViewSorter.Create;
-  FSorter.ListView:=self.ListView;
-  FSorter.OnSort:=DoSort;
   inherited;
+  FSorter.OnSort:=DoSort;
 end;
 
 procedure TPickupDlg.Populate(const Session: TLDAPSession; const Filter: string; const Attributes: array of string; const Base: string = '');
@@ -307,26 +281,6 @@ begin
     if ListView.Items[i].Selected then FSelected.Add(FShowed[i]);
 end;
 
-procedure TPickupDlg.ListViewDblClick(Sender: TObject);
-begin
-  ModalResult := mrOk
-end;
-
-function TPickupDlg.GetColumns: TListColumns;
-begin
-  result:=ListView.Columns;
-end;
-
-function TPickupDlg.GetImages: TCustomImageList;
-begin
-  result:=ListView.SmallImages;
-end;
-
-procedure TPickupDlg.SetImages(const Value: TCustomImageList);
-begin
-  ListView.SmallImages:=Value;
-end;
-
 function TPickupDlg.GetSelCount: integer;
 begin
   result:=FSelected.Count;
@@ -337,34 +291,9 @@ begin
   result:=TLdapEntry(FSelected[Index]);
 end;
 
-function TPickupDlg.GetMultiSelect: boolean;
-begin
-  result:=ListView.MultiSelect;
-end;
-
-procedure TPickupDlg.setMultiSelect(const Value: boolean);
-begin
-  ListView.MultiSelect:=Value;
-end;
-
-procedure TPickupDlg.ListViewChange(Sender: TObject; Item: TListItem; Change: TItemChange);
-begin
-  OkBtn.Enabled := ListView.SelCount>0;
-end;
-
 procedure TPickupDlg.FormCreate(Sender: TObject);
 begin
-  SetImages(MainFrm.ImageList);
-end;
-
-function TPickupDlg.GetColumnNames: string;
-begin
-     Result := FColumnNames.CommaTExt;
-end;
-
-procedure TPickupDlg.SetColumnNames(AValue: string);
-begin
-  FColumnNames.CommaText := AValue;
+  Images := MainFrm.ImageList;
 end;
 
 end.

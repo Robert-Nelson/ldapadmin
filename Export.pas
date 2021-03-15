@@ -220,21 +220,20 @@ end;
 
 procedure TExportDlg.OKBtnClick(Sender: TObject);
 begin
-  //ExportingLabel.Caption := dn;
-  Notebook.ActivePage := cProgress;
+  Notebook.PageIndex := 1;
   Application.ProcessMessages;
   try
     case SaveDialog.FilterIndex of
       1, 2: WriteToLdif(SaveDialog.FilterIndex = 2);
       3:    WriteToDsml;
     end;
-    ResultLabel.Caption := Format('Success: %d Object(s) succesfully exported!', [fCount]);
+    ResultLabel.Caption := Format(stExportSuccess, [fCount]);
   except
-    OKBtn.Caption := '&Retry';
+    OKBtn.Caption := cRetry;
     raise;
   end;
   OKBtn.Visible := false;
-  CancelBtn.Caption := '&Close';
+  CancelBtn.Caption := cClose;
   CancelBtn.Left := (Width - CancelBtn.Width) div 2;
   CancelBtn.Default := true;
 end;

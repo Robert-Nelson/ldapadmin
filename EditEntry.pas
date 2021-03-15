@@ -120,6 +120,10 @@ type
     ActCertView: TAction;
     Viewcertificate1: TMenuItem;
     Viewpicture1: TMenuItem;
+    ActCopyName: TAction;
+    ActCopyValue: TAction;
+    Copyattributename1: TMenuItem;
+    Copyvalue1: TMenuItem;
     procedure mbSaveClick(Sender: TObject);
     procedure mbExitClick(Sender: TObject);
     procedure mbDeleteRowClick(Sender: TObject);
@@ -157,6 +161,8 @@ type
     procedure FormDeactivate(Sender: TObject);
     procedure ActPicViewExecute(Sender: TObject);
     procedure ActCertViewExecute(Sender: TObject);
+    procedure ActCopyNameExecute(Sender: TObject);
+    procedure ActCopyValueExecute(Sender: TObject);
   private
     fConnection: TConnection;
     Entry: TLDAPEntry;
@@ -202,7 +208,7 @@ var
 
 implementation
 
-uses BinView, PicView, Cert, Misc, Main, Config;
+uses BinView, PicView, Cert, Misc, Main, Config, ClipBrd;
 
 {$R *.DFM}
 
@@ -898,7 +904,11 @@ end;
 
 procedure TEditEntryFrm.PushShortCutClick(Sender: TObject);
 begin
-  PushShortCut(Sender as TAction);
+  if ActCut.Visible then
+    PushShortCut(Sender as TAction)
+  else
+    with attrStringGrid do
+      ClipBoard.SetTextBuf(PChar(Cells[0, Row] + ': ' + GetValueAsText(TInplaceAttribute(Objects[1, Row]).Value)));
 end;
 
 procedure TEditEntryFrm.ToolBtnClick(Sender: TObject);
@@ -991,6 +1001,26 @@ end;
 procedure TEditEntryFrm.ActionList1Update(Action: TBasicAction; var Handled: Boolean);
 var
   ac: TComponent;
+
+  procedure DoEditItems(IsText: Boolean; eUndo: Boolean = false; eCut: Boolean = false; eDelete: Boolean = false);
+  begin
+    ActUndo.Visible := IsText;
+    ActCut.Visible := IsText;
+    //ActCopy.Visible := IsText;
+    ActPaste.Visible := IsText;
+    ActDelete.Visible := IsText;
+    ActCopyName.Visible := not IsText;
+    ActCopyValue.Visible := not IsText;
+
+    if not IsText then exit;
+
+    ActUndo.Enabled := eUndo;
+    ActCut.Enabled := eCut;
+    ActCopy.Enabled := eCut or not IsText;
+    ActPaste.Enabled := true;
+    ActDelete.Enabled := eDelete;
+  end;
+
 begin
   if fNeedRefresh then // Workaround for CloseUp combo event
   begin
@@ -1003,7 +1033,7 @@ begin
   ActBinView.Enabled := false;
   ActCertView.Visible := false;
   ActPicView.Visible := false;
-  
+
   ac := ActiveControl;
   if Assigned(ac) then
   begin
@@ -1035,27 +1065,24 @@ begin
 
   if ActiveControl is TCustomEdit then with TCustomEdit(ActiveControl) do
   begin
-    ActUndo.Enabled := CanUndo;
+    DoEditItems(true, CanUndo, SelLength > 0, Text <> '');
+    {ActUndo.Enabled := CanUndo;
     ActCut.Enabled := SelLength > 0;
     ActCopy.Enabled := ActCut.Enabled;
     ActPaste.Enabled := true;
-    ActDelete.Enabled := Text <> '';
+    ActDelete.Enabled := Text <> '';}
   end else
   if ActiveControl is TCustomComboBox then with TCustomComboBox(ActiveControl) do
   begin
-    ActUndo.Enabled := true;
+    DoEditItems(true, true, SelLength > 0, Text <> '');
+    {ActUndo.Enabled := true;
     ActCut.Enabled := SelLength > 0;
     ActCopy.Enabled := ActCut.Enabled;
     ActPaste.Enabled := true;
-    ActDelete.Enabled := Text <> '';
+    ActDelete.Enabled := Text <> '';}
   end
-  else begin
-    ActUndo.Enabled := false;
-    ActCut.Enabled := false;
-    ActCopy.Enabled := false;
-    ActPaste.Enabled := false;
-    ActDelete.Enabled := false;
-  end;
+  else
+    DoEditItems(false);
 end;
 
 procedure TEditEntryFrm.StringGridDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
@@ -1389,6 +1416,16 @@ begin
   if Assigned(Objects[1, Row]) then
     with TInplaceAttribute(Objects[1, Row]).Value do
         ShowContext(Data, DataSize, ctxAuto);
+end;
+
+procedure TEditEntryFrm.ActCopyNameExecute(Sender: TObject);
+begin
+  with attrStringGrid do ClipBoard.SetTextBuf(PChar(Cells[0, Row]));
+end;
+
+procedure TEditEntryFrm.ActCopyValueExecute(Sender: TObject);
+begin
+  with attrStringGrid do ClipBoard.SetTextBuf(PChar(GetValueAsText(TInplaceAttribute(Objects[1, Row]).Value)));
 end;
 
 end.

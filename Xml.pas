@@ -26,8 +26,10 @@
                                  Added script tag support, T.Karlovic
     @Version 2012/02/08  v1.2.3. Added Utf8 read support, T.Karlovic
                                  Added Markups property, T.Karlovic
-                                 Read performance improvement
+                                 Read performance improvement, T.Karlovic
                                  TFileStream->TMemoryStream, T.Karlovic
+   @Version 2013/12/18  v1.2.4.  Fixed TXmlNode.Add AAttribute assignment, T.Karlovic
+   @Version 2014/01/03  v1.2.5.  Added Sort method, T.Karlovic
   }
 
 unit Xml;
@@ -79,11 +81,12 @@ type
     property    Name: string read FName write FName;
     property    Parent: TXmlNode read FParent write SetParent;
     property    Content: string read FContent write FContent;
+    property    CaseSensitive: boolean read GetCaseSens;
     function    Add(const AName: string=''; const AContent: string=''; const AAttributes: TstringList=nil): TXmlNode;
-    function    Clone(const Recurse: boolean): TxmlNode;
+    function    Clone(Parent: TXmlNode; const Recurse: boolean): TxmlNode;
     procedure   Delete(Index: integer);
     function    NodeByName(AName: string; CaseSensitive: boolean=true; Lang: string=''): TXmlNode;
-    property    CaseSensitive: boolean read GetCaseSens;
+    procedure   Sort(Compare: TListSortCompare; Recurse: Boolean);
   end;
 
   TStreamCallback = procedure (Node: TXmlNode) of object;
@@ -108,6 +111,7 @@ type
     procedure   SaveToStream(const Stream: TStream; StreamCallback: TStreamCallback = nil); virtual;
     procedure   LoadFromFile(const FileName: string);
     procedure   SaveToFile(const FileName: string; StreamCallback: TStreamCallback = nil);
+    procedure   Sort(Compare: TListSortCompare);
     function    ByPath(const APath: string): TXmlNode;
     function    Exist(const Path: string): boolean;
     property    CaseSensitive: boolean read GetCaseSens write SetCaseSens;
@@ -121,7 +125,7 @@ implementation
 uses Misc, Constant;
 
 const
-  TAB  = '  ';//#9;
+  TAB  = '   ';//#9;
   CRLF = #13#10;
 
 { EXmlException }
@@ -147,7 +151,7 @@ constructor EXmlException.Create(Stream: TStream; const TagName, ErrMsg: string)
       end;
       inc(i);
     end;
-    while FText[il] in [#13,#10] do inc(il);
+    while (il < iEnd) and (FText[il] in [#13,#10]) do inc(il);
     Pos := iend - il - Length(Tag);
   end;
 begin
@@ -191,7 +195,7 @@ begin
   result:=TXmlNode.Create(self);
   result.Name:=AName;
   result.Content:=AContent;
-  if AAttributes<>nil then Attributes.Assign(AAttributes);
+  if AAttributes<>nil then result.Attributes.Assign(AAttributes);
 end;
 
 function TXmlNode.NodeByName(AName: string; CaseSensitive: boolean=true; Lang: string=''): TXmlNode;
@@ -220,6 +224,24 @@ begin
   end;
 end;
 
+procedure TXmlNode.Sort(Compare: TListSortCompare; Recurse: Boolean);
+
+  procedure DoSort(Node: TXmlNode);
+  var
+    i: Integer;
+  begin
+    Node.FNodes.Sort(Compare);
+    if Recurse then
+    begin
+      for i:=0 to Node.Count - 1 do
+        DoSort(Node[i]);
+    end;
+  end;
+
+begin
+  DoSort(Self);
+end;
+
 procedure TXmlNode.Delete(Index: integer);
 begin
   FNodes.Delete(Index);
@@ -238,7 +260,7 @@ begin
   else result:=FParent.CaseSensitive;
 end;
 
-function TXmlNode.Clone(const Recurse: boolean): TxmlNode;
+function TXmlNode.Clone(Parent: TXmlNode; const Recurse: boolean): TxmlNode;
   function DoAdd(Src, Dest: TXmlNode): TXmlNode;
   var
     i: integer;
@@ -252,7 +274,7 @@ function TXmlNode.Clone(const Recurse: boolean): TxmlNode;
   end;
 
 begin
-  result:=DoAdd(self, nil);
+  result:=DoAdd(self, Parent);
 end;
 
 
@@ -414,7 +436,7 @@ var
     s: TStringList;
   begin
     if not GetNextTag(Stream, PrevContent, TagName, Attrs, TagType) then
-     raise EXmlException.Create(Stream, TagName, '');
+     raise EXmlException.Create(Stream, TagName, XML_NO_OPENING_TAG);
 
     if TagName = '?xml' then
     begin
@@ -552,13 +574,10 @@ procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCa
       end;
   end;
 
-  procedure WriteString(Value: string);
+  procedure WriteString(const Value: string);
   var
     s: string;
   begin
-    if fMarkups then
-      Value := EncodeMarkups(Value);
-
     if fUtf8 then
     begin
       s := StringToUTF8Len(PChar(Value), length(Value));
@@ -571,10 +590,17 @@ procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCa
   procedure WriteNode(Node: TXmlNode; Indent: string; IsFirst: boolean=false);
   var
     i: integer;
+    encName: string;
   begin
     if not IsFirst then WriteString(CRLF);
-    if pos(' ', Node.Name)>0 then WriteString(Indent+'<"'+Node.Name+'"')
-    else WriteString(Indent+'<'+Node.Name);
+
+    if fMarkups then
+      encName := EncodeMarkups(Node.Name)
+    else
+      encName := Node.Name;
+      
+    if pos(' ', encName) > 0 then WriteString(Indent + '<"' + encName + '"')
+    else WriteString(Indent + '<' + encName);
 
     for i:=0 to Node.Attributes.Count-1 do
       WriteString(' '+Node.Attributes.Names[i]+'='''+Node.Attributes.Values[Node.Attributes.Names[i]]+'''');
@@ -586,12 +612,17 @@ procedure TXmlTree.SaveToStream(const Stream: TStream; StreamCallback: TStreamCa
     end;
 
     WriteString('>');
-    WriteString(Node.Content);
+
+    if fMarkups then
+      WriteString(EncodeMarkups(Node.Content))
+    else
+      WriteString(Node.Content);
+
     for i:=0 to Node.Count-1 do WriteNode(Node[i], Indent+TAB);
 
     if Node.Count>0 then WriteString(CRLF+Indent);
-    if pos(' ', Node.Name)>0 then WriteString('</"'+Node.Name+'">')
-    else WriteString('</'+Node.Name+'>');
+    if pos(' ', encName) > 0 then WriteString('</"' + encName + '">')
+    else WriteString('</' + encName + '>');
     if Assigned(StreamCallback) then StreamCallback(Node);
   end;
 
@@ -599,6 +630,11 @@ begin
   WriteNode(Root, '', True);
 end;
 
+procedure TXmlTree.Sort(Compare: TListSortCompare);
+begin
+  if Assigned(Root) then
+    Root.Sort(Compare, true);
+end;
 
 procedure TXmlTree.LoadFromFile(const FileName: string);
 var
@@ -607,6 +643,8 @@ begin
   FStream:=TMemoryStream.Create;
   try
     FStream.LoadFromFile(FileName);
+    if FStream.Size = 0 then
+      raise Exception.CreateFmt(stEmptyFile, [FileName]);
     LoadFromStream(FStream);
   finally
     FStream.Free;

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Search.pas
-  *      Copyright (C) 2003-2012 Tihomir Karlovic
+  *      Copyright (C) 2003-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -22,14 +22,20 @@
 unit Search;
 
 {$I VER.INC}
+{$I LdapAdmin.inc}
 
 interface
 
 uses
-  {$IFDEF VER_D7H}Themes,{$ENDIF}
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  ComCtrls, StdCtrls, LDAPClasses, Menus, ExtCtrls, Sorter, WinLdap, ToolWin,
-  ImgList, ActnList, Buttons, Schema, Contnrs, Connection;
+    {$IFDEF VER_D7H}Themes,{$ENDIF}
+    Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+    ComCtrls, StdCtrls, LDAPClasses, Menus, ExtCtrls, Sorter, WinLdap, ToolWin,
+    ImgList, ActnList, Buttons, Schema, Contnrs, Connection, Xml
+    {$IFDEF REGEXPR}
+    { Note: If you want to compile templates with regex support you'll need }
+    { Regexpr.pas unit from TRegeExpr library (http://www.regexpstudio.com) }
+    , Regexpr
+    {$ENDIF};
 
 const
   MODPANEL_HEIGHT         = 65;
@@ -40,7 +46,21 @@ const
   MODPANEL_OP_COMBO_WIDTH = 97;
 
   SAVE_SEARCH_EXT     = '*.ldif';
-  SAVE_MODIFY_EXT     = '*.txt';
+  SAVE_MODIFY_EXT     = '*.lab';
+  SAVE_MODIFY_LOG_EXT = '*.txt';
+
+  CMOD_XML_ROOT_NAME  = 'changemod';
+  CMOD_XML_LDAPOP     = 'ldapop';
+  CMOD_XML_MODOP      = 'modop';
+  CMOD_XML_ADD        = 'add';
+  CMOD_XML_DELETE     = 'delete';
+  CMOD_XML_REPLACE    = 'replace';
+
+  CMOD_IDX_ADD        = 0;
+  CMOD_IDX_DELETE     = 1;
+  CMOD_IDX_REPLACE    = 2;
+
+  TAB_CLOSE_BTN_SIZE  = 14;
 
 type
 
@@ -60,11 +80,15 @@ type
   TModBoxState = (mbxNew, mbxReady, mbxRunning, mbxDone);
 
   TModifyPanel = class(TPanel)
-  public
+  private
     Ctrls:        array[0..3] of TControl;
+  public
+    procedure     Save(Node: TXmlNode);
+    procedure     Load(Node: TXmlNode);
   end;
 
   TModifyOp = class
+  private
     LdapOperation: Integer;
     AttributeName: string;
     Value1:        string;
@@ -86,6 +110,7 @@ type
     procedure     ButtonClick(Sender: TObject);
     procedure     OpComboChange(Sender: TObject);
     procedure     AddPanel;
+    procedure     Reset;
   protected
     procedure     Resize; override;
   public
@@ -93,41 +118,98 @@ type
     destructor    Destroy; override;
     procedure     New;
     procedure     Run;
+    procedure     Save(const Filename: string);
+    procedure     Load(const Filename: string);
     procedure     SaveResults(const Filename: string);
     property      SearchList: TSearchList read fSearchList write fSearchList;
     property      State: TModBoxState read fState;
   end;
 
-  TResultTabSheet=class(TTabSheet)
+  TSearchListView = class(TListView)
   private
     FSearchList:  TSearchList;
-    FListView:    TListView;
     FSorter:      TListViewSorter;
     procedure     SetSearchList(ASearchList: TSearchList);
     procedure     ListViewSort(SortColumn:  TListColumn; SortAsc: boolean);
     procedure     ListViewData(Sender: TObject; Item: TListItem);
-  protected
+    procedure     GetSelection(List: TStringList);
+    procedure     RemoveFromList(List: TStringList);
+    procedure     AdjustPaths(List: TStringList; TargetDn, TargetRdn: string);
   public
     constructor   Create(AOwner: TComponent); override;
     destructor    Destroy; override;
+    procedure     CopySelection(TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+    procedure     DeleteSelection;
     property      SearchList: TSearchList read fSearchList write SetSearchList;
-    property      ListView: TListView read FListView;
   end;
 
-  TResultPageControl=class(TPageControl)
+  TTabBtnState = (tbsNormal, tbsPushed, tbsHot);
+
+  TResultTabSheet = class(TTabSheet)
   private
-    function      GetActiveListView: TListView;
+    FListView:    TSearchListView;
+    FCloseButtonRect: TRect;
+    FCloseBtnState: TTabBtnState;
+    function      GetCaption: string;
+    procedure     SetCaption(Value: string);
+  public
+    constructor   Create(AOwner: TComponent); override;
+    destructor    Destroy; override;
+    property      ListView: TSearchListView read FListView;
+    property      Caption: string read GetCaption write SetCaption;
+  end;
+
+  TResultPageControl = class(TPageControl)
+  private
+    FTabBtnPad:   string;
+    FMouseTab:    TResultTabSheet;
+    procedure     CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
+    function      GetActiveListView: TSearchListView;
     function      GetActivePage: TResultTabSheet;
     procedure     SetActivePage(Value: TResultTabSheet);
+    function      GetTabPadding: string;
   protected
     procedure     MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure     MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure     MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure     Change; override;
+    procedure     DrawTab(TabIndex: Integer; const Rect: TRect; Active: Boolean); override;
   public
+    constructor   Create(AOwner: TComponent); override;
     function      AddPage: TResultTabSheet;
     procedure     RemovePage(Page: TResultTabSheet);
-    property      ActiveList: TListView read GetActiveListView;
+    property      ActiveList: TSearchListView read GetActiveListView;
     property      ActivePage: TResultTabSheet read GetActivePage write SetActivePage;
+    property      TabPadding: string read GetTabPadding write FTabBtnPad;
   end;
+
+  {$IFDEF REGEXPR}
+  TRegStatement = class
+  private
+    fRegex:      TRegExpr;
+    fArgument:   string;
+    fNegate:     Boolean;
+  public
+    constructor Create;
+    destructor  Destroy; override;
+    property    Regex: TRegExpr read fRegex;
+    property    Argument: string read fArgument write fArgument;
+    property    Negate: Boolean read fNegate write fNegate;
+  end;
+
+  TSimpleParser = class(TObjectList)
+  private
+    fStatement: string;
+    function      GetItem(Index: Integer): TRegStatement;
+    procedure     SetStatement(Value: string);
+    function      GetNextExpression(Content: PChar; var Expression: string): Integer;
+    procedure     ParseExpression(Expression: string);
+    procedure     ParseStatement(Statement: string);
+  public
+    property Statement: string read fStatement write SetStatement;
+    property Items[Index: Integer]: TRegStatement read GetItem; default;
+  end;
+  {$ENDIF}
 
   TSearchFrm = class(TForm)
     StatusBar: TStatusBar;
@@ -188,6 +270,34 @@ type
     ToolButton9: TToolButton;
     ActClearAll: TAction;
     ClearAllBtn: TButton;
+    TabSheet4: TTabSheet;
+    cbRegExp: TComboBox;
+    btnSaveRegEx: TButton;
+    btnDeleteRegEx: TButton;
+    Label8: TLabel;
+    edRegExp: TEdit;
+    cbxReGreedy: TCheckBox;
+    cbxReCase: TCheckBox;
+    cbxReMultiline: TCheckBox;
+    ActLoad: TAction;
+    ToolButton1: TToolButton;
+    ToolButton2: TToolButton;
+    OpenDialog: TOpenDialog;
+    ActCopy: TAction;
+    Copy1: TMenuItem;
+    ActMove: TAction;
+    Move1: TMenuItem;
+    N2: TMenuItem;
+    ActDelete: TAction;
+    Delete1: TMenuItem;
+    ActSaveSelected: TAction;
+    N3: TMenuItem;
+    Save1: TMenuItem;
+    Saveselected1: TMenuItem;
+    sbCustom1: TSpeedButton;
+    sbCustom2: TSpeedButton;
+    edCustom1: TEdit;
+    edCustom2: TEdit;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
     procedure PathBtnClick(Sender: TObject);
@@ -211,17 +321,41 @@ type
     procedure ActClearAllExecute(Sender: TObject);
     procedure TabSheet2Resize(Sender: TObject);
     procedure TabSheet3Resize(Sender: TObject);
+    procedure TabSheet4Resize(Sender: TObject);
+    procedure cbRegExpChange(Sender: TObject);
+    procedure cbRegExpDropDown(Sender: TObject);
+    procedure btnSaveRegExClick(Sender: TObject);
+    procedure btnDeleteRegExClick(Sender: TObject);
+    procedure ActLoadExecute(Sender: TObject);
+    procedure ActCopyExecute(Sender: TObject);
+    procedure ActMoveExecute(Sender: TObject);
+    procedure ActDeleteExecute(Sender: TObject);
+    procedure sbCustom1Click(Sender: TObject);
+    procedure sbCustom2Click(Sender: TObject);
   private
     Connection: TConnection;
     ResultPages: TResultPageControl;
     ModifyBox: TModifyBox;
     fSearchFilter: string;
-    procedure Search(const Filter: string);
-    procedure Modify(const Filter: string);
+    {$IFDEF REGEXPR}
+    fSimpleParser: TSimpleParser;
+    {$ENDIF}
+    procedure Search(const Filter, Attributes: string);
+    procedure Modify(const Filter, Attributes: string);
+    {$IFDEF REGEXPR}
+    procedure EvaluateRegex(SearchList: TSearchList);
+    {$ENDIF}
+    procedure SaveItem(Combo: TComboBox; const RegPath, Content: string);
+    procedure DeleteItem(Combo: TComboBox; const RegPath: string);
+    procedure ComboDropDown(Combo: TComboBox; const RegPath: string);
+    procedure ComboChange(Combo: TComboBox; const RegPath: string; SaveBtn, DeleteBtn: TButton; Edit: TCustomEdit);
+    function  GetCustomFilter(var ACaption, AFilter: string): Boolean;
+    procedure HandleCustomChange(Btn: TSpeedButton; lbl: TLabel; edInput, edContent: TEdit; RestoreCaption: string);
   public
     constructor Create(AOwner: TComponent; const dn: string; AConnection: TConnection); reintroduce;
     procedure   SessionDisconnect(Sender: TObject);
     procedure   ShowModify;
+    procedure CopyMove(Move: Boolean);
   end;
 
 var
@@ -229,10 +363,11 @@ var
 
 implementation
 
-uses EditEntry, Constant, Main, Ldif, PickAttr, Xml, Config, Dsml, Params,
-     ObjectInfo, Misc;
-
 {$R *.DFM}
+
+uses
+  EditEntry, Constant, Main, Ldif, PickAttr, Config, Dsml, Params, ObjectInfo,
+  ParseErr, Misc, LdapCopy, LdapOp, ListViewDlg;
 
 { TSearch }
 
@@ -283,6 +418,73 @@ begin
     AbortSearch := true;
 end;
 
+{ TModifyPanel }
+
+procedure TModifyPanel.Save(Node: TXmlNode);
+var
+  sl: TStringList;
+begin
+  if (Ctrls[1] as TComboBox).Text = '' then
+    exit;
+  sl := TStringList.Create;
+  try
+    sl.Add('');
+    case (Ctrls[0] as TComboBox).ItemIndex of
+      LdapOpAdd:     sl[0] := CMOD_XML_MODOP + '=add';
+      LdapOpReplace: sl[0] := CMOD_XML_MODOP + '=replace';
+      LdapOpDelete:  sl[0] := CMOD_XML_MODOP + '=delete';
+    end;
+    with Node.Add(CMOD_XML_LDAPOP, '', sl) do begin
+      Add('attribute', (Ctrls[1] as TComboBox).Text);
+      Add('value1', (Ctrls[2] as TEdit).Text);
+      if (Ctrls[0] as TComboBox).ItemIndex = LdapOpReplace then
+        Add('value2', (Ctrls[3] as TEdit).Text);
+    end;
+  finally
+    sl.Free;
+  end;
+end;
+
+procedure TModifyPanel.Load(Node: TXmlNode);
+var
+  s: string;
+  vNode: TXmlNode;
+begin
+  if Node.Name <> CMOD_XML_LDAPOP then
+    exit;
+  if not Assigned(Node.Attributes) or (Node.Attributes.Count = 0) then
+    raise Exception.CreateFmt(stMissingOperator, [CMOD_XML_MODOP]);
+  s := Copy(Node.Attributes[0], Pos('=', Node.Attributes[0]) + 1, MaxInt);
+
+  with Ctrls[0] as TComboBox do begin
+    if s = CMOD_XML_ADD then
+      ItemIndex := CMOD_IDX_ADD
+    else
+    if s = CMOD_XML_DELETE then
+      ItemIndex := CMOD_IDX_DELETE
+    else
+    if s = CMOD_XML_REPLACE then
+      ItemIndex := CMOD_IDX_REPLACE
+    else
+      raise Exception. CreateFmt(stUnsuppOperation, [s]);
+
+    (Self.Parent as TModifyBox).OpComboChange(Ctrls[0]);
+
+    vNode := Node.NodeByName('attribute');
+    if Assigned(vNode) then
+      (ctrls[1] as TComboBox).Text := vNode.Content;
+    vNode := Node.NodeByName('value1');
+    if Assigned(vNode) then
+      (ctrls[2] as TEdit).Text := vNode.Content;
+    if ItemIndex = CMOD_IDX_REPLACE then
+    begin
+      vNode := Node.NodeByName('value2');
+      if Assigned(vNode) then
+        (ctrls[3] as TEdit).Text := vNode.Content;
+    end;
+  end;
+end;
+
 { TModifyBox }
 
 procedure TModifyBox.DoTimer(Sender: TObject);
@@ -296,7 +498,7 @@ end;
 procedure TModifyBox.ButtonClick(Sender: TObject);
 begin
   if fState <> mbxRunning then
-    New
+    Reset
   else
     fState := mbxDone;
 end;
@@ -344,7 +546,7 @@ begin
       Tag := 1;
     end;
 
-    { Operation combo und it's label are owned by ScrollBox and therefore not freed }
+    { Operation combo and it's label are owned by ScrollBox and therefore not freed }
     for i := Parent.ComponentCount - 1 downto 0 do
       Parent.Components[i].Free;
 
@@ -398,6 +600,23 @@ begin
     Parent := Panel;
   end;
 end;
+
+procedure TModifyBox.Reset;
+var
+  i: Integer;
+begin
+  fSbPanel.Parent := Parent;
+  fMemo.Clear;
+  fSbPanel.Parent := nil;
+  fProgressBar.Position := 0;
+  fCloseButton.Caption := cCancel;
+  fOpList.Clear;
+  FreeAndNil(fSearchList);
+  for i := 0 to ControlCount - 1 do
+    Controls[i].Visible := true;
+  fState := mbxReady;
+end;
+
 
 procedure TModifyBox.Resize;
 begin
@@ -508,7 +727,7 @@ begin
       if op.LdapOperation = LdapOpReplace then
         op.Value2 := (Ctrls[3] as TEdit).Text;
     end;
-    Free;
+    Visible := false;
   end;
 
   fProgressBar.Max := SearchList.Entries.Count;
@@ -540,8 +759,42 @@ begin
     fProgressBar.StepIt;
   end;
   fTimer.Enabled := false;
-  fState := mbxdone;
+  fState := mbxDone;
   fCloseButton.Caption := cOk;
+end;
+
+procedure TModifyBox.Save(const Filename: string);
+var
+  xmlTree: TXmlTree;
+  i: Integer;
+begin
+  xmlTree := TXmlTree.Create;
+  XmlTree.Root.Name := CMOD_XML_ROOT_NAME;
+  try
+    for i := 0 to ControlCount - 1 do
+      (Controls[i] as TModifyPanel).Save(XmlTree.Root);
+    xmlTree.SaveToFile(Filename);
+  finally
+    xmlTree.Free;
+  end;
+end;
+
+procedure TModifyBox.Load(const Filename: string);
+var
+  xmlTree: TXmlTree;
+  i: Integer;
+begin
+  xmlTree := TXmlTree.Create;
+  try
+    xmlTree.LoadFromFile(FileName);
+    if xmlTree.Root.Name <> CMOD_XML_ROOT_NAME then
+      raise Exception.CreateFmt(stNotLABatchFile, [FileName]);
+    New;
+    for i:=0 to xmlTree.Root.Count-1 do
+      (Controls[ControlCount - 1] as TModifyPanel).Load(xmlTree.Root[i]);
+  finally
+    xmlTree.Free;
+  end;
 end;
 
 procedure TModifyBox.SaveResults(const Filename: string);
@@ -610,20 +863,22 @@ end;
 
 procedure TModifyBox.New;
 begin
-  fMemo.Clear;
-  fSbPanel.Parent := nil;
-  fProgressBar.Position := 0;
-  fCloseButton.Caption := cCancel;
-  fOpList.Clear;
-  FreeAndNil(fSearchList);
+  Reset;
   while ControlCount > 0 do Controls[0].Free;
-  fState := mbxNew;
   AddPanel;
+  fState := mbxNew;
 end;
 
 { TResultsPageControl }
 
-function TResultPageControl.GetActiveListView: TListView;
+procedure TResultPageControl.CMMouseLeave(var Message: TMessage);
+begin
+  if Assigned(FMouseTab) then
+    FMouseTab.FCloseBtnState := tbsNormal;
+  Repaint;
+end;
+
+function TResultPageControl.GetActiveListView: TSearchListView;
 begin
   if Assigned(ActivePage) then
     Result := TResultTabSheet(ActivePage).ListView
@@ -641,12 +896,94 @@ begin
   inherited ActivePage := Value;
 end;
 
+function TResultPageControl.GetTabPadding: string;
+var
+  cnt: Integer;
+begin
+  if FTabBtnPad = '' then
+  begin
+    cnt := Round(TAB_CLOSE_BTN_SIZE / Canvas.TextWidth(' '));
+    while cnt >= 0 do begin
+      FTabBtnPad := FTabBtnPad + ' ';
+      dec(cnt);
+    end;
+  end;
+  Result := FTabBtnPad;
+end;
+
 procedure TResultPageControl.Change;
 begin
   inherited;
   with (ActivePage as TResultTabSheet) do
-    if Assigned(SearchList) then with SearchList do
+    if Assigned(ActiveList) then with ActiveList.SearchList do
       fStatusBar.Panels[1].Text := Format(stCntObjects, [FEntries.Count]);
+end;
+
+procedure TResultPageControl.DrawTab(TabIndex: Integer; const Rect: TRect; Active: Boolean);
+var
+  TabSheet: TResultTabSheet;
+  TabCaption: TPoint;
+  CloseBtnRect: TRect;
+  {$IFDEF XPSTYLE}
+  CloseBtnDrawDetails: TThemedElementDetails;
+  {$ENDIF}
+  CloseBtnDrawState: Cardinal;
+begin
+  TabCaption.Y := Rect.Top + 3;
+
+  if Active then
+  begin
+    CloseBtnRect.Top := Rect.Top + 4;
+    CloseBtnRect.Right := Rect.Right - 5;
+    TabCaption.X := Rect.Left + 6;
+  end
+  else
+  begin
+    CloseBtnRect.Top := Rect.Top + 3;
+    CloseBtnRect.Right := Rect.Right - 5;
+    TabCaption.X := Rect.Left + 3;
+  end;
+
+  if Pages[TabIndex] is TResultTabSheet then
+  begin
+    TabSheet := Pages[TabIndex] as TResultTabSheet;
+
+    CloseBtnRect.Bottom := CloseBtnRect.Top + TAB_CLOSE_BTN_SIZE;
+    CloseBtnRect.Left := CloseBtnRect.Right - TAB_CLOSE_BTN_SIZE;
+    TabSheet.FCloseButtonRect := CloseBtnRect;
+
+    Canvas.FillRect(Rect);
+    Canvas.TextOut(TabCaption.X, TabCaption.Y, Pages[TabIndex].Caption);
+
+    {$IFDEF XPSTYLE}
+    if ThemeServices.ThemesEnabled then
+    begin
+      Dec(TabSheet.FCloseButtonRect.Left);
+      case TabSheet.FCloseBtnState of
+        tbsNormal: CloseBtnDrawDetails := ThemeServices.GetElementDetails(twSmallCloseButtonNormal);
+        tbsHot:    CloseBtnDrawDetails := ThemeServices.GetElementDetails(twSmallCloseButtonHot);
+        tbsPushed: CloseBtnDrawDetails := ThemeServices.GetElementDetails(twSmallCloseButtonPushed);
+      end;
+      ThemeServices.DrawElement(Canvas.Handle, CloseBtnDrawDetails, TabSheet.FCloseButtonRect);
+    end
+    else
+    {$ENDIF}
+    begin
+      case TabSheet.FCloseBtnState of
+        tbsNormal: CloseBtnDrawState := DFCS_CAPTIONCLOSE + DFCS_INACTIVE;
+        tbsHot:    CloseBtnDrawState := DFCS_CAPTIONCLOSE;
+        tbsPushed: CloseBtnDrawState := DFCS_CAPTIONCLOSE + DFCS_PUSHED;
+      end;
+      Windows.DrawFrameControl(Canvas.Handle,
+        TabSheet.FCloseButtonRect, DFC_CAPTION, CloseBtnDrawState);
+    end;
+  end;
+end;
+
+constructor TResultPageControl.Create(AOwner: TComponent);
+begin
+  inherited;
+  OwnerDraw := true;
 end;
 
 function TResultPageControl.AddPage: TResultTabSheet;
@@ -657,58 +994,161 @@ end;
 
 procedure TResultPageControl.RemovePage(Page: TResultTabSheet);
 begin
+  { Removing of the last tab in tab area forces PageControl to redraw it. }
+  { Otherwise, traces of text may be left visible due to custom DrawTab.  }
+  Page.PageIndex := Page.PageControl.PageCount - 1;
   Page.PageControl:=nil;
   Page.Free;
 end;
 
 procedure TResultPageControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  if (ssDouble in Shift) then
-    RemovePage(ActivePage);
-  inherited;
+  if (Button = mbLeft) and Assigned(FMouseTab) and
+    (FMouseTab.FCloseBtnState = tbsHot) then
+  begin
+    FMouseTab.FCloseBtnState := tbsPushed;
+    Repaint;
+  end
+  else
+    inherited;
 end;
 
-{ TResultsTabSheet }
-
-constructor TResultTabSheet.Create(AOwner: TComponent);
+procedure TResultPageControl.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  CloseBtnState: TTabBtnState;
+  InRect, NeedRepaint: Boolean;
+  I: Integer;
+  TabSheet: TResultTabSheet;
 begin
-  inherited;
-
-  FListView:=TListView.Create(self);
-  with FListView do begin
-    Parent:=self;
-    Align:=alClient;
-    ViewStyle:=vsReport;
-    ReadOnly:=true;
-    RowSelect:=true;
-    GridLines:=true;
-    OwnerData:=true;
-    DoubleBuffered:=true;
-    OnData:=ListViewData;
-    FullDrag:=true;
-    SmallImages:=MainFrm.ImageList;
-
-    with Columns.Add do begin
-      Caption:='DN';
-      Width:=150;
-      Tag:=-1;
-    end;
+  InRect := false;
+  TabSheet := nil;
+  for i := 0 to PageCount - 1 do if Pages[i] is TResultTabSheet then
+  begin
+    TabSheet := TResultTabSheet(Pages[i]);
+    InRect := PtInRect(TabSheet.FCloseButtonRect, Point(X, Y));
+    if InRect then
+      break;
   end;
 
-  FSorter:=TListViewSorter.Create;
-  FSorter.ListView:=FListView;
-  FSorter.OnSort:=ListViewSort;
-end;
+  if InRect then
+  begin
+    if (ssLeft in Shift) then
+      CloseBtnState := tbsPushed
+    else
+      CloseBtnState := tbsHot;
+  end
+  else
+    CloseBtnState := tbsNormal;
 
-destructor TResultTabSheet.Destroy;
-begin
-  FSearchList.Free;
-  FSorter.Free;
-  FListView.Free;
+  NeedRepaint := false;
+
+  if (TabSheet <> FMouseTab) and Assigned(FMouseTab) and (FMouseTab.FCloseBtnState <> tbsNormal) then
+  begin
+    FMouseTab.FCloseBtnState := tbsNormal;
+    NeedRepaint := true;
+  end;
+
+  if Assigned(TabSheet) and (TabSheet.FCloseBtnState <> CloseBtnState) then
+  begin
+    TabSheet.FCloseBtnState := CloseBtnState;
+    NeedRepaint := true;
+  end;
+
+  FMouseTab := TabSheet;
+
+  if NeedRepaint then
+    Repaint;
+
   inherited;
 end;
 
-procedure TResultTabSheet.ListViewData(Sender: TObject; Item: TListItem);
+procedure TResultPageControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button = mbLeft) and Assigned(FMouseTab) and
+    (FMouseTab.FCloseBtnState = tbsPushed) then
+  begin
+    RemovePage(FMouseTab);
+    FMouseTab := nil;
+    Repaint;
+  end
+  else
+    inherited;
+end;
+
+{ TSearchListView }
+
+constructor TSearchListView.Create(AOwner: TComponent);
+begin
+  inherited;
+  FSorter := TListViewSorter.Create;
+  FSorter.ListView := Self;
+  FSorter.OnSort := ListViewSort;
+  ViewStyle:=vsReport;
+  ReadOnly:=true;
+  RowSelect:=true;
+  GridLines:=true;
+  OwnerData:=true;
+  DoubleBuffered:=true;
+  OnData:=ListViewData;
+  FullDrag:=true;
+  SmallImages:=MainFrm.ImageList;
+  Multiselect := true;
+  DragMode := dmAutomatic;
+  with Columns.Add do begin
+    Caption:='DN';
+    Width:=150;
+    Tag:=-1;
+  end;
+end;
+
+destructor TSearchListView.Destroy;
+begin
+  inherited;
+  FSearchList.Free;
+  FSorter.Free;
+end;
+
+procedure TSearchListView.GetSelection(List: TStringList);
+var
+  SelItem: TListItem;
+begin
+  SelItem := Selected;
+  while Assigned(SelItem) do begin
+    List.Add(TLdapEntry(SelItem.Data).dn);
+    SelItem:= GetNextItem(SelItem, sdAll, [isSelected]);
+  end;
+end;
+
+procedure TSearchListView.CopySelection(TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+var
+  List: TStringList;
+begin
+  List := TStringList.Create;
+  try
+    GetSelection(List);
+    MainFrm.DoCopyMove(List, TargetSession, TargetDn, TargetRdn, Move);
+    if Move then
+      AdjustPaths(List, TargetDn, TargetRdn);
+  finally
+    List.Free
+  end;
+end;
+
+procedure TSearchListView.DeleteSelection;
+var
+  List: TStringList;
+begin
+  List := TStringList.Create;
+  try
+    GetSelection(List);
+    MainFrm.DoDelete(List);
+    RemoveFromList(List);
+  finally
+    List.Free
+  end;
+end;
+
+procedure TSearchListView.ListViewData(Sender: TObject; Item: TListItem);
 var
   i: integer;
   Entry: TLdapEntry;
@@ -717,70 +1157,316 @@ begin
     Entry := Entries[Item.Index];
     Item.ImageIndex := (Entry.Session as TConnection).GetImageIndex(Entry);
     Item.Caption:=Entry.dn;
+    Item.Data := Entry;
     for i:=0 to Attributes.Count-1 do begin
       Item.SubItems.Add(Entry.AttributesByName[Attributes[i]].AsString);
     end;
   end;
 end;
 
-procedure TResultTabSheet.ListViewSort(SortColumn: TListColumn; SortAsc: boolean);
+procedure TSearchListView.ListViewSort(SortColumn: TListColumn; SortAsc: boolean);
 begin
   if not Assigned(SearchList) then exit;
   with SearchList do
   if SortColumn.Tag<0 then Entries.Sort([PSEUDOATTR_DN], SortAsc)
   else Entries.Sort([Attributes[SortColumn.Tag]], SortAsc);
-  ListView.Repaint;
+  Repaint;
 end;
 
-procedure TResultTabSheet.SetSearchList(ASearchList: TSearchList);
+procedure TSearchListView.SetSearchList(ASearchList: TSearchList);
 var
   i, w: integer;
 begin
   try
     FSearchList := ASearchList;
-    FListView.Items.BeginUpdate;
-    FListView.Columns.BeginUpdate;
+    Items.BeginUpdate;
+    Columns.BeginUpdate;
     w := Width;
     if FSearchList.Attributes.Count > 0 then
       w := (w - 400) div FSearchList.Attributes.Count;
     if w < 40 then w := 40;
     for i:=0 to FSearchList.Attributes.Count-1 do begin
       if FSearchList.Attributes[i] <> '*' then
-      with FListView.Columns.Add do begin
+      with Columns.Add do begin
         Caption:=FSearchList.Attributes[i];
         Width:=w;
         Tag:=i;
       end;
     end;
-    FListView.Columns[0].Width := 400;
+    Columns[0].Width := 400;
   finally
-    FListView.Columns.EndUpdate;
-    FListView.Items.EndUpdate;
+    Columns.EndUpdate;
+    Items.EndUpdate;
   end;
-  FListView.Items.Count:=FSearchList.Entries.Count;
+  Items.Count:=FSearchList.Entries.Count;
 end;
+
+procedure TSearchListView.RemoveFromList(List: TStringList);
+var
+  i, idx: Integer;
+
+  procedure RemoveEntry(var EndIndex: Integer; Value: string);
+  var
+    i: Integer;
+  begin
+    with SearchList.Entries do
+      for i := 0 to EndIndex do
+        if Items[i].dn = Value then
+        begin
+          EndIndex := i;
+          Self.Items[i].Selected := false;
+          Delete(i);
+          Exit;
+        end;
+  end;
+
+begin
+  idx := Items.Count - 1;
+  for i := List.Count - 1 downto 0 do
+  if List.Objects[i] = LDAP_OP_SUCCESS then
+    RemoveEntry(idx, List[i]);
+  Items.Count := SearchList.Entries.Count;
+  if idx >= Items.Count then
+    idx := Items.Count - 1;
+  if idx >= 0 then with Items[idx] do
+  begin
+    Selected := true;
+    Focused := true;
+  end;
+  Selected.MakeVisible(true);
+  Repaint;
+end;
+
+procedure TSearchListView.AdjustPaths(List: TStringList; TargetDn, TargetRdn: string);
+var
+  i, idx: Integer;
+
+  procedure AdjustItem(var StartIndex: Integer; Value: string);
+  var
+    i: Integer;
+    rdn: string;
+  begin
+    with SearchList.Entries do
+      for i := StartIndex to Count - 1 do with Items[i] do
+      if dn = Value then
+      begin
+        StartIndex := i;
+        if TargetRdn <> '' then
+          rdn := TargetRdn
+        else
+          rdn := GetRdnFromDn(dn);
+        dn := rdn + ',' + TargetDn;
+        Exit;
+      end;
+    end;
+
+begin
+  for i := 0 to List.Count - 1 do
+  if List.Objects[i] = LDAP_OP_SUCCESS then
+    AdjustItem(idx, List[i]);
+  Repaint;
+end;
+
+{ TResultTabSheet }
+
+function TResultTabSheet.GetCaption: string;
+begin
+  Result := TTabSheet(Self).Caption;
+end;
+
+procedure TResultTabSheet.SetCaption(Value: string);
+begin
+  if PageControl is TResultPageControl then
+    TTabSheet(Self).Caption := Value + TResultPageControl(PageControl).TabPadding
+  else
+    TTabSheet(Self).Caption := Value;
+end;
+
+constructor TResultTabSheet.Create(AOwner: TComponent);
+begin
+  inherited;
+  FListView := TSearchListView.Create(self);
+  FListView.Parent := Self;
+  FListView.Align := alClient;
+end;
+
+destructor TResultTabSheet.Destroy;
+begin
+  FListView.Free;
+  inherited;
+end;
+
+{$IFDEF REGEXPR}
+
+{ TRegStatement }
+
+constructor TRegStatement.Create;
+begin
+  inherited;
+  fRegex := TRegExpr.Create;
+end;
+
+destructor  TRegStatement.Destroy;
+begin
+  fRegex.Free;
+  inherited Destroy;
+end;
+
+{ TSimpleParser }
+
+function TSimpleParser.GetItem(Index: Integer): TRegStatement;
+begin
+  Result := TRegStatement(TObjectList(Self).Items[Index]);
+end;
+
+procedure TSimpleParser.SetStatement(Value: string);
+begin
+  fStatement := Value;
+  Clear;
+  ParseStatement(Value);
+end;
+
+function TSimpleParser.GetNextExpression(Content: PChar; var Expression: string): Integer;
+var
+  p, p1: PChar;
+  Compound: Boolean;
+begin
+  Result := 0;
+  Expression := '';
+  if (Content = nil) or (Content^ = #0) then Exit;
+  p := Content;
+  Compound := false;
+
+  while p^ in [' ', #13, #10] do p := CharNext(p);
+  if p^ = '(' then
+  begin
+    Compound := true;
+    p := CharNext(p);
+  end;
+
+  while p^ in [' ', #13, #10] do p := CharNext(p);
+
+  while not (p^ in [#0, #13, #10, '(', ')']) do
+  begin
+    if p^ = '\' then
+    begin
+      p1 := CharNext(p);
+      if p1^ in ['(', ')'] then
+        p := p1;
+    end;
+    Expression := Expression + p^;
+    p := CharNext(p);
+  end;
+
+  if p^ = ')' then
+  begin
+    if not Compound then
+      raise Exception.CreateFmt(stRegexError, [Expression + p^, stNoOpeningParenthesys]);
+    p := CharNext(p);
+  end
+  else if Compound then
+    raise Exception.CreateFmt(stRegexError, ['(' + Expression, stNoClosingParenthesys]);
+
+  Result := p - Content;
+end;
+
+procedure TSimpleParser.ParseExpression(Expression: string);
+var
+  Head, Tail, Cut: PChar;
+  RegStatement: TRegStatement;
+  s: string;
+begin
+  Head := PChar(Expression);
+  Tail := Head;
+  Cut := Head;
+  RegStatement := TRegStatement.Create;
+  Add(RegStatement);
+  while not (Tail^ in [#0, #13, #10]) do
+  begin
+    case Tail^ of
+      '!': begin
+             RegStatement.Negate := true;
+             Cut := Tail;
+             Tail := CharNext(Tail);
+             if Tail^ <> '=' then
+               raise Exception.CreateFmt(stRegexError, [Head^, stExpectedButReceived + Tail^ + '"']);
+             Continue;
+           end;
+      '=': begin
+             if not RegStatement.Negate then
+               Cut := Tail;
+             if Cut = Head then
+               raise Exception.CreateFmt(stRegexError, [Head, stEmptyArg]);
+             { Right trim }
+             Cut := CharPrev(Head, Cut);
+             if Cut <> Head then
+               while Cut^ = ' ' do Cut := CharPrev(Head, Cut);
+             SetString(RegStatement.fArgument, Head, Cut - Head + 1);
+             Tail := CharNext(Tail);
+             break;
+           end;
+      ' ': begin
+             Tail := CharNext(Tail);
+             while Tail^ = ' ' do Tail := CharNext(Tail);
+             if (Tail^ <> '!') and (Tail^ <> '=') then
+               raise Exception.CreateFmt(stInvalidOperator, [Tail^]);
+             Continue;
+           end;
+    end;
+    Tail := CharNext(Tail);
+  end;
+
+  if Tail^ = #0 then
+    raise Exception.CreateFmt(stRegexError, [Head, stMissingOperator]);
+
+  while Tail^ in [' ', #13, #10, '('] do Tail := CharNext(Tail);
+  Head := Tail;
+  while not (Tail^ in [#0, #13, #10]) do Tail := CharNext(Tail);
+  
+  SetString(s, Head, Tail - Head);
+  RegStatement.Regex.Expression := s;
+  RegStatement.Regex.Compile;
+end;
+
+procedure TSimpleParser.ParseStatement(Statement: string);
+var
+  LastPos, Pos: Integer;
+  s: string;
+begin
+  Pos := 1;
+  LastPos := Pos;
+  while true do
+  begin
+    Pos := GetNextExpression(PChar(@Statement[LastPos]), s);
+    if Pos = 0 then break;
+    inc(LastPos, Pos);
+    ParseExpression(s);
+  end;
+end;
+{$ENDIF}
 
 { TSearchForm }
 
-procedure TSearchFrm.Search(const Filter: string);
+procedure TSearchFrm.Search(const Filter, Attributes: string);
 var
   Page: TResultTabSheet;
+  SearchList: TSearchList;
 begin
-  if Assigned(ResultPages.ActivePage) and not Assigned(ResultPages.ActivePage.SearchList) then
+  if Assigned(ResultPages.ActivePage) and (ResultPages.ActiveList.Items.Count = 0) then
     Page := ResultPages.ActivePage
   else
     Page := ResultPages.AddPage;
   ResultPages.ActivePage := Page;
   Screen.Cursor := crHourGlass;
   try
-    Page.SearchList := TSearchList.Create(Connection, cbBasePath.Text,                                          Filter, cbAttributes.Text,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    Page.Caption := Filter;    Page.ListView.PopupMenu := PopupMenu1;
+    SearchList := TSearchList.Create(Connection,                                     cbBasePath.Text,                                     Filter,                                     Attributes,                                     cbSearchLevel.ItemIndex,                                     cbDerefAliases.ItemIndex,                                     StatusBar);    {$IFDEF REGEXPR}    EvaluateRegex(SearchList);    {$ENDIF}    Page.ListView.SearchList := SearchList;    Page.Caption := Filter;    Page.ListView.PopupMenu := PopupMenu1;
     Page.ListView.OnDblClick := ListViewDblClick;
   finally
     Screen.Cursor := crDefault;
   end;
 end;
 
-procedure TSearchFrm.Modify(const Filter: string);
+procedure TSearchFrm.Modify(const Filter, Attributes: string);
 var
   attrs: string;
   i: Integer;
@@ -804,7 +1490,7 @@ var
 begin
   Screen.Cursor := crHourGlass;
   try
-    attrs := '';
+    attrs := Attributes;
     for i := 0 to ModifyBox.ControlCount - 1 do with (ModifyBox.Controls[i] as TModifyPanel) do
     begin
       if TComboBox(Ctrls[1]).Text <> '' then
@@ -813,12 +1499,162 @@ begin
         attrs := attrs + TComboBox(Ctrls[1]).Text;
       end;
       ExtractParams(attrs, PChar(TEdit(Ctrls[2]).Text));
-      ExtractParams(attrs, PChar(TEdit(Ctrls[3]).Text));
+      if Assigned(Ctrls[3]) then
+        ExtractParams(attrs, PChar(TEdit(Ctrls[3]).Text));
     end;
     ModifyBox.SearchList.Free;
-    ModifyBox.SearchList := TSearchList.Create(Connection, cbBasePath.Text,                                          Filter, attrs,                                          cbSearchLevel.ItemIndex,                                          cbDerefAliases.ItemIndex, StatusBar);    ModifyBox.Run;  finally
+    ModifyBox.SearchList := TSearchList.Create(Connection,                                               cbBasePath.Text,                                               Filter,                                               attrs,                                               cbSearchLevel.ItemIndex,                                               cbDerefAliases.ItemIndex,                                               StatusBar);    {$IFDEF REGEXPR}    EvaluateRegex(ModifyBox.SearchList);    {$ENDIF}    ModifyBox.Run;    ActSave.Hint := cSaveBatchProtocol;    ActLoad.Hint := '';
+  finally
     Screen.Cursor := crDefault;
   end;
+end;
+
+{$IFDEF REGEXPR}
+procedure TSearchFrm.EvaluateRegex(SearchList: TSearchList);
+var
+  i: Integer;
+  s: string;
+
+  function RegMatch(Entry: TLdapEntry): Boolean;
+  var
+    i, j: Integer;
+    Attr: TLdapAttribute;
+    t: Boolean;
+  begin
+    Result := true;
+    for i := 0 to fSimpleParser.Count - 1 do with fSimpleParser[i] do
+    begin
+      t := false;
+      Attr := Entry.AttributesByName[Argument];
+      with Attr do begin
+        for j := 0 to ValueCount - 1 do
+        if Regex.Exec(Values[j].AsString) then
+        begin
+          t := true;
+          break;
+        end;
+        if Negate then t := not t;
+      end;
+      Result := Result and t;
+    end;
+  end;
+
+begin
+ if (edRegexp.Text <> '') and (fSimpleParser.Count > 0) then
+ begin
+   s := StatusBar.Panels[1].Text;
+   if s[Length(s)] = '.' then s[Length(s)] := ',';
+   StatusBar.Panels[1].Text := stRegApplying;
+   StatusBar.Repaint;
+   for i := SearchList.Entries.Count - 1 downto 0 do
+   begin
+     if not RegMatch(SearchList.Entries[i]) then
+       SearchList.Entries.Delete(i);
+   end;
+   StatusBar.Panels[1].Text := Format(stRegCntMatching, [s, SearchList.Entries.Count]);
+ end;
+end;
+{$ENDIF}
+
+procedure TSearchFrm.SaveItem(Combo: TComboBox; const RegPath, Content: string);
+var
+  idx: Integer;
+begin
+  with Combo do begin
+    if Text = '' then Exit;
+    idx := Items.IndexOf(Text);
+    if idx = - 1 then
+      Items.Add(Text);
+    Connection.Account.WriteString(RegPath + Text, Content);
+  end;
+end;
+
+procedure TSearchFrm.DeleteItem(Combo: TComboBox; const RegPath: string);
+var
+  idx: Integer;
+begin
+  with cbFilters do begin
+    idx := Items.IndexOf(Text);
+    if idx <> -1 then
+    begin
+      Connection.Account.Delete(RegPath + Text);
+      Items.Delete(idx);
+    end;
+  end;
+end;
+
+procedure TSearchFrm.ComboDropDown(Combo: TComboBox; const RegPath: string);
+var
+  FilterNames: TStrings;
+  i: Integer;
+begin
+  if Combo.Tag = 0 then
+  begin
+    FilterNames := TStringList.Create;
+    try
+      Connection.Account.GetValueNames(RegPath, FilterNames);
+      for i := 0 to FilterNames.Count - 1 do
+        Combo.Items.Add(FilterNames[i]);
+    finally
+      FilterNames.Free;
+    end;
+    Combo.Tag := 1;
+  end;
+end;
+
+procedure TSearchFrm.ComboChange(Combo: TComboBox; const RegPath: string; SaveBtn, DeleteBtn: TButton; Edit: TCustomEdit);
+var
+  idx: Integer;
+begin
+  with Combo do begin
+    SaveBtn.Enabled := Text <> '';
+    DeleteBtn.Enabled := SaveFilterBtn.Enabled;
+    idx := Items.IndexOf(Text);
+    if idx <> -1 then
+      Edit.Text := Connection.Account.ReadString(RegPath + Text);
+  end;
+end;
+
+function TSearchFrm.GetCustomFilter(var ACaption, AFilter: string): Boolean;
+var
+  sl: TStrings;
+  i: Integer;
+  Item: TListItem;
+begin
+  with TListViewDlg.Create(Self) do
+  try
+    Caption := cPickQuery;
+    sl := TStringList.Create;
+    try
+      Connection.Account.GetValueNames(rSearchCustFilters, sl);
+      for i := 0 to sl.Count - 1 do
+      begin
+        Item := ListView.Items.Add;
+        Item.Caption := sl[i];
+        Item.Subitems.Add(Connection.Account.ReadString(rSearchCustFilters + sl[i]));
+      end;
+    finally
+      sl.Free;
+    end;
+    Result := ShowModal = mrOk;
+    if Result then
+    begin
+      ACaption := ListView.Selected.Caption;
+      AFilter := ListView.Selected.SubItems[0];
+    end;
+  finally
+    Free;
+  end;
+end;
+
+procedure TSearchFrm.CopyMove(Move: Boolean);
+var
+  TargetData: TTargetData;
+begin
+  with ResultPages, ActiveList do
+  if Assigned(ActiveList) and Assigned(ActiveList.Selected) and
+     ExecuteCopyDialog(Self, TLdapEntry(Selected.Data).dn, SelCount, Move, Connection, TargetData) then
+       CopySelection(TargetData.Connection, TargetData.Dn, TargetData.Rdn, Move);
 end;
 
 constructor TSearchFrm.Create(AOwner: TComponent; const dn: string; AConnection: TConnection);
@@ -853,6 +1689,11 @@ begin
     cbAttributes.Items.CommaText := ReadString(rSearchAttributes, '');
     cbSearchLevel.ItemIndex := ReadInteger(rSearchScope, 2);
     cbDerefAliases.ItemIndex := ReadInteger(rSearchDerefAliases, 0);
+    cbxReGreedy.Checked := ReadBool(rSearchRegExGreedy, true);
+    cbxReCase.Checked := ReadBool(rSearchRegExCase, true);
+    cbxReMultiLine.Checked := ReadBool(rSearchRegExMulti);
+    Height := ReadInteger(rSearchHeight, Height);
+    Width := ReadInteger(rSearchWidth, Width);
   end;
   AConnection.OnDisconnect.Add(SessionDisconnect);
   StatusBar.Panels[0].Text := Format(cServer, [AConnection.Server]);
@@ -869,6 +1710,11 @@ begin
     WriteString(rSearchAttributes, cbAttributes.Items.CommaText);
     WriteInteger(rSearchScope, cbSearchLevel.ItemIndex);
     WriteInteger(rSearchDerefAliases, cbDerefAliases.ItemIndex);
+    WriteBool(rSearchRegExGreedy, cbxReGreedy.Checked);
+    WriteBool(rSearchRegExCase, cbxReCase.Checked);
+    WriteBool(rSearchRegExMulti, cbxReMultiLine.Checked);
+    WriteInteger(rSearchHeight, Height);
+    WriteInteger(rSearchWidth, Width);
   end;
 end;
 
@@ -888,6 +1734,9 @@ procedure TSearchFrm.FormDestroy(Sender: TObject);
 begin
   ResultPanel.Free;
   ModifyBox.Free;
+  {$IFDEF REGEXPR}
+  fSimpleParser.Free;
+  {$ENDIF}
 end;
 
 procedure TSearchFrm.PathBtnClick(Sender: TObject);
@@ -901,7 +1750,8 @@ end;
 
 procedure TSearchFrm.ActStartExecute(Sender: TObject);
 var
-  s: string;
+  RawFilter1, RawFilter2, Filter, Attributes: string;
+  i: Integer;
 
   function Prepare(const Filter: string): string;
   var
@@ -929,27 +1779,101 @@ var
     end;
   end;
 
+  function CleanWildcards(s: string): string;
+  var
+    p: PChar;
+  begin
+    Result := '';
+    p := PChar(s);
+    while p^ <> #0 do
+    begin
+      if p^ = '*' then
+      begin
+        Result := Result + p^;
+        while p^ = '*' do
+        begin
+          p := CharNext(p);
+          if p^ = #0 then
+            exit;
+        end;
+      end;
+      Result := Result + p^;
+      p := CharNext(p);
+    end;
+  end;
+
 begin
   ComboHistory(cbBasePath);
   ComboHistory(cbAttributes);
-  if PageControl.ActivePageIndex = 0 then
+
+  if (PageControl.ActivePageIndex = 0) or ((PageControl.ActivePageIndex <> 1) and (Memo1.Text = '')) then
   begin
-    s := '';
-    if edName.Text <> '' then
-      s := StringReplace(fSearchFilter, '%s', edName.Text, [rfReplaceAll, rfIgnoreCase]);
-    if edEmail.Text <> '' then
-      s := Format('%s(mail=*%s*)', [s, edEMail.Text]);
-    if s = '' then
-      s := sANYCLASS
+
+    if sbCustom1.Down then
+      RawFilter1 := edCustom1.Text
     else
-      s := '(&' + s + ')';
+      RawFilter1 := fSearchFilter;
+
+    if edName.Text <> '' then
+      RawFilter1 := StringReplace(RawFilter1, '%s', edName.Text, [rfReplaceAll, rfIgnoreCase])
+    else
+    if not sbCustom1.Down then
+      RawFilter1 := '';
+
+    if sbCustom2.Down then
+      RawFilter2 := edCustom2.Text
+    else
+      RawFilter2 := '(mail=*%s*)';
+
+    if edEMail.Text <> '' then
+      RawFilter2 := StringReplace(RawFilter2, '%s', edEMail.Text, [rfReplaceAll, rfIgnoreCase])
+    else
+    if not sbCustom2.Down then
+      RawFilter2 := '';
+
+    if (RawFilter1 <> '') and (RawFilter2 <> '') then
+      Filter := Format('(&%s%s)', [RawFilter1, RawFilter2])
+    else
+    if (RawFilter1 = '') and (RawFilter2 = '') then
+      Filter := sANYCLASS
+    else
+      Filter := RawFilter1 + RawFilter2;
+
+    Filter := CleanWildcards(StringReplace(Filter, '%s', '*', [rfReplaceAll, rfIgnoreCase]));
   end
   else
-    s := Prepare(Memo1.Text);
+    Filter := Prepare(Memo1.Text);
+
+  Attributes := cbAttributes.Text;
+
+  {$IFDEF REGEXPR}
+  if edRegExp.Text <> '' then
+  begin
+    if not Assigned(fSimpleParser) then
+      fSimpleParser := TSimpleParser.Create;
+
+    fSimpleParser.Statement := edRegExp.Text;
+
+    for i := 0 to fSimpleParser.Count - 1 do with fSimpleParser[i] do
+    begin
+      Regex.ModifierG := cbxReGreedy.Checked;
+      Regex.ModifierI := not cbxReCase.Checked;
+      Regex.ModifierM := cbxReMultiline.Checked;
+      if Attributes <> '' then
+        Attributes := Attributes + ',';
+      Attributes := Attributes + fSimpleParser[i].Argument;
+    end;
+  end;
+  {$ENDIF}
+
+  ActLoad.Enabled := false;
+  ActSave.Enabled := false;
+  ActSaveSelected.Enabled := false;
+
   if btnSearch.Down then
-    Search(s)
+    Search(Filter, Attributes)
   else
-    Modify(s);
+    Modify(Filter, Attributes);
 end;
 
 procedure TSearchFrm.ActGotoExecute(Sender: TObject);
@@ -966,7 +1890,7 @@ begin
   with ResultPages, ActiveList do
   if Assigned(ActiveList) and Assigned(Selected) then
   begin
-    oi := TObjectInfo.Create(ResultPages.ActivePage.SearchList.Entries[ResultPages.ActiveList.Selected.Index], false);
+    oi := TObjectInfo.Create(ResultPages.ActiveList.SearchList.Entries[ResultPages.ActiveList.Selected.Index], false);
     try
       MainFrm.EditProperty(Self, oi);
     finally
@@ -976,6 +1900,8 @@ begin
 end;
 
 procedure TSearchFrm.ActSaveExecute(Sender: TObject);
+var
+  SelectedOnly: Boolean;
 
   procedure ToLdif;
   var
@@ -984,8 +1910,10 @@ procedure TSearchFrm.ActSaveExecute(Sender: TObject);
   begin
     ldif := TLDIFFile.Create(SaveDialog.FileName, fmWrite);
     ldif.UnixWrite := SaveDialog.FilterIndex = 2;
-    with ResultPages.ActivePage.SearchList do try
+    with ResultPages.ActiveList, SearchList do
+    try
       for i := 0 to Entries.Count - 1 do
+      if not SelectedOnly or (SelectedOnly and Items[i].Selected) then
         ldif.WriteRecord(Entries[i]);
     finally
       ldif.Free;
@@ -1002,6 +1930,7 @@ procedure TSearchFrm.ActSaveExecute(Sender: TObject);
     with ResultPages.ActivePage.ListView do
     try
       for i := 0 to Items.Count - 1 do with Items[i] do
+      if not SelectedOnly or (SelectedOnly and Selected) then
       begin
         s := '"' + Caption + '"';
         if SubItems.Count > 0 then
@@ -1017,38 +1946,70 @@ procedure TSearchFrm.ActSaveExecute(Sender: TObject);
   procedure ToXml;
   var
     DsmlTree: TDsmlTree;
+    EntryList: TLdapEntryList;
+    i: Integer;
   begin
-    DsmlTree := TDsmlTree.Create(ResultPages.ActivePage.SearchList.Entries);
+    with ResultPages.ActiveList, SearchList do
+    if SelectedOnly then
+    begin
+      EntryList := TLdapEntryList.Create(false);
+      for i := 0 to Entries.Count - 1 do
+        if Items[i].Selected then
+          EntryList.Add(Entries[i]);
+    end
+    else
+      EntryList := Entries;
     try
-      DsmlTree.SaveToFile(SaveDialog.FileName);
+      DsmlTree := TDsmlTree.Create(EntryList);
+      try
+        DsmlTree.SaveToFile(SaveDialog.FileName);
+      finally
+        DsmlTree.Free;
+      end;
     finally
-      DsmlTree.Free;
+      if SelectedOnly then
+        EntryList.Free;
     end;
   end;
 
 begin
+  SelectedOnly := Sender = ActSaveSelected;
   if btnSearch.Down then
   begin
-    with ResultPages, ActivePage do
+    with ResultPages, ActiveList do
     if Assigned(ActivePage) and (SearchList.Entries.Count > 0) then
     begin
       SaveDialog.Filter := SAVE_SEARCH_FILTER;
       SaveDialog.DefaultExt := SAVE_SEARCH_EXT;
       if SaveDialog.Execute then
+      try
+        Screen.Cursor := crHourGlass;
         case SaveDialog.FilterIndex of
           1, 2: ToLdif;
           3:    ToCSV;
           4:    ToXml;
         end;
+      finally
+        Screen.Cursor := crDefault;
+      end;
     end;
   end
   else
   if Assigned(ModifyBox) then
   begin
-    SaveDialog.Filter := SAVE_MODIFY_FILTER;
-    SaveDialog.DefaultExt := SAVE_MODIFY_EXT;
-    if SaveDialog.Execute then
-      ModifyBox.SaveResults(SaveDialog.FileName);
+    if ModifyBox.State = mbxDone then
+    begin
+      SaveDialog.Filter := SAVE_MODIFY_LOG_FILTER;
+      SaveDialog.DefaultExt := SAVE_MODIFY_LOG_EXT;
+      if SaveDialog.Execute then
+        ModifyBox.SaveResults(SaveDialog.FileName);
+    end
+    else begin
+      SaveDialog.Filter := SAVE_MODIFY_FILTER;
+      SaveDialog.DefaultExt := SAVE_MODIFY_EXT;
+      if SaveDialog.Execute then
+        ModifyBox.Save(SaveDialog.FileName);
+    end;
   end;
 end;
 
@@ -1066,17 +2027,21 @@ end;
 
 procedure TSearchFrm.ActionListUpdate(Action: TBasicAction; var Handled: Boolean);
 var
-  Enbl: Boolean;
+  Enbl, Modv: Boolean;
 begin
-  ActStart.Enabled := (not (Assigned(ModifyBox) and ModifyBox.Visible) or (ModifyBox.State = mbxReady)) and (PageControl.ActivePageIndex <> 2);
-  ActClearAll.Enabled := Assigned(ResultPages.ActivePage) and Assigned(ResultPages.ActivePage.SearchList);
-  Enbl := Assigned(ResultPages.ActiveList) and (ResultPages.ActiveList.Items.Count > 0);
-  ActSave.Enabled := Enbl or (Assigned(ModifyBox) and ModifyBox.Visible and (ModifyBox.State = mbxDone));
+  Modv := Assigned(ModifyBox) and ModifyBox.Visible;
+  ActStart.Enabled := (not Modv or (ModifyBox.State = mbxReady))
+                       and ((PageControl.ActivePageIndex <> 1) or (Memo1.Text <> ''));
+  ActClearAll.Enabled := Assigned(ResultPages.ActivePage) and Assigned(ResultPages.ActiveList.SearchList);
+  ActLoad.Enabled := Modv and (ModifyBox.State <> mbxDone);
+  Enbl := btnSearch.Down and Assigned(ResultPages.ActiveList) and (ResultPages.ActiveList.Items.Count > 0);
+  ActSave.Enabled := Enbl or(Modv and ((ModifyBox.State <> mbxNew) or (ModifyBox.State = mbxDone)));
   Enbl := Enbl and ActStart.Enabled and Assigned(ResultPages.ActiveList.Selected);
   ActGoto.Enabled := Enbl;
   ActEdit.Enabled := Enbl;
+  ActSaveSelected.Enabled := Enbl;
   if Enbl then
-  with TObjectInfo.Create(ResultPages.ActivePage.SearchList.Entries[ResultPages.ActiveList.Selected.Index], false) do begin
+  with TObjectInfo.Create(ResultPages.ActiveList.SearchList.Entries[ResultPages.ActiveList.Selected.Index], false) do begin
     ActProperties.Enabled := Supported;
     Free;
   end
@@ -1108,62 +2073,23 @@ begin
 end;
 
 procedure TSearchFrm.SaveFilterBtnClick(Sender: TObject);
-var
-  idx: Integer;
 begin
-  with cbFilters do begin
-    if Text = '' then Exit;
-    idx := Items.IndexOf(Text);
-    if idx = - 1 then
-      Items.Add(Text);
-    Connection.Account.WriteString(rSearchCustFilters + Text, Memo1.Text);
-  end;
+  SaveItem(cbFilters, rSearchCustFilters, Memo1.Text);
 end;
 
 procedure TSearchFrm.cbFiltersChange(Sender: TObject);
-var
-  idx: Integer;
 begin
-  with cbFilters do begin
-    SaveFilterBtn.Enabled := Text <> '';
-    DeleteFilterBtn.Enabled := SaveFilterBtn.Enabled;
-    idx := Items.IndexOf(Text);
-    if idx <> -1 then
-      Memo1.Text := Connection.Account.ReadString(rSearchCustFilters + Text);
-  end;
+  ComboChange(cbFilters, rSearchCustFilters, SaveFilterBtn, DeleteFilterBtn, Memo1);
 end;
 
 procedure TSearchFrm.DeleteFilterBtnClick(Sender: TObject);
-var
-  idx: Integer;
 begin
-  with cbFilters do begin
-    idx := Items.IndexOf(Text);
-    if idx <> -1 then
-    begin
-      Connection.Account.Delete(rSearchCustFilters + Text);
-      Items.Delete(idx);
-    end;
-  end;
+  DeleteItem(cbFilters, rSearchCustFilters);
 end;
 
 procedure TSearchFrm.cbFiltersDropDown(Sender: TObject);
-var
-  FilterNames: TStrings;
-  i: Integer;
 begin
-  if cbFilters.Tag = 0 then
-  begin
-    FilterNames := TStringList.Create;
-    try
-      Connection.Account.GetValueNames(rSearchCustFilters, FilterNames);
-      for i := 0 to FilterNames.Count - 1 do
-        cbFilters.Items.Add(FilterNames[i]);
-    finally
-      FilterNames.Free;
-    end;
-    cbFilters.Tag := 1;
-  end;
+  ComboDropDown(cbFilters, rSearchCustFilters);
 end;
 
 procedure TSearchFrm.FormDeactivate(Sender: TObject);
@@ -1184,6 +2110,8 @@ begin
     if Assigned(ModifyBox) then ModifyBox.Visible := false;
       ResultPanel.Visible := true;
     MainFrm.ImageList.GetBitmap(20, StartBtn.Glyph);
+    ActSave.Hint := cSaveSrchResults;
+    ActLoad.Hint := '';
   end
   else begin
     if not Assigned(ModifyBox) then
@@ -1196,6 +2124,8 @@ begin
     ResultPanel.Visible := false;
     ModifyBox.Visible := true;
     MainFrm.ImageList.GetBitmap(38, StartBtn.Glyph);
+    ActSave.Hint := cSaveBatchToFile;
+    ActLoad.Hint := cLoadBatchFromFile;
   end;
 end;
 
@@ -1219,7 +2149,7 @@ begin
     Memo1.Width := Width - 46;
     DeleteFilterBtn.Left := Width - DeleteFilterBtn.Width - 6;
     SaveFilterBtn.Left := DeleteFilterBtn.Left - SaveFilterBtn.Width - 4;
-    cbFilters.Width := SaveFilterBtn.Left - 44;
+    cbFilters.Width := SaveFilterBtn.Left - cbFilters.Left - 4;
   end;
 end;
 
@@ -1228,6 +2158,104 @@ begin
   edAttrBtn.Left := TabSheet3.Width - edAttrBtn.Width - 6;
   cbAttributes.Width := edAttrBtn.Left - cbAttributes.Left - 6;
   cbDerefAliases.Width := cbAttributes.Left + cbAttributes.Width - cbDerefAliases.Left;
+end;
+
+procedure TSearchFrm.TabSheet4Resize(Sender: TObject);
+begin
+  with TabSheet2 do begin
+    edRegExp.Width := Width - edRegexp.Left - 6;
+    btnDeleteRegex.Left := Width - btnDeleteRegex.Width - 6;
+    btnSaveRegex.Left := btnDeleteRegex.Left - btnSaveRegex.Width - 4;
+    cbRegExp.Width := btnSaveRegex.Left - cbRegExp.Left - 4;
+  end;
+end;
+
+procedure TSearchFrm.cbRegExpChange(Sender: TObject);
+begin
+  ComboChange(cbRegExp, rSearchRegEx, btnSaveRegEx, btnDeleteRegEx, edRegExp);
+end;
+
+procedure TSearchFrm.cbRegExpDropDown(Sender: TObject);
+begin
+  ComboDropDown(cbRegExp, rSearchRegEx);
+end;
+
+procedure TSearchFrm.btnSaveRegExClick(Sender: TObject);
+begin
+  SaveItem(cbRegExp, rSearchRegEx, edRegExp.Text);
+end;
+
+procedure TSearchFrm.btnDeleteRegExClick(Sender: TObject);
+begin
+  DeleteItem(cbRegExp, rSearchRegEx);
+end;
+
+procedure TSearchFrm.ActLoadExecute(Sender: TObject);
+begin
+  OpenDialog.Filter := SAVE_MODIFY_FILTER;
+  OpenDialog.DefaultExt := SAVE_MODIFY_EXT;
+  if OpenDialog.Execute then
+  try
+    ModifyBox.Load(OpenDialog.FileName);
+  except
+    on E:EXmlException do
+      ParseError(mtError, Application.MainForm, OpenDialog.FileName, E.Message, E.Message2, E.XmlText, E.Tag, E.Line, E.Position);
+  end;
+end;
+
+procedure TSearchFrm.ActCopyExecute(Sender: TObject);
+begin
+  CopyMove(false);
+end;
+
+procedure TSearchFrm.ActMoveExecute(Sender: TObject);
+begin
+  CopyMove(true);
+end;
+
+procedure TSearchFrm.ActDeleteExecute(Sender: TObject);
+begin
+  if Assigned(ResultPages.ActiveList) then
+    ResultPages.ActiveList.DeleteSelection;
+end;
+
+procedure TSearchFrm.HandleCustomChange(Btn: TSpeedButton; lbl: TLabel; edInput, edContent: TEdit; RestoreCaption: string);
+var
+  Caption, Filter: string;
+begin
+  if Btn.Down and GetCustomFilter(Caption, Filter) then
+  begin
+    lbl.Caption := Caption;
+    edContent.Text := Filter;
+    if Pos('%s', Filter) = 0 then
+    begin
+      edInput.Visible := false;
+      edContent.Left := edInput.Left;
+      edContent.Width := TabSheet1.Width - 61;
+    end
+    else begin
+      edInput.Visible := true;
+      edInput.Width := 129;
+      edContent.Left := edName.Left + 129 + 4;
+      edContent.Width := TabSheet1.Width - 61 - edInput.Width - 4;
+    end;
+    exit;
+  end;
+
+  lbl.Caption := RestoreCaption + ':';
+  btn.Down := false;
+  edInput.Visible := true;
+  edInput.Width := TabSheet1.Width - 61;
+end;
+
+procedure TSearchFrm.sbCustom1Click(Sender: TObject);
+begin
+  HandleCustomChange(sbCustom1, label6, edName, edCustom1, cName);
+end;
+
+procedure TSearchFrm.sbCustom2Click(Sender: TObject);
+begin
+  HandleCustomChange(sbCustom2, Label7, edEMail, edCustom2, '&E-Mail');
 end;
 
 end.

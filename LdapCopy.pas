@@ -1,5 +1,5 @@
   {      LDAPAdmin - Copy.pas
-  *      Copyright (C) 2005-2012 Tihomir Karlovic
+  *      Copyright (C) 2005-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -28,6 +28,12 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   ImgList, Connection;
 
 type
+
+  TTargetData = record
+    Connection: TConnection;
+    Dn: string;
+    Rdn: string;
+  end;
 
   TExpandNodeProc = procedure (Node: TTreeNode; Session: TLDAPSession) of object;
 
@@ -64,10 +70,9 @@ type
   public
     constructor Create(AOwner: TComponent;
                        dn: string;
-                       Connection: TConnection;
-                       ImageList: TImageList;
-                       ExpandNode: TExpandNodeProc;
-                       SortProc: TTVCompare); reintroduce;
+                       Count: Integer;
+                       Move: Boolean;
+                       Connection: TConnection); reintroduce;
     property TargetDn: string read GetTgtDn;
     property TargetRdn: string read GetTgtRdn;
     property TargetConnection: TConnection read GetTgtConnection;
@@ -76,11 +81,34 @@ type
 var
   CopyDlg: TCopyDlg;
 
+function ExecuteCopyDialog(Owner: TComponent; dn: string; Count: Integer; Move: Boolean; Connection: TConnection; out TargetData: TTargetData): Boolean;
+
 implementation
 
 {$R *.DFM}
 
-uses Registry, Config, SizeGrip, Constant, ObjectInfo;
+uses Registry, Config, SizeGrip, Constant, ObjectInfo, Misc, Main;
+
+function ExecuteCopyDialog(Owner: TComponent; dn: string; Count: Integer; Move: Boolean; Connection: TConnection; out TargetData: TTargetData): Boolean;
+begin
+    with TCopyDlg.Create(Owner, dn, Count, Move, Connection) do
+    try
+      ShowModal;
+      if ModalResult = mrOk then
+      begin
+        with TargetData do begin
+          Connection := TargetConnection;
+          Dn := TargetDn;
+          Rdn := TargetRdn;
+        end;
+        Result := true;
+      end
+      else
+        Result := false;
+    finally
+      Free;
+    end;
+end;
 
 { TCopyDlg }
 
@@ -114,12 +142,11 @@ end;
 
 constructor TCopyDlg.Create(AOwner: TComponent;
                             dn: string;
-                            Connection: TConnection;
-                            ImageList: TImageList;
-                            ExpandNode: TExpandNodeProc;
-                            SortProc: TTVCompare);
+                            Count: Integer;
+                            Move: Boolean;
+                            Connection: TConnection);
 var
-  v: string;
+  v, tgt: string;
   i,j: integer;
 begin
   inherited Create(AOwner);
@@ -127,16 +154,12 @@ begin
   OkBtn.Enabled := false;
   cbConnections := TLAComboBox.Create(Self);
   with cbConnections do begin
-    //Parent := Self;
     Parent := Panel3;
-    //Left := 80;
     Left := edName.Left;
     Top := 8;
-    //Width := 305;
     Width := edName.Width;
     Height := 22;
     Style := csOwnerDrawFixed;
-    //Anchors := [akLeft, akTop, akRight];
     ItemHeight := 16;
     TabOrder := 0;
     OnChange := cbConnectionsChange;
@@ -156,10 +179,24 @@ begin
   if MainConnectionIdx = -1 then
     raise Exception.Create(stNoActiveConn);
   cbConnections.Items.Objects[MainConnectionIdx] := Connection;
-  fExpandNode := ExpandNode;
-  fSortProc := SortProc;
-  TreeView.Images := ImageList;
+  fExpandNode := MainFrm.ExpandNode;
+  fSortProc := @TreeSortProc;
+  TreeView.Images := MainFrm.ImageList;
   cbConnections.ItemIndex := MainConnectionIdx;
+
+  if Count > 1 then
+  begin
+    edName.Visible := false;
+    label2.Visible := false;
+    tgt := Format(stNumObjects, [Count])
+  end
+  else
+    tgt := '"' + dn + '"';
+
+  if Move then
+    Caption := Format(cMoveTo, [tgt])
+  else
+    Caption := Format(cCopyTo, [tgt]);
 end;
 
 procedure TCopyDlg.cbConnectionsChange(Sender: TObject);
@@ -269,7 +306,6 @@ end;
 procedure TCopyDlg.FormResize(Sender: TObject);
 begin
   edName.Width := Panel3.Width - edName.Left;
-  //cbConnections.Width := Panel3.Width - cbConnections.Left;
   cbConnections.Width := edName.Width;
   TreeView.Width := Panel3.Width - TreeView.Left;
   TreeView.Height := Panel3.Height - TreeView.Top;

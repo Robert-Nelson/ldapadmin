@@ -40,7 +40,7 @@ object SearchFrm: TSearchFrm
     Left = 0
     Top = 29
     Width = 722
-    Height = 164
+    Height = 172
     Align = alTop
     BorderWidth = 3
     TabOrder = 1
@@ -48,7 +48,7 @@ object SearchFrm: TSearchFrm
       Left = 4
       Top = 4
       Width = 714
-      Height = 156
+      Height = 164
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 0
@@ -56,7 +56,7 @@ object SearchFrm: TSearchFrm
         Left = 0
         Top = 0
         Width = 714
-        Height = 156
+        Height = 164
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
@@ -107,7 +107,7 @@ object SearchFrm: TSearchFrm
           Left = 0
           Top = 49
           Width = 714
-          Height = 107
+          Height = 115
           Align = alClient
           BevelOuter = bvNone
           TabOrder = 1
@@ -115,38 +115,132 @@ object SearchFrm: TSearchFrm
             Left = 0
             Top = 0
             Width = 617
-            Height = 107
+            Height = 115
             ActivePage = TabSheet1
             Align = alClient
             TabOrder = 0
             object TabSheet1: TTabSheet
               Caption = '&Search'
               object Label6: TLabel
-                Left = 8
-                Top = 15
+                Left = 24
+                Top = 0
                 Width = 31
                 Height = 13
                 Caption = '&Name:'
               end
               object Label7: TLabel
-                Left = 8
-                Top = 42
+                Left = 24
+                Top = 40
                 Width = 32
                 Height = 13
                 Caption = '&E-Mail:'
               end
+              object sbCustom1: TSpeedButton
+                Left = 576
+                Top = 16
+                Width = 21
+                Height = 21
+                AllowAllUp = True
+                Anchors = [akTop, akRight]
+                GroupIndex = 1
+                Glyph.Data = {
+                  36030000424D3603000000000000360000002800000010000000100000000100
+                  1800000000000003000000000000000000000000000000000000000000000000
+                  0000000000000000000000000000000000000000000000000000000000000000
+                  0000000000000000000000000000000000000000000000000000000000000000
+                  0000000000000000000000000000000000000000000000000000000000000000
+                  0000000000000000000000006640496640496640496640496640496640496640
+                  49664049664049000000000000000000000000000000000000000000664049FF
+                  FFFFE0E0E0E3E3E3E7E7E7EAEAEAEDEDEDF0F0F0664049000000000000000000
+                  000000000000000000000000664049FFFFFFDEDEDEE1E1E18989898B8B8B8D8D
+                  8DEEEEEE664049000000000000000000000000000000000000000000664049FF
+                  FFFFDBDBDBDFDFDFE2E2E2E5E5E5E8E8E8ECECEC664049000000000000000000
+                  6640496640496640496640496640496640496640496640496640498888888B8B
+                  8BE9E9E9664049000000000000000000664049FFFFFFABABABE3E3E3E7E7E7EA
+                  EAEAEDEDEDEEEFF065434CDADEDFDEE2E3E3E6E665404A000000000000000000
+                  664049FFFFFF0000009D9D9D7C7C7C7D7D7D7D8081E2EBED6A5D6A7E7F8A7E7F
+                  8A7F7883664D577FBFFF000000000000000000000000000000000000BCBCBCE4
+                  E5E5DDE6E8C7E3EB789AAB7FADBD7FADBD789AAB6D6F7C79D2E8000000000000
+                  664049FFFFFF000000A8A8A886868687898A87999EACDDEBA4D3E2D1EFF8D1F0
+                  F8AAE3F284D4EB7DD3EB000000000000664049FFFFFFA4A4A4DADADADDDDDDDC
+                  DFE0C8DFE5A7DDECCCE8F0F6FAFBF6FAFBCFECF490D9EE7BD2EC000000000000
+                  6640498C6F7781616981616981616980646D7F7F8A8CB8CBCCE7EFF6FAFBF6FA
+                  FBCFECF491DAEE7BD2EC00000000000066404966404966404966404966404966
+                  434D695D6A7898ABA4D1E2D1EFF7D1EFF7AAE2F284D4EB7DD3EB000000000000
+                  0000000000000000000000000000007FFFFF79D2E87CD0E984D4ED88D2E788D2
+                  E784D4ED7CD0E979D2E800000000000000000000000000000000000000000000
+                  00003FBFFF6EC7DD7ACDE679D1E879D1E87ACDE66EC7DD7FBFFF}
+                OnClick = sbCustom1Click
+              end
+              object sbCustom2: TSpeedButton
+                Left = 576
+                Top = 56
+                Width = 21
+                Height = 21
+                AllowAllUp = True
+                Anchors = [akTop, akRight]
+                GroupIndex = 2
+                Glyph.Data = {
+                  36030000424D3603000000000000360000002800000010000000100000000100
+                  1800000000000003000000000000000000000000000000000000000000000000
+                  0000000000000000000000000000000000000000000000000000000000000000
+                  0000000000000000000000000000000000000000000000000000000000000000
+                  0000000000000000000000000000000000000000000000000000000000000000
+                  0000000000000000000000006640496640496640496640496640496640496640
+                  49664049664049000000000000000000000000000000000000000000664049FF
+                  FFFFE0E0E0E3E3E3E7E7E7EAEAEAEDEDEDF0F0F0664049000000000000000000
+                  000000000000000000000000664049FFFFFFDEDEDEE1E1E18989898B8B8B8D8D
+                  8DEEEEEE664049000000000000000000000000000000000000000000664049FF
+                  FFFFDBDBDBDFDFDFE2E2E2E5E5E5E8E8E8ECECEC664049000000000000000000
+                  6640496640496640496640496640496640496640496640496640498888888B8B
+                  8BE9E9E9664049000000000000000000664049FFFFFFABABABE3E3E3E7E7E7EA
+                  EAEAEDEDEDEEEFF065434CDADEDFDEE2E3E3E6E665404A000000000000000000
+                  664049FFFFFF0000009D9D9D7C7C7C7D7D7D7D8081E2EBED6A5D6A7E7F8A7E7F
+                  8A7F7883664D577FBFFF000000000000000000000000000000000000BCBCBCE4
+                  E5E5DDE6E8C7E3EB789AAB7FADBD7FADBD789AAB6D6F7C79D2E8000000000000
+                  664049FFFFFF000000A8A8A886868687898A87999EACDDEBA4D3E2D1EFF8D1F0
+                  F8AAE3F284D4EB7DD3EB000000000000664049FFFFFFA4A4A4DADADADDDDDDDC
+                  DFE0C8DFE5A7DDECCCE8F0F6FAFBF6FAFBCFECF490D9EE7BD2EC000000000000
+                  6640498C6F7781616981616981616980646D7F7F8A8CB8CBCCE7EFF6FAFBF6FA
+                  FBCFECF491DAEE7BD2EC00000000000066404966404966404966404966404966
+                  434D695D6A7898ABA4D1E2D1EFF7D1EFF7AAE2F284D4EB7DD3EB000000000000
+                  0000000000000000000000000000007FFFFF79D2E87CD0E984D4ED88D2E788D2
+                  E784D4ED7CD0E979D2E800000000000000000000000000000000000000000000
+                  00003FBFFF6EC7DD7ACDE679D1E879D1E87ACDE66EC7DD7FBFFF}
+                OnClick = sbCustom2Click
+              end
+              object edCustom1: TEdit
+                Left = 160
+                Top = 16
+                Width = 412
+                Height = 21
+                Anchors = [akLeft, akTop, akRight]
+                Color = clInfoBk
+                Enabled = False
+                TabOrder = 2
+              end
               object edName: TEdit
-                Left = 48
-                Top = 12
-                Width = 546
+                Left = 24
+                Top = 16
+                Width = 548
                 Height = 21
                 Anchors = [akLeft, akTop, akRight]
                 TabOrder = 0
               end
+              object edCustom2: TEdit
+                Left = 160
+                Top = 56
+                Width = 412
+                Height = 21
+                Anchors = [akLeft, akTop, akRight]
+                Color = clInfoBk
+                Enabled = False
+                TabOrder = 3
+              end
               object edEmail: TEdit
-                Left = 48
-                Top = 40
-                Width = 546
+                Left = 24
+                Top = 56
+                Width = 548
                 Height = 21
                 Anchors = [akLeft, akTop, akRight]
                 TabOrder = 1
@@ -167,7 +261,7 @@ object SearchFrm: TSearchFrm
                 Left = 40
                 Top = 8
                 Width = 563
-                Height = 41
+                Height = 49
                 Font.Charset = DEFAULT_CHARSET
                 Font.Color = clWindowText
                 Font.Height = -12
@@ -178,17 +272,17 @@ object SearchFrm: TSearchFrm
               end
               object cbFilters: TComboBox
                 Left = 40
-                Top = 52
+                Top = 60
                 Width = 426
                 Height = 21
-                ItemHeight = 0
+                ItemHeight = 13
                 TabOrder = 1
                 OnChange = cbFiltersChange
                 OnDropDown = cbFiltersDropDown
               end
               object SaveFilterBtn: TButton
                 Left = 469
-                Top = 52
+                Top = 60
                 Width = 65
                 Height = 23
                 Anchors = []
@@ -199,7 +293,7 @@ object SearchFrm: TSearchFrm
               end
               object DeleteFilterBtn: TButton
                 Left = 538
-                Top = 52
+                Top = 60
                 Width = 65
                 Height = 23
                 Anchors = []
@@ -218,35 +312,38 @@ object SearchFrm: TSearchFrm
                 Top = 12
                 Width = 47
                 Height = 13
+                Alignment = taRightJustify
                 Caption = 'Attributes:'
               end
               object Label2: TLabel
                 Left = 4
-                Top = 44
+                Top = 52
                 Width = 62
                 Height = 13
+                Alignment = taRightJustify
                 Caption = 'Search level:'
               end
               object Label3: TLabel
-                Left = 248
-                Top = 44
+                Left = 256
+                Top = 52
                 Width = 97
                 Height = 13
+                Alignment = taRightJustify
                 Caption = 'Dereference aliases:'
               end
               object cbAttributes: TComboBox
                 Left = 72
                 Top = 8
-                Width = 458
+                Width = 449
                 Height = 21
                 Anchors = [akLeft, akTop, akRight]
-                ItemHeight = 0
+                ItemHeight = 13
                 TabOrder = 0
               end
               object edAttrBtn: TButton
-                Left = 537
+                Left = 528
                 Top = 8
-                Width = 67
+                Width = 76
                 Height = 23
                 Anchors = [akTop]
                 Caption = 'Edit...'
@@ -255,8 +352,8 @@ object SearchFrm: TSearchFrm
               end
               object cbSearchLevel: TComboBox
                 Left = 72
-                Top = 40
-                Width = 169
+                Top = 48
+                Width = 161
                 Height = 21
                 Style = csDropDownList
                 ItemHeight = 13
@@ -267,9 +364,9 @@ object SearchFrm: TSearchFrm
                   'Entire subtree')
               end
               object cbDerefAliases: TComboBox
-                Left = 352
-                Top = 40
-                Width = 178
+                Left = 360
+                Top = 48
+                Width = 161
                 Height = 21
                 Style = csDropDownList
                 Anchors = [akLeft, akTop, akRight]
@@ -282,12 +379,92 @@ object SearchFrm: TSearchFrm
                   'Always')
               end
             end
+            object TabSheet4: TTabSheet
+              Caption = '&Regular Expressions'
+              ImageIndex = 3
+              OnResize = TabSheet4Resize
+              object Label8: TLabel
+                Left = 11
+                Top = 10
+                Width = 48
+                Height = 13
+                Alignment = taRightJustify
+                Caption = 'Evaluator:'
+              end
+              object cbRegExp: TComboBox
+                Left = 64
+                Top = 60
+                Width = 402
+                Height = 21
+                ItemHeight = 13
+                TabOrder = 4
+                OnChange = cbRegExpChange
+                OnDropDown = cbRegExpDropDown
+              end
+              object btnSaveRegEx: TButton
+                Left = 469
+                Top = 59
+                Width = 65
+                Height = 23
+                Anchors = []
+                Caption = 'Sa&ve'
+                Enabled = False
+                TabOrder = 5
+                OnClick = btnSaveRegExClick
+              end
+              object btnDeleteRegEx: TButton
+                Left = 538
+                Top = 59
+                Width = 65
+                Height = 23
+                Anchors = []
+                Caption = '&Delete'
+                Enabled = False
+                TabOrder = 6
+                OnClick = btnDeleteRegExClick
+              end
+              object edRegExp: TEdit
+                Left = 64
+                Top = 7
+                Width = 537
+                Height = 21
+                TabOrder = 0
+              end
+              object cbxReGreedy: TCheckBox
+                Left = 64
+                Top = 35
+                Width = 97
+                Height = 17
+                Caption = 'Greedy mode'
+                Checked = True
+                State = cbChecked
+                TabOrder = 1
+              end
+              object cbxReCase: TCheckBox
+                Left = 205
+                Top = 35
+                Width = 97
+                Height = 17
+                Caption = 'Case sensitive'
+                Checked = True
+                State = cbChecked
+                TabOrder = 2
+              end
+              object cbxReMultiline: TCheckBox
+                Left = 352
+                Top = 35
+                Width = 113
+                Height = 17
+                Caption = 'Multiline matching'
+                TabOrder = 3
+              end
+            end
           end
           object Panel3: TPanel
             Left = 617
             Top = 0
             Width = 97
-            Height = 107
+            Height = 115
             Align = alRight
             BevelOuter = bvNone
             TabOrder = 1
@@ -354,9 +531,9 @@ object SearchFrm: TSearchFrm
   end
   object ResultPanel: TPanel
     Left = 0
-    Top = 193
+    Top = 201
     Width = 722
-    Height = 298
+    Height = 290
     Align = alClient
     BorderWidth = 3
     TabOrder = 2
@@ -404,36 +581,49 @@ object SearchFrm: TSearchFrm
       ImageIndex = 6
       Style = tbsSeparator
     end
-    object ToolButton3: TToolButton
+    object ToolButton1: TToolButton
       Left = 64
       Top = 0
-      Action = ActEdit
-    end
-    object ToolButton4: TToolButton
-      Left = 92
-      Top = 0
-      Action = ActProperties
-    end
-    object ToolButton5: TToolButton
-      Left = 120
-      Top = 0
-      Action = ActGoto
+      Action = ActLoad
     end
     object ToolButton6: TToolButton
-      Left = 148
+      Left = 92
       Top = 0
       Action = ActSave
     end
     object ToolButton8: TToolButton
-      Left = 176
+      Left = 120
       Top = 0
       Width = 8
       Caption = 'ToolButton8'
       ImageIndex = 32
       Style = tbsSeparator
     end
-    object ToolButton9: TToolButton
+    object ToolButton3: TToolButton
+      Left = 128
+      Top = 0
+      Action = ActEdit
+    end
+    object ToolButton4: TToolButton
+      Left = 156
+      Top = 0
+      Action = ActProperties
+    end
+    object ToolButton5: TToolButton
       Left = 184
+      Top = 0
+      Action = ActGoto
+    end
+    object ToolButton2: TToolButton
+      Left = 212
+      Top = 0
+      Width = 8
+      Caption = 'ToolButton2'
+      ImageIndex = 19
+      Style = tbsSeparator
+    end
+    object ToolButton9: TToolButton
+      Left = 220
       Top = 0
       Action = ActClose
     end
@@ -447,6 +637,27 @@ object SearchFrm: TSearchFrm
     end
     object Editentry1: TMenuItem
       Action = ActEdit
+    end
+    object N2: TMenuItem
+      Caption = '-'
+    end
+    object Move1: TMenuItem
+      Action = ActMove
+    end
+    object Copy1: TMenuItem
+      Action = ActCopy
+    end
+    object Delete1: TMenuItem
+      Action = ActDelete
+    end
+    object N3: TMenuItem
+      Caption = '-'
+    end
+    object Save1: TMenuItem
+      Action = ActSave
+    end
+    object Saveselected1: TMenuItem
+      Action = ActSaveSelected
     end
     object N1: TMenuItem
       Caption = '-'
@@ -480,7 +691,6 @@ object SearchFrm: TSearchFrm
     end
     object ActSave: TAction
       Caption = '&Save'
-      Hint = 'Save search results'
       ImageIndex = 31
       OnExecute = ActSaveExecute
     end
@@ -501,6 +711,28 @@ object SearchFrm: TSearchFrm
       Hint = 'Clear all search results'
       OnExecute = ActClearAllExecute
     end
+    object ActLoad: TAction
+      Caption = '&Load'
+      ImageIndex = 48
+      OnExecute = ActLoadExecute
+    end
+    object ActCopy: TAction
+      Caption = 'Co&py...'
+      OnExecute = ActCopyExecute
+    end
+    object ActMove: TAction
+      Caption = '&Move...'
+      OnExecute = ActMoveExecute
+    end
+    object ActDelete: TAction
+      Caption = '&Delete'
+      ImageIndex = 12
+      OnExecute = ActDeleteExecute
+    end
+    object ActSaveSelected: TAction
+      Caption = 'Save selected...'
+      OnExecute = ActSaveExecute
+    end
   end
   object SaveDialog: TSaveDialog
     DefaultExt = '*.ldif'
@@ -511,5 +743,9 @@ object SearchFrm: TSearchFrm
     Options = [ofOverwritePrompt, ofHideReadOnly, ofEnableSizing]
     Left = 72
     Top = 448
+  end
+  object OpenDialog: TOpenDialog
+    Left = 104
+    Top = 449
   end
 end

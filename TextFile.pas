@@ -1,5 +1,5 @@
   {      LDAPAdmin - TextFile.pas
-  *      Copyright (C) 2005 Tihomir Karlovic
+  *      Copyright (C) 2005-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -25,80 +25,119 @@ interface
 
 uses SysUtils, Classes;
 
-const
-  BUF_SIZE = 4096;
-
 type
   TTextFile = class(TFileStream)
   private
-    fBuffer: array[0..BUF_SIZE-1] of Char;
-    fPos: Integer;
-    fNumRead: Integer;
     fUnixWrite: Boolean;
-    function IsEof: Boolean;
-    function GetPos: Integer;
+    fUtf8:      Boolean;
+    fUnicode:   Boolean;
+    function    IsEof: Boolean;
   public
-    function  ReadLn: string;
-    procedure WriteLn(Value: string);
-    property Eof: Boolean read IsEof;
-    property UnixWrite: Boolean read fUnixWrite write fUnixWrite;
-    property Pos: Integer read GetPos;
+    constructor Create(const FileName: string; Mode: Word);
+    function    ReadLn: string;
+    procedure   WriteLn(Value: string);
+    property    Eof: Boolean read IsEof;
+    property    UnixWrite: Boolean read fUnixWrite write fUnixWrite;
+    property    Utf8: Boolean read fUtf8 write fUtf8;
+    property    Unicode: Boolean read fUnicode write fUnicode;
   end;
 
 implementation
 
-uses Constant;
+uses Constant, Misc;
+
+constructor TTextFile.Create(const FileName: string; Mode: Word);
+const
+  UTF_16BOM_BE: Word = $FEFF;
+  UTF_16BOM_LE: Word = $FFFE;
+  UTF_8BOM: array[0..2] of Byte = ($EF, $BB, $BF);
+
+  procedure ReadHeader;
+  var
+    NumRead: Integer;
+    Bom: Word;
+  begin
+    NumRead := Read(Bom, 2);
+    if NumRead = 2 then
+    begin
+      if (Bom = UTF_16BOM_BE) or (Bom = UTF_16BOM_LE) then
+      begin
+        fUnicode := true;
+        exit;
+      end;
+      if Bom = $BBEF then
+      begin
+        NumRead := Read(Bom, 1);
+        if (NumRead = 1) and (Bom and $FF = $BF) then // UTF8 BOM
+        begin
+          utf8 := true;
+          exit;
+        end;
+      end;
+    end;
+    Position := 0;
+  end;
+
+begin
+  inherited;
+
+  if Mode = fmOpenRead then
+    ReadHeader
+  else
+  if Mode = fmCreate then
+  begin
+    if Unicode then
+      WriteBuffer(UTF_16BOM_BE, SizeOf(UTF_16BOM_BE))
+    else
+    if Utf8 then
+      WriteBuffer(UTF_8BOM, SizeOf(UTF_8BOM));
+  end;
+end;
 
 function TTextFile.IsEof: Boolean;
 begin
-  Result := (Position = Size) and (fPos = fNumRead);
-end;
-
-function TTextFile.GetPos: Integer;
-begin
-  Result := Position + BUF_SIZE - fPos;
+  Result := Position = Size;
 end;
 
 function TTextFile.ReadLn: string;
 var
-  p1, s1, len: Integer;
+  ch: Word;
+  Len: Integer;
 begin
   if Eof then
     raise Exception.Create(stLdifEof);
-  s1 := 0;
   Result := '';
-  repeat
-    if fPos = fNumRead then
+  if Unicode then
+    Len := 2
+  else begin
+    Len := 1;
+    ch := 0;
+  end;
+  while not EOF do
+  begin
+    ReadBuffer(ch, Len);
+    if ch = 13 then
+      Break;
+    if ch <> 10 then
     begin
-      fNumRead := Read(fBuffer, BUF_SIZE);
-      if fNumRead = 0 then
-        break;
-      fPos := 0;
+      Result := Result + AnsiChar(ch);
+      if Unicode then
+        Result := Result + AnsiChar(Hi(ch));
     end;
-    p1 := fPos;
-    while (p1 < fNumRead) and  (fBuffer[p1] <> #10) do
-      inc(p1);
-    len := p1 - fPos;
-    if len > 0 then
-    begin
-      if fBuffer[p1 - 1] = #13 then
-        dec(len);
-      SetLength(Result, s1 + len);
-      Move(fBuffer[fPos], Result[s1 + 1], len);
-      s1 := s1 + len;
-      fPos := p1;
-    end;
-    if fPos < fNumRead then // EOL found
-    begin
-      inc(fPos);
-      break;
-    end;
-  until Eof;
+  end;
+  if Result = '' then
+    exit;
+  if Unicode then
+    Result := WideStringToUtf8Len(PWideChar(Result), Length(Result) div 2)
+  else
+  if utf8 then
+    Result := UTF8ToStringLen(PChar(Result), Length(Result));
 end;
 
 procedure TTextFile.WriteLn(Value: string);
 var
   len: Integer;
+  w: WideString;
 begin
   len := Length(Value) + 1;
   SetLength(Value, len + Ord(not UnixWrite));
@@ -108,7 +147,16 @@ begin
     inc(Len);
   end;
   Value[Len] := #10;
-  Write(Value[1], Length(Value));
+  if fUnicode then
+  begin
+    w := StringToWide(Value);
+    Write(w[1], Length(w));
+  end
+  else begin
+    if fUtf8 then
+      Value := StringToUTF8Len(PChar(Value), length(Value));
+    Write(Value[1], Length(Value));
+  end;
 end;
 
 end.

@@ -1,5 +1,5 @@
   {      LDAPAdmin - Main.pas
-  *      Copyright (C) 2003-2013 Tihomir Karlovic
+  *      Copyright (C) 2003-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -179,6 +179,11 @@ type
     Customizemenu1: TMenuItem;
     mbLanguage: TMenuItem;
     N16: TMenuItem;
+    ActGoTo: TAction;
+    Goto1: TMenuItem;
+    ActBookmark: TAction;
+    Bookmarks1: TMenuItem;
+    Bookmarks2: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LDAPTreeExpanding(Sender: TObject; Node: TTreeNode;
@@ -251,6 +256,8 @@ type
     procedure ActEditValueExecute(Sender: TObject);
     procedure ActAliasExecute(Sender: TObject);
     procedure ActCustomizeMenuExecute(Sender: TObject);
+    procedure ActGoToExecute(Sender: TObject);
+    procedure ActBookmarkExecute(Sender: TObject);
   private
     Root: TTreeNode;
     fCmdLineAccount: TFakeAccount;
@@ -278,20 +285,25 @@ type
     procedure InitStatusBar;
     procedure RefreshStatusBar;
     procedure ClassifyEntry(ObjectInfo: TObjectInfo; CNode: TTreeNode);
-    procedure ExpandNode(Node: TTreeNode; Session: TLDAPSession);
     procedure RefreshNode(Node: TTreeNode; Expand: Boolean);
     procedure RefreshTree;
     procedure RefreshValueListView(Node: TTreeNode);
     procedure RefreshEntryListView(Node: TTreeNode);
-    procedure DoCopyMove(TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
-    procedure CopyMoveEntry(Move: Boolean);
-    function IsActPropertiesEnable: Boolean;
-    function SelectedNode: TTreeNode;
-    function IsContainer(ANode: TTreeNode): Boolean;
+    procedure CopySelection(TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+    procedure GetSelection(List: TStringList);
+    procedure RemoveNodes(List: TStringList);
+    procedure CopyMove(Move: Boolean);
+    procedure Delete;
+    function  IsActPropertiesEnable: Boolean;
+    function  SelectedNode: TTreeNode;
+    function  IsContainer(ANode: TTreeNode): Boolean;
     procedure NewTemplateClick(Sender: TObject);
     procedure NewClick(Sender: TObject);
     procedure LanguageExecute(Sender: TObject);
   public
+    procedure ExpandNode(Node: TTreeNode; Session: TLDAPSession);
+    procedure DoCopyMove(List: TStringList; TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+    procedure DoDelete(List: TStringList);
     function  ShowSchema: TSchemaDlg;
     function  PickEntry(const ACaption: string): string;
     function  LocateEntry(const dn: string; const Select: Boolean): TTreeNode;
@@ -309,26 +321,11 @@ implementation
 
 uses EditEntry, ConnList, Search, LdapOp, Constant, Export, Import, Prefs, Misc,
      LdapCopy, BinView, Input, ConfigDlg, Templates, TemplateCtrl, Shellapi,
-     Cert, PicView, Base64, About, Alias, SizeGrip, CustMenuDlg, Lang;
+     Cert, PicView, About, Alias, SizeGrip, CustMenuDlg, Lang, Bookmarks;
 
 {$R *.DFM}
 {$I LdapAdmin.inc}
 {$IFDEF XPSTYLE} {$R Manifest.res} {$ENDIF}
-
-function CustomSortProc(Node1, Node2: TTreeNode; Data: Integer): Integer; stdcall;
-var
-  n1, n2: Integer;
-begin
-  n1 := Node1.ImageIndex;
-  n2 := Node2.ImageIndex;
-  if ((n1 = bmOu) and (n2 <> bmOu)) then
-    Result := -1
-  else
-  if ((n2 = bmOu) and (n1 <> bmOu))then
-    Result := 1
-  else
-    Result := CompareText(Node1.Text, Node2.Text);
-end;
 
 procedure TMainFrm.ValueWrite(Sender: TLdapAttributeData);
 begin
@@ -557,7 +554,8 @@ begin
           if AnsiStrIComp(PChar(Result.Text), PCharArray(comp)[i]) = 0 then
           begin
             Parent := Result;
-            Result.Expand(false);
+            if Select then
+              Result.Expand(false);
             break;
           end;
           Result := Result.GetNextChild(Result);
@@ -823,7 +821,7 @@ begin
   finally
     RefreshStatusBar;
     fSearchList.Clear;
-    Node.CustomSort(@CustomSortProc, 0);
+    Node.CustomSort(@TreeSortProc, 0);
     Screen.Cursor := crDefault;
   end;
 end;
@@ -1040,59 +1038,122 @@ begin
       ActPropertiesExecute(Sender)
 end;
 
-procedure TMainFrm.DoCopyMove(TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+procedure TMainFrm.RemoveNodes(List: TStringList);
+var
+  i: Integer;
+  Node: TTreeNode;
+  ListItem: TListItem;
+begin
+  for i := 0 to List.Count - 1 do
+  begin
+    if List.Objects[i] <> LDAP_OP_SUCCESS then
+      Continue;
+    Node := LocateEntry(List[i], false);
+    if Assigned(Node) and (TObjectInfo(Node.Data).dn = List[i]) then
+    begin
+      if EntryListView.Visible then
+      begin
+        ListItem := EntryListView.FindData(0, Node, true, false);
+        if Assigned(ListItem) then
+          ListItem.Delete;
+      end;
+      Node.Delete;
+    end;
+  end;
+end;
+
+procedure TMainFrm.GetSelection(List: TStringList);
 var
   SelItem: TListItem;
-  LeftNode: TTreeNode;
+  SelNode: TTreeNode;
+begin
+  if LdapTree.Focused then
+  begin
+    SelNode := SelectedNode;
+    if Assigned(SelNode) then
+      List.Add(TObjectInfo(SelNode.Data).dn)
+  end
+  else begin
+    SelItem := EntryListView.Selected;
+    repeat
+      List.Add(TObjectInfo(TTreeNode(SelItem.Data).Data).dn);
+      SelItem:= EntryListView.GetNextItem(SelItem, sdAll, [isSelected]);
+    until SelItem = nil;
+  end;
+end;
+
+procedure TMainFrm.CopySelection(TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+var
   List: TStringList;
-  srcdn: string;
+begin
+  List := TStringList.Create;
+  try
+    GetSelection(List);
+    DoCopyMove(List, TargetSession, TargetDn, TargetRdn, Move);
+  finally
+    List.Free
+  end;
+end;
+
+procedure TMainFrm.DoCopyMove(List: TStringList; TargetSession: TLdapSession; TargetDn, TargetRdn: string; Move: Boolean);
+var
+  Node: TTreeNode;
+  dstdn, seldn: string;
+  ep: TLVCustomDrawItemEvent;
+
+  procedure SafeRefresh(Node: TTreeNode; Expand: Boolean);
+  begin
+    if Copy(seldn, Length(seldn) - Length(dstdn) + 1, MaxInt) = dstdn then
+    begin
+      try
+        ep := ValueListView.OnCustomDrawItem;
+        ValueListView.OnCustomDrawItem := nil;
+        RefreshNode(Node, Expand);
+      finally
+        ValueListView.OnCustomDrawItem := ep;
+      end;
+      LocateEntry(seldn, true);
+      if ValueListView.Visible then
+        RefreshValueListView(LdapTree.Selected);
+      if EntryListView.Visible then
+        RefreshEntryListView(LdapTree.Selected);
+    end
+    else
+      RefreshNode(Node, Expand);
+  end;
+
 begin
   with TLdapOpDlg.Create(Self, Connection) do
   try
-    LeftNode := LdapTree.Selected;
-    srcdn := TObjectInfo(LDAPTree.Selected.Data).dn;
     ShowProgress := true;
     DestSession := TargetSession;
-    if LDAPTree.Focused then
+
+    if List.Count = 1 then
     begin
-      CopyTree(srcdn,TargetDn, TargetRdn, Move);
-      if Move then
-      begin
-        RefreshNode(LeftNode.Parent, false);
-        if ValueListView.Visible then
-          RefreshValueListView(LdapTree.Selected);
-        if EntryListView.Visible then
-          RefreshEntryListView(LdapTree.Selected);
-      end;
+      CopyTree(List[0], TargetDn, TargetRdn, Move);
+      List.Objects[0] := LDAP_OP_SUCCESS;
     end
     else begin
-      List := TStringList.Create;
-      try
-        SelItem := EntryListView.Selected;
-        Show;
-        repeat
-          List.Add(TObjectInfo(TTreeNode(SelItem.Data).Data).dn);
-          SelItem:= EntryListView.GetNextItem(SelItem, sdAll, [isSelected]);
-        until SelItem = nil;
-        CopyTree(List,TargetDn, Move);
-        if Move then
-        begin
-          RefreshNode(LeftNode, false);
-          RefreshEntryListView(LeftNode);
-        end;
-      finally
-        List.Free;
-      end;
+      Show;
+      CopyTree(List, TargetDn, Move);
     end;
+
+    if Move then
+      RemoveNodes(List);
+
   finally
     Free;
     if TargetSession = Connection then
     begin
       LdapTree.Items.BeginUpdate;
       try
-        RefreshNode(LocateEntry(TargetDn, false), true);
-        if not Assigned(LdapTree.Selected) or (TObjectInfo(LdapTree.Selected.Data).dn <> srcdn) then
-          LocateEntry(srcdn, true);
+        Node := LdapTree.Selected;
+        if Assigned(Node) then
+          seldn := TObjectInfo(Node.Data).dn
+        else
+          seldn := '';
+        dstdn := TargetDn;
+        SafeRefresh(LocateEntry(TargetDn, false), true);
       finally
         LdapTree.Items.EndUpdate;
       end;
@@ -1100,34 +1161,62 @@ begin
   end;
 end;
 
-procedure TMainFrm.CopyMoveEntry(Move: Boolean);
+procedure TMainFrm.CopyMove(Move: Boolean);
 var
-  tgt: string;
   Node: TTreeNode;
+  cnt: Integer;
+  TargetData: TTargetData;
 begin
   Node := SelectedNode;
   if Assigned(Node) then
   begin
-    with TCopyDlg.Create(Self, TObjectInfo(Node.Data).dn, Connection, ImageList, ExpandNode, @CustomSortProc) do
-    try
-      if EntryListView.Focused and (EntryListView.SelCount > 1) then
-      begin
-        edName.Visible := false;
-        label2.Visible := false;
-        tgt := Format(stNumObjects, [EntryListView.SelCount])
-      end
-      else
-        tgt := '"' + TObjectInfo(LDAPTree.Selected.Data).dn + '"';
-      if Move then
-        Caption := Format(cMoveTo, [tgt])
-      else
-        Caption := Format(cCopyTo, [tgt]);
-      ShowModal;
-      if ModalResult = mrOk then
-        DoCopyMove(TargetConnection, TargetDn, TargetRdn, Move);
-    finally
-      Free;
+    cnt := 0;
+    if EntryListView.Focused then
+      cnt := EntryListView.SelCount;
+    if ExecuteCopyDialog(Self, TObjectInfo(Node.Data).dn, cnt, Move, Connection, TargetData) then
+      CopySelection(TargetData.Connection, TargetData.Dn, TargetData.Rdn, Move);
+  end;
+end;
+
+procedure TMainFrm.DoDelete(List: TStringList);
+var
+  msg: string;
+begin
+  if List.Count > 1 then
+    msg := Format(stConfirmMultiDel, [List.Count])
+  else
+    msg := Format(stConfirmDel, [List[0]]);
+
+  if MessageDlg(msg, mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  with TLdapOpDlg.Create(Self, Connection) do
+  try
+    ShowProgress := true;
+    if List.Count = 1 then
+    begin
+      DeleteTree(List[0]);
+      if ModalResult = mrNone then
+        List.Objects[0] := LDAP_OP_SUCCESS;
+    end
+    else begin
+      Show;
+      DeleteTree(List);
     end;
+    RemoveNodes(List);
+  finally
+    Free;
+  end;
+end;
+
+procedure TMainFrm.Delete;
+var
+  List: TStringList;
+begin
+  List := TStringList.Create;
+  try
+    GetSelection(List);
+    DoDelete(List);
+  finally
+    List.Free;
   end;
 end;
 
@@ -1151,26 +1240,37 @@ begin
     CopyTree(TObjectInfo(LDAPTree.Selected.Data).dn, pdn, newdn, true);
     TObjectInfo(LDAPTree.Selected.Data).Free;
     LdapTree.Selected.Data := TObjectInfo.Create(TLdapEntry.Create(Connection, newdn + ',' + pdn));
-    ActRefreshExecute(nil);
+    ActRefreshExecute(nil);    
   finally
     Free;
   end;
 end;
 
-procedure TMainFrm.LDAPTreeDragOver(Sender, Source: TObject; X, Y: Integer;
-  State: TDragState; var Accept: Boolean);
+procedure TMainFrm.LDAPTreeDragOver(Sender, Source: TObject; X, Y: Integer; State: TDragState; var Accept: Boolean);
+var
+  srcdn, dstdn: string;
 begin
-  Accept := Accept and Assigned(LDAPTree.DropTarget) and (LDAPTree.DropTarget = LDAPTree.GetNodeAt(X, Y)) and
-    (LDAPTree.DropTarget <> SelectedNode) and
-    IsContainer(LDAPTree.DropTarget) and
-    (Copy(TObjectInfo(LDAPTree.DropTarget.Data).dn, Length(TObjectInfo(LDAPTree.DropTarget.Data).dn) - Length(TObjectInfo(SelectedNode.Data).dn) + 1, MaxInt) <> TObjectInfo(SelectedNode.Data).dn);
+
+  with LdapTree do
+  if Assigned(DropTarget) and (DropTarget = GetNodeAt(X, Y)) and IsContainer(DropTarget) then
+    dstdn := TObjectInfo(DropTarget.Data).dn
+  else begin
+    Accept := false;
+    exit;
+  end;
+
+  if Source is TSearchListView then
+    srcdn := TLdapEntry(TSearchListView(Source).Selected.Data).dn
+  else
+    srcdn := TObjectInfo(SelectedNode.Data).dn;
+
+  Accept := Accept and (System.Copy(dstdn, Length(dstdn) - Length(srcdn) + 1, MaxInt) <> srcdn);
 end;
 
 procedure TMainFrm.LDAPTreeDragDrop(Sender, Source: TObject; X, Y: Integer);
 var
   msg: String;
   cpy: boolean;
-  SelNode: TTreeNode;
 begin
   cpy := GetKeyState(VK_CONTROL) < 0;
   if cpy then
@@ -1178,16 +1278,23 @@ begin
   else
     msg := stAskTreeMove;
 
-  SelNode := SelectedNode;
-
-  if EntryListView.Focused and (EntryListView.SelCount > 1) then
-    msg := Format(msg, [Format(stNumObjects, [EntryListView.SelCount]), LDAPTree.DropTarget.Text])
+  if Source is TListView then
+  begin
+    if TListView(Source).SelCount > 1 then
+      msg := Format(msg, [Format(stNumObjects, [TListView(Source).SelCount]), LDAPTree.DropTarget.Text])
+    else
+      msg := Format(msg, [TListView(Source).Selected.Caption, LDAPTree.DropTarget.Text]);
+  end
   else
-    msg := Format(msg, [SelNode.Text, LDAPTree.DropTarget.Text]);
+    msg := Format(msg, [TTreeView(Source).Selected.Text, LDAPTree.DropTarget.Text]);
 
-  if Assigned(SelNode.Data) and Assigned(LDAPTree.DropTarget.Data) and
-    (MessageDlg(msg, mtConfirmation, [mbOk, mbCancel], 0) = mrOk) then
-    DoCopyMove(Connection, TObjectInfo(LDAPTree.DropTarget.Data).dn, '', not cpy);
+  if MessageDlg(msg, mtConfirmation, [mbOk, mbCancel], 0) = mrOk then
+  begin
+    if (Source is TSearchListView)  then
+      TSearchListView(Source).CopySelection(Connection, TObjectInfo(LDAPTree.DropTarget.Data).dn, '', not cpy)
+    else
+      CopySelection(Connection, TObjectInfo(LDAPTree.DropTarget.Data).dn, '', not cpy)
+  end;
 end;
 
 procedure TMainFrm.LDAPTreeStartDrag(Sender: TObject; var DragObject: TDragObject);
@@ -1384,64 +1491,8 @@ begin
 end;
 
 procedure TMainFrm.ActDeleteEntryExecute(Sender: TObject);
-var
-  SelItem: TListItem;
-  LeftNode: TTreeNode;
-  msg: string;
-  List: TStringList;
 begin
-  if SelectedNode <> nil then
-  begin
-    LeftNode := LdapTree.Selected;
-    if EntryListView.Focused and (EntryListView.SelCount > 1) then
-      msg := Format(stConfirmMultiDel, [EntryListView.SelCount])
-    else
-      msg := Format(stConfirmDel, [TObjectInfo(SelectedNode.Data).dn]);
-    if MessageDlg(msg, mtConfirmation, [mbYes, mbNo], 0) = mrYes then
-    with TLdapOpDlg.Create(Self, Connection) do
-    begin
-      ShowProgress := true;
-      try
-        //LdapTree.Items.BeginUpdate;
-        try
-          if LDAPTree.Focused then
-          begin
-            DeleteTree(TObjectInfo(LDAPTree.Selected.Data).dn);
-            if ModalResult <> mrCancel then
-              LeftNode.Delete;
-          end
-          else begin
-            SelItem := EntryListView.Selected;
-            List := TStringList.Create;
-            try
-              Show;
-              repeat
-                List.Add(TObjectInfo(TTreeNode(SelItem.Data).Data).dn);
-                SelItem:= EntryListView.GetNextItem(SelItem, sdAll, [isSelected]);
-                Application.ProcessMessages;
-                if ModalResult = mrCancel then
-                  break;
-              until (SelItem = nil);
-              if ModalResult <> mrCancel then
-                DeleteTree(List);
-            finally
-              List.Free;
-              try
-                RefreshNode(LeftNode, false);
-                RefreshEntryListView(LeftNode);
-              except end;
-            end;
-          end;
-        except
-          ActRefreshExecute(nil);
-          raise;
-        end;
-      finally
-        //LdapTree.Items.EndUpdate;
-        Free;
-      end;
-    end;
-  end;
+  Delete;
 end;
 
 procedure TMainFrm.ActRefreshExecute(Sender: TObject);
@@ -1528,12 +1579,12 @@ end;
 
 procedure TMainFrm.ActCopyEntryExecute(Sender: TObject);
 begin
-  CopyMoveEntry(false);
+  CopyMove(false);
 end;
 
 procedure TMainFrm.ActMoveEntryExecute(Sender: TObject);
 begin
-  CopyMoveEntry(true);
+  CopyMove(true);
 end;
 
 procedure TMainFrm.StatusBarDrawPanel(StatusBar: TStatusBar; Panel: TStatusPanel; const Rect: TRect);
@@ -1835,24 +1886,24 @@ begin
   Clipboard.AsText := TObjectInfo(SelectedNode.Data).dn;
 end;
 
-function GetClipboardText(Value: TLdapAttributeData): string;
+{function GetClipboardText(Value: TLdapAttributeData): string;
 begin
   if Value.DataType = dtText then
     Result := Value.AsString
   else
     Result := Base64Encode(Pointer(Value.Data)^, Value.DataSize)
-end;
+end;}
 
 procedure TMainFrm.ActCopyExecute(Sender: TObject); begin
   if ValueListView.Selected=nil then exit;
   if ValueListView.Selected.SubItems.Count=0 then ActCopyNameExecute(Sender)
-  else Clipboard.SetTextBuf(pchar(ValueListView.Selected.Caption+': '+GetClipboardText(ValueListView.Selected.Data)));
+  else Clipboard.SetTextBuf(pchar(ValueListView.Selected.Caption+': ' + GetValueAsText(ValueListView.Selected.Data)));
 end;
 
 procedure TMainFrm.ActCopyValueExecute(Sender: TObject); begin
   if ValueListView.Selected=nil then exit;
   if ValueListView.Selected.SubItems.Count=0 then exit;
-  Clipboard.SetTextBuf(pchar(GetClipboardText(ValueListView.Selected.Data)));
+  Clipboard.SetTextBuf(pchar(GetValueAsText(ValueListView.Selected.Data)));
 end;
 
 procedure TMainFrm.ActCopyNameExecute(Sender: TObject); begin
@@ -1892,6 +1943,7 @@ begin
   Connection := TConnection(fConnections[NewTab]);
   with Connection do
   begin
+    ActPreferences.Visible := DirectoryType <> dtActiveDirectory;
     ActionMenu.AssignItems(mbNew);
     ActionMenu.AssignItems(pbNew);
     LVSorter.ListView := ValueListView;
@@ -1958,6 +2010,7 @@ begin
                           (Value.Attribute.Entry.OperationalAttributes.IndexOf(Value.Attribute.Name) = -1) and
                           (lowercase(Value.Attribute.Name) <> 'objectclass') and
                           (GetAttributeFromDn(Value.Attribute.Entry.dn) <> Value.Attribute.Name);
+  ActGoto.Enabled := IsValidDn(Value.AsString);
   case Value.DataType of
     dtCert: pbViewCert.Visible := true;
     dtJpeg: pbViewPicture.Visible := true;
@@ -2096,6 +2149,26 @@ begin
     else
       GlobalConfig.WriteString(rLanguage, '');
     Checked := true;
+  end;
+end;
+
+procedure TMainFrm.ActGoToExecute(Sender: TObject);
+begin
+  LocateEntry(TLdapAttributeData(ValueListView.Selected.Data).AsString, true);
+end;
+
+procedure TMainFrm.ActBookmarkExecute(Sender: TObject);
+var
+  s: string;
+begin
+  s := '';
+  if Assigned(LDAPTree.Selected) then
+    s := TObjectInfo(LDAPTree.Selected.Data).dn;
+  with TBookmarkDlg.Create(Self, s, Connection) do
+  try
+    ShowModal;
+  finally
+    Free;
   end;
 end;
 

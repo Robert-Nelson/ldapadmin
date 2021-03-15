@@ -1,3 +1,6 @@
+// Use RegExp Library
+{$DEFINE REGEXPR}
+
 // Delphi 5 *************************************
 {$IFDEF VER130}
         {$DEFINE SCRIPTLET_CAST_FIX}

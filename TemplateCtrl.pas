@@ -571,7 +571,6 @@ var
   TxtRect: TRect;
   p: TPoint;
 begin
-//  inherited;
 
   // Calc button rect //////////////////////////////////////////////////////////
   FBtnRect.Top:=1;
@@ -874,7 +873,6 @@ begin
     Anchors := [akTop, akRight];
     ModalResult := mrCancel;
     Caption := cCancel;
-    //Cancel := true;
   end;
 
   with TButton.Create(Self) do begin
@@ -893,8 +891,6 @@ end;
 destructor TTemplateForm.Destroy;
 begin
   inherited;
-  {while ComponentCount > 0 do
-    Components[0].Free;}
   fEventHandler.Free;
   fTemplatePanels.Free;
   fEntry.Free;
@@ -944,7 +940,6 @@ var
   Oc: TLdapAttribute;
   i: Integer;
 begin
-  //if esNew in fEntry.State then Exit;
   Result := false;
   Oc := Entry.AttributesByName['objectclass'];
   if not Assigned(Oc) then exit;

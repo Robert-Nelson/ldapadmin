@@ -1,5 +1,5 @@
   {      LDAPAdmin - Import.pas
-  *      Copyright (C) 2004-2007 Tihomir Karlovic
+  *      Copyright (C) 2004-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -23,8 +23,13 @@ unit Import;
 
 interface
 
-uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
+uses
+  Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, Dialogs, WinLdap, LDAPClasses, ComCtrls;
+
+const
+  cwSmall   = 262;
+  cwBig     = 473;
 
 type
   TImportDlg = class(TForm)
@@ -33,7 +38,6 @@ type
     Notebook: TNotebook;
     Bevel1: TBevel;
     Label1: TLabel;
-    btnFileName: TSpeedButton;
     edFileName: TEdit;
     Label2: TLabel;
     ProgressBar: TProgressBar;
@@ -43,21 +47,22 @@ type
     ImportingLabel: TLabel;
     cbStopOnError: TCheckBox;
     edRejected: TEdit;
-    btnRejected: TSpeedButton;
     Label6: TLabel;
     OpenDialog: TOpenDialog;
     DetailBtn: TButton;
     mbErrors: TMemo;
     errResultLabel: TLabel;
     errLabel: TLabel;
+    btnFileName: TSpeedButton;
+    btnRejected: TSpeedButton;
     procedure btnFileNameClick(Sender: TObject);
     procedure edFileNameChange(Sender: TObject);
     procedure OKBtnClick(Sender: TObject);
     procedure DetailBtnClick(Sender: TObject);
-    procedure FormCreate(Sender: TObject);
     procedure CancelBtnClick(Sender: TObject);
     procedure btnRejectedClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormActivate(Sender: TObject);
   private
     ObjCount: Integer;
     ErrCount: Integer;
@@ -138,6 +143,8 @@ begin
       try
         ReadRecord(Entry);
         ProgressBar.Position := NumRead;
+        if Entry.dn = '' then
+          break;
         ImportingLabel.Caption := Entry.dn;
         //Label3.Caption := IntToStr(Trunc((NumRead / ProgressBar.Max) * 100)) + '%';
         if not (esDeleted in Entry.State) then
@@ -160,7 +167,7 @@ begin
             on E: EInOutError do
               RaiseLastWin32Error
             else
-              raise //Exception.Create(Format('%s: %s!', [edRejected.Text, E.Message]));
+              raise;
           end;
           if StopOnError then
             case MessageDlg(Format(stSkipRecord, [E.Message]), mtError, [mbIgnore, mbCancel, mbAll], 0) of
@@ -188,7 +195,7 @@ end;
 procedure TImportDlg.OKBtnClick(Sender: TObject);
 begin
   OKBtn.Enabled := false;
-  Notebook.ActivePage := cProgress;
+  Notebook.PageIndex := 1;
   Application.ProcessMessages;
   try
     ImportFile(edFileName.Text);
@@ -216,19 +223,14 @@ begin
   if mbErrors.Visible then
   begin
     mbErrors.Visible := false;
-    Height := 266;
+    Height := cwSmall;
     DetailBtn.Caption := cDetails + ' >>';
   end
   else begin
     mbErrors.Visible := true;
-    Height := 477;
+    Height := cwBig;
     DetailBtn.Caption := cDetails + ' <<';
   end;
-end;
-
-procedure TImportDlg.FormCreate(Sender: TObject);
-begin
-  Height := 266;
 end;
 
 procedure TImportDlg.CancelBtnClick(Sender: TObject);
@@ -245,6 +247,11 @@ end;
 procedure TImportDlg.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Action := caFree;
+end;
+
+procedure TImportDlg.FormActivate(Sender: TObject);
+begin
+  Height := cwSmall;
 end;
 
 end.

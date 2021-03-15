@@ -1,5 +1,5 @@
   {      LDAPAdmin - Templates.pas
-  *      Copyright (C) 2006-2013 Tihomir Karlovic
+  *      Copyright (C) 2006-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -23,7 +23,7 @@ unit Templates;
 
 interface
 
-{$DEFINE REGEXPR}
+{$I LdapAdmin.inc}
 
 uses ComCtrls, LdapClasses, Classes, Contnrs, Controls, StdCtrls, ExtCtrls, Xml, Windows,
      Forms, Graphics, jpeg, Grids, Messages, Dialogs, Mask, Script, Math, XmlLoader
@@ -275,7 +275,7 @@ type
     procedure     Write; override;
   end;
 
-  TTemplateCtrlCheckBox =class(TTemplateSVControl)
+  TTemplateCtrlCheckBox = class(TTemplateSVControl)
   private
     fFalse:       string;
     fTrue:        string;
@@ -492,6 +492,17 @@ type
     property      Left: Boolean read fLeft write SetLeft;
   end;
 
+  TTemplateCtrlLoadButton = class(TTemplateCtrlButton)
+  private
+    fFilter: string;
+    fFilterIndex: Integer;
+    procedure     ButtonClick(Sender: TObject);
+  protected
+    procedure     LoadProc(XmlNode: TXmlNode); override;
+  public
+    constructor   Create(Attribute: TTemplateAttribute); override;
+  end;
+
   { Template classes }
 
   TTemplateScriptEvent = class
@@ -637,7 +648,6 @@ var
   TemplateParser: TTemplateParser;
 
 implementation
-  {$I LdapAdmin.inc}
 
 uses
   {$IFDEF VARIANTS} variants, {$ENDIF}
@@ -645,7 +655,7 @@ uses
   Pickup, ParseErr;
 
 const
-  CONTROLS_CLASSES: array[0..20] of TTControl = ( TTemplateCtrlEdit,
+  CONTROLS_CLASSES: array[0..21] of TTControl = ( TTemplateCtrlEdit,
                                                   TTemplateCtrlCombo,
                                                   TTemplateCtrlComboList,
                                                   TTemplateCtrlComboLookupList,
@@ -665,7 +675,8 @@ const
                                                   TTemplateCtrlInteger,
                                                   TTemplateCtrlLabel,
                                                   TTemplateCtrlList,
-                                                  TTemplateCtrlListBox );
+                                                  TTemplateCtrlListBox,
+                                                  TTemplateCtrlLoadButton );
   //DEFAULT_CONTROL_CLASS: TTControl = TTemplateCtrlEdit;
 
   EVENT_NAMES: string = 'ONCLICK,ONDBLCLICK,ONKEYDOWN,ONKEYPRESS,ONKEYUP,' +
@@ -3187,6 +3198,69 @@ begin
   fMargin := CT_SPACING;
 
   TPanel(fControl).Height := 2 * fMargin + fList.Control.Height + fBtnHeight;
+end;
+
+{ TTemplateCtrlLoadButton }
+
+procedure TTemplateCtrlLoadButton.LoadProc(XmlNode: TXmlNode);
+var
+  i: Integer;
+begin
+  inherited;
+  for i := 0 to XmlNode.Count - 1 do with XmlNode[i] do
+    if Name = 'filter' then
+      fFilter := Content
+    else
+    if Name = 'filterindex' then
+      fFilterIndex := CheckStrToInt(Content, Name);
+end;
+
+procedure TTemplateCtrlLoadButton.ButtonClick(Sender: TObject);
+var
+  Value: TTemplateAttributeValue;
+  FileStream: TFileStream;
+begin
+  with TOpenDialog.Create(Sender as TControl) do
+  try
+    Filter := fFilter;
+    FilterIndex := fFilterIndex;
+    if Execute then
+    begin
+      if Assigned(fDataControl) then
+      begin
+        Value := TTemplateAttributeValue.Create(nil);
+        try
+          Value.fValue := LoadBase64(FileName);
+          Value.Base64 := true;
+          fDataControl.SetValue(Value);
+        finally
+          Value.Free;
+        end;
+      end;
+      if Assigned(fLdapAttribute) then
+      begin
+        FileStream := TFileStream.Create(FileName, fmOpenRead);
+        try
+          if fLdapAttribute.ValueCount = 0 then
+            fLdapAttribute.AddValue;
+          fLdapAttribute.Values[0].LoadFromStream(FileStream);
+        finally
+          FileStream.Free;
+        end;
+      end;
+    end;
+  finally
+    Free;
+  end;
+end;
+
+constructor TTemplateCtrlLoadButton.Create(Attribute: TTemplateAttribute);
+begin
+  inherited;
+  with TButton(fControl) do begin
+    OnExit := OnExitProc;
+    OnClick := ButtonClick;
+  end;
 end;
 
 { TTemplateList }

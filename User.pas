@@ -1152,9 +1152,12 @@ end;
 procedure TUserDlg.cbSambaClick(Sender: TObject);
 begin
   if cbSamba.Checked then
-  begin
+  try
     SambaPreset;
     SambaSheet.TabVisible := true;
+  except
+    cbSamba.Checked := false;
+    raise;
   end
   else begin
     SambaAccount.Remove;
@@ -1187,6 +1190,7 @@ begin
   SambaAccount.Free;
   MailAccount.Free;
   TranscodeList.Free;
+  DomList.Free;
   with CheckListBox.Items do
     for i := 0 to Count - 1 do
       if Objects[i] is TTabSheet then Objects[i].Free;

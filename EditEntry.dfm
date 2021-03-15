@@ -1066,6 +1066,12 @@ object EditEntryFrm: TEditEntryFrm
     object mbCopy1: TMenuItem
       Action = ActCopy
     end
+    object Copyattributename1: TMenuItem
+      Action = ActCopyName
+    end
+    object Copyvalue1: TMenuItem
+      Action = ActCopyValue
+    end
     object mbPaste1: TMenuItem
       Action = ActPaste
     end
@@ -1206,6 +1212,16 @@ object EditEntryFrm: TEditEntryFrm
       Category = 'Edit'
       Caption = 'View &certificate...'
       OnExecute = ActCertViewExecute
+    end
+    object ActCopyName: TAction
+      Category = 'Edit'
+      Caption = 'Copy attribute name'
+      OnExecute = ActCopyNameExecute
+    end
+    object ActCopyValue: TAction
+      Category = 'Edit'
+      Caption = 'Copy value'
+      OnExecute = ActCopyValueExecute
     end
   end
   object TemplatePopupMenu: TPopupMenu

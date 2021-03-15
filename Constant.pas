@@ -1,5 +1,5 @@
   {      LDAPAdmin - Constant.pas
-  *      Copyright (C) 2003-2013 Tihomir Karlovic
+  *      Copyright (C) 2003-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -122,6 +122,9 @@ const
 // Registry names
 
   rAccountFiles       = 'ConfigFiles';
+  rBookmarks          = 'Bookmarks\Bookmarks';
+  rBookmarksMenuShow  = 'Bookmarks\ShowBookmarksInMenu';
+  rBookmarksTreeShow  = 'Bookmarks\ShowBookmarksInTree';
   rDirectoryType      = 'Connection\DirectoryType';
   rDontCheckProto     = 'DontCheckProto';
   rEditorSchemaHelp   = 'General\EdSchemaHelp';
@@ -159,12 +162,19 @@ const
   rSambaNetbiosName   = 'Samba\NetbiosName';
   rSambaProfilePath   = 'Samba\ProfilePath';
   rSambaScript        = 'Samba\Script';
+  rSambaRidMethod     = 'Samba\RidMethod';
+  rSearchHeight       = 'Search\Height';
+  rSearchWidth        = 'Search\Width';
   rSearchAttributes   = 'Search\Attributes';
   rSearchBase         = 'Search\Base';
   rSearchCustFilters  = 'Search\Filters\';
+  rSearchRegEx        = 'Search\RegEx\';
   rSearchDerefAliases = 'Search\DereferenceAliases';
   rSearchFilter       = 'SearchFilter';
   rSearchScope        = 'Search\Scope';
+  rSearchRegExGreedy  = 'Search\RegExGreedy';
+  rSearchRegExMulti   = 'Search\RegExMultiline';
+  rSearchRegExCase    = 'Search\RegExCase';
   rSmartDelete        = 'SmartDelete';
   rStartupSession     = 'StartupSession';
   rTemplateAutoload   = 'TemplateAutoload';
@@ -212,9 +222,14 @@ const
 resourcestring
 
   LAC_NOTLAC               = 'The file "%s" is not an Ldap Admin accounts file';
-  BAD_XML_DOCUMENT         = 'Not well formed XML.';
+  BAD_XML_DOCUMENT         = 'Not a well formed XML file.';
   XML_BAD_CLOSE_TAG        = 'The "%s" is expected, but the "%s" is received';
   XML_UNEXPECTED_CLOSE_TAG = 'Unexpected closing tag "%s"';
+  XML_NO_OPENING_TAG       = 'No opening tag!';
+
+  SAVE_SEARCH_FILTER       = 'Ldif file, Windows format (CR/LF) (*.ldif)|*.ldif|Ldif file, Unix format (LF only) (*.ldif)|*.ldif|CSV (Comma-separated) (*.csv)|*.csv|XML (*.xml)|*.xml';
+  SAVE_MODIFY_FILTER       = 'LDAP Admin batch file (*.lbf)|*.lbf';
+  SAVE_MODIFY_LOG_FILTER   = 'Text file (*.txt)|*.txt';
 
 
 // Captions
@@ -261,6 +276,7 @@ resourcestring
   cImage            = 'Image';
   cInformation      = 'Information';
   cIpAddress        = 'IP Address';
+  cLoadBatchFromFile= 'Load batch from file';
   cMaildrop         = 'Maildrop';
   cModifyOk         = 'Ok.';
   cModifySkipped    = 'Skipped.';
@@ -286,6 +302,7 @@ resourcestring
   cPickAccounts     = 'Choose Accounts';
   cPickGroups       = 'Choose Groups';
   cPickMembers      = 'Choose members';
+  cPickQuery        = 'Choose query';
   cPreparing        = 'Preparing...';
   cProgress         = 'Progress:';
   cPropertiesOf     = 'Properties of %s';
@@ -295,6 +312,8 @@ resourcestring
   cRetry            = '&Retry';
   cSambaDomain      = 'Samba Domain';
   cSASLCurrUSer     = 'Use current user credentials';
+  cSaveBatchProtocol= 'Save protocol';
+  cSaveBatchToFile  = 'Save batch to file';
   cSaveToLdap       = 'Save to LDAP';
   cSearchBase       = 'Search base';
   cSearchResults    = 'Search results:';
@@ -306,6 +325,7 @@ resourcestring
   cSkipAll          = 'Skip &all';
   cSmartDelete      = '&Smart delete';
   cSmtpAddress      = 'SMTP Address:';
+  cSaveSrchResults  = 'Save search results';
   cSurname          = 'Second name';
   cText             = 'Text';
   cUnknown          = 'Unknown';
@@ -313,7 +333,7 @@ resourcestring
   cUsername         = 'Username';
   cUserPrompt       = 'User Prompt';
   cValue            = 'Value';
-  cView             = '&View:';
+  cView             = '&View';
   cViewPic          = 'View picture: ';
   cWarning          = 'Warning';
 
@@ -346,6 +366,7 @@ resourcestring
   stCertInvalidSig  = 'Signature check failed!';
   stCertInvalidTime = 'The security certificate has expired or is not yet valid!';
   stCertNotFound    = 'Issuer certificate not found';
+  stCertOpenStoreErr= 'Error opening certificate system store %s: %s!';
   stCertSelfSigned  = 'The certificate is self-signed root certificate';
   stClassNotFound   = 'Class %s not found!';
   stCntObjects      = '%d object(s) retrieved.';
@@ -353,6 +374,7 @@ resourcestring
   stConfirmDel      = 'Delete entry "%s"?';
   stConfirmDelAccnt = 'Delete account "%s"?';
   stConfirmMultiDel = 'Delete %d entries?';
+  stConvErrSambaRid = 'Error converting sambaNextRid:';
   stDateFormat      = 'date format';
   stDeleteAll       = '"%s"'#10#13'This directory entry is not empty (it contains further leaves). Delete all recursively?';
   stDeleteMenuItem  = 'Delete this menu item?';
@@ -364,9 +386,12 @@ resourcestring
   stDuplicateEntry  = 'EntryList does not allow duplicates';
   stDuplicateSC     = 'Shortcut ''%s'' is already assigned to ''%s'' menu item!';
   stEmptyArg        = 'Empty argument!';
+  stEmptyFile       = 'File %s is empty!';
   stErrExtMethName  = 'Error extracting method name!';
   stEvTypeEvTypeErr = 'Error setting %s event: %s event type is not supported!';
   stExtConfirmAssoc = 'LDAPAdmin is currently not your default LDAP browser.'+#10+'Would you like to make it your default LDAP browser?';
+  stExpectedButReceived  = 'Expected "=" but recieved "';
+  stExportSuccess   = 'Success: %d Object(s) succesfully exported!';
   stFileOverwrite   = 'File ''%s'' exists, overwrite?';
   stFileReadOnly    = 'File opened in read only mode!';
   stGetProcAddrErr  = 'Cannot GetProcAddress of %s.';
@@ -380,6 +405,7 @@ resourcestring
   stInvalidCmdVer   = 'Invalid LDAP version in command line: %s';
   stInvalidFilter   = 'Invalid or unsupported filter type!';
   stInvalidLdapOp   = 'Invalid Ldap operation!';
+  stInvalidOperator = 'Invalid operator "%s"!';
   stInvalidTagValue = 'Invalid value %s for <%s>!';
   stInvalidTimeFmt  = 'Invalid time format!';
   stInvalidURL      = 'Invalid URL format!';
@@ -401,15 +427,19 @@ resourcestring
   stLdifUrlNotSupp  = 'URL method not supported!';
   stMenuAssignTempl = 'A template name must not be empty!';
   stMenuLocateTempl = 'The template "%s" which is assigned to this action could not be located!';
-  stMoveOverlap     = 'Cannot move: Source and destination paths overlap!';
+  stMissingOperator = 'Missing operator!';
+  stMoveOverlap     = 'Source and destination paths overlap!';
   stNeedElevated    = 'On Vista or higher, LDAPAdmin must be executed with elevated privileges for this operation to succesfully complete!';
   stNoActiveConn    = 'Connection error: could not locate active connection!';
+  stNoClosingParenthesys = 'Missing closing parenthesys!';
+  stNoOpeningParenthesys = 'Missing opening parenthesys!';
   stNoMoreChecks    = 'Do not perform this check in the future.';
   stNoMoreNums      = 'Pool depleted! No more available free id''s for %s!';
   stNoPosixID       = 'You should disable id creation only if you use a server side id assignment! Otherwise, you will not be able to create any users or groups.';
   stNoRdn           = 'You have to enter the unique name (rdn) for this entry!';
   stNoSchema        = 'Can''t load LDAP schema';
   stNotEnoughArgs   = 'Not enough arguments!';
+  stNotLABatchFile  = '%s is not LDAPAdmin batch file!';
   stNumber          = 'number';
   stNumObjects      = '%d objects';
   stObjnRetrvd      = 'Object not yet retrieved!';
@@ -417,7 +447,11 @@ resourcestring
   stPassDiff        = 'Passwords do not match!';
   stPassFor         = 'Password for : %s';
   stPropReadOnly    = 'Property is read only!';
+  stRefUpdateError  = 'An error is occured while updating references:'#10#13'%s'#10#13'Not all references could be updated.';
   stRegAccntErr     = 'Could not read account data!';
+  stRegApplying     = 'Applying regular expression...';
+  stRegCntMatching  = '%s %d object(s) match regular expression.';
+  stRegexError      = 'Error in regex filter: %s'#13'%s';
   stRegexFailed     = 'Regexp validation failed!';
   stReqAttr         = 'Attribute %s may not be empty!';
   stReqMail         = 'At least one E-Mail address must be defined!';
@@ -443,12 +477,10 @@ resourcestring
   stUnclosedStr     = 'Unclosed string!';
   stUnknownValueType= 'Unknown value type.'#10'key:%s'#10'value:%s"';
   stUnsupportedAuth = 'Unsupported authentication method: %s!';
+  stUnsuppOperation = 'Unsupported operation: %s!';
   stUnsuppScript    = 'Unsupported script type: ';
   stUserBreak       = 'User break!';
   stWritePropRO     = 'Can not write to read only property!';
-
-  SAVE_SEARCH_FILTER  = 'Ldif file, Windows format (CR/LF) (*.ldif)|*.ldif|Ldif file, Unix format (LF only) (*.ldif)|*.ldif|CSV (Comma-separated) (*.csv)|*.csv|XML (*.xml)|*.xml';
-  SAVE_MODIFY_FILTER  = 'Text file (*.txt)|*.txt';
 
 implementation
 

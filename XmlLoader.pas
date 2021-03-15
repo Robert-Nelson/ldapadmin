@@ -27,22 +27,22 @@ uses Classes;
 
 type
 
-  TXmlLoader =    class
+  TXmlLoader = class
   private
-    fFileExtension:   string;
-    function      GetCount: Integer;
-    procedure     SetCommaPaths(Value: string);
+    fFileExtension: string;
+    function        GetCount: Integer;
+    procedure       SetCommaPaths(Value: string);
   protected
-    fFiles:       TStringList;
+    fFiles:         TStringList;
   public
-    constructor   Create; virtual;
-    destructor    Destroy; override;
-    procedure     Clear;
-    function      Parse(const FileName: string): TObject; virtual; abstract;
-    procedure     AddPath(Path: string);
-    property      Count: Integer read GetCount;
-    property      Paths: string write SetCommaPaths;
-    property      FileExtension: string read fFileExtension write fFileExtension;
+    constructor     Create; virtual;
+    destructor      Destroy; override;
+    procedure       Clear;
+    function        Parse(const FileName: string): TObject; virtual; abstract;
+    procedure       AddPath(Path: string);
+    property        Count: Integer read GetCount;
+    property        Paths: string write SetCommaPaths;
+    property        FileExtension: string read fFileExtension write fFileExtension;
   end;
 
 implementation

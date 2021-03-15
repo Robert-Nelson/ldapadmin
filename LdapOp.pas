@@ -1,5 +1,5 @@
   {      LDAPAdmin - LdapOp.pas
-  *      Copyright (C) 2004-2007 Tihomir Karlovic
+  *      Copyright (C) 2004-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic
   *
@@ -27,6 +27,9 @@ uses
   SysUtils, Windows, Messages, Classes, Graphics, Controls,
   StdCtrls, ExtCtrls, Forms, ComCtrls, LDAPClasses, WinLdap, Posix;
 
+const
+  LDAP_OP_SUCCESS = Pointer(1);
+
 type
   TLdapOpDlg = class(TForm)
     CancelBtn: TButton;
@@ -39,13 +42,15 @@ type
     fShowProgress: Boolean;
     fSmartDelete: Boolean;
     fDeleteAll: Boolean;
+    fSkipOnOverlap: Boolean;
+    function  CheckPathOverlap(const SourceDn, DestDn: string): Boolean;
     procedure SetShowProgress(Value: Boolean);
-    function GetDstSession: TLDAPSession;
+    function  GetDstSession: TLDAPSession;
     procedure Prepare(const dn: string); overload;
     procedure Prepare(List: TStringList); overload;
     procedure DeleteLeaf(const Entry: TLdapEntry);
     procedure DeleteChildren(const dn: string);
-    procedure Copy(const dn, pdn, rdn: string; Move: Boolean);
+    procedure Copy(const SourceDn, TargetDn: string; Move: Boolean);
   public
     constructor Create(AOwner: TComponent; ASession: TLDAPSession); reintroduce;
     procedure CopyTree(const dn, pdn, rdn: string; Move: Boolean); overload;
@@ -66,6 +71,17 @@ implementation
 {$R *.DFM}
 
 uses Misc, Dialogs, Config, Constant;
+
+function TLdapOpDlg.CheckPathOverlap(const SourceDn, DestDn: string): Boolean;
+begin
+  Result := (SourceSession <> DestSession) or (System.Copy(DestDn, Length(DestDn) - Length(SourceDn) + 1, MaxInt) <> SourceDn);
+  if not (Result or fSkipOnOverlap) then
+  case MessageDlgEx(SourceDn +#10#13 + Format(stSkipRecord, [stMoveOverlap]), mtError, [mbYes, mbNo, mbCancel], [cSkip, cSkipAll, cCancel],[]) of
+    mrYes:    Exit;
+    mrCancel: Abort;
+    mrNo:     FSkipOnOverlap := true;
+  end;
+end;
 
 procedure TLdapOpDlg.SetShowProgress(Value: Boolean);
 begin
@@ -121,6 +137,7 @@ begin
       if ModalResult = mrCancel then
         Abort;
       inc(c, EntryList.Count);
+      EntryList.Clear;
     end;
     ProgressBar.Max := c;
   finally
@@ -131,25 +148,21 @@ end;
 
 { This procedure copies entire subtree to a different location (dn). If Move is
   set to true then the source entries are deleted, effectivly moving the tree }
-procedure TLdapOpDlg.Copy(const dn, pdn, rdn: string; Move: Boolean);
+procedure TLdapOpDlg.Copy(const SourceDn, TargetDn: string; Move: Boolean);
 var
   EntryList: TLdapEntryList;
   srcEntry, dstEntry: TLDAPEntry;
-  srdn, newdn: string;
   i, j: Integer;
   Attr: TLdapAttribute;
 begin
 
   { Copy base entry }
-  if rdn = '' then
-    srdn := GetRdnFromDn(dn)
-  else
-    srdn := rdn;
-  srcEntry := TLDAPEntry.Create(SourceSession, dn);
+  srcEntry := TLDAPEntry.Create(SourceSession, SourceDn);
   if SourceSession <> DestSession then
-    dstEntry := TLDAPEntry.Create(DestSession, dn)
+    dstEntry := TLDAPEntry.Create(DestSession, SourceDn)
   else
     dstEntry := srcEntry;
+
   with srcEntry do
   try
     Read;
@@ -162,7 +175,7 @@ begin
           Attr.AddValue(Data, DataSize);
       end;
     end;
-    dstEntry.dn := srdn + ',' + pdn;
+    dstEntry.dn := TargetDn;
     dstEntry.Write;
   finally
     if dstEntry <> srcEntry then
@@ -172,22 +185,21 @@ begin
 
   if Move and fSmartDelete then
   begin
-    newdn := srdn + ',' + pdn;
     if SourceSession = DestSession then
       { Adjust group references to new dn }
-      SourceSession.ModifySet( Format(sMY_DN_GROUPS,[dn]),
+      SourceSession.ModifySet( Format(sMY_DN_GROUPS,[SourceDn]),
                                SourceSession.Base, LDAP_SCOPE_SUBTREE,
                                ['member', 'uniqueMember'],
-                               [dn, dn],
-                               [newdn, newdn],
+                               [SourceDn, SourceDn],
+                               [TargetDn, TargetDn],
                                LdapOpReplace)
     else
       { Remove group references }
-      SourceSession.ModifySet( Format(sMY_DN_GROUPS,[dn]),
+      SourceSession.ModifySet( Format(sMY_DN_GROUPS,[SourceDn]),
                                SourceSession.Base, LDAP_SCOPE_SUBTREE,
                                ['member', 'uniqueMember'],
-                               [dn, dn],
-                               [newdn, newdn],
+                               [SourceDn, SourceDn],
+                               [TargetDn, TargetDn],
                                LdapOpReplace)
     end;
 
@@ -197,7 +209,7 @@ begin
   { Copy subentries }
   EntryList := TLdapEntryList.Create;
   try
-    SourceSession.Search(sANYCLASS, dn, LDAP_SCOPE_ONELEVEL, nil, false, EntryList);
+    SourceSession.Search(sANYCLASS, SourceDn, LDAP_SCOPE_ONELEVEL, nil, false, EntryList);
 
     if not Visible and  (EntryList.Count > 0) then
       Show;
@@ -210,7 +222,7 @@ begin
       Application.ProcessMessages;
       if ModalResult <> mrNone then
         Break;
-      Copy(dn, srdn +',' + pdn, '', Move);
+      Copy(dn, GetRdnFromDn(dn) + ',' + TargetDn, Move);
       if Move then
         Delete;
     end;
@@ -221,29 +233,37 @@ end;
 
 { Deletes one leaf. If the leaf is simple entry it just deletes it, if the leaf
   represents posixAccount it removes memberUid from groups before deleting) }
+{$IFDEF VER130}
+{$O-}
+{$ENDIF}
 procedure TLdapOpDlg.DeleteLeaf(const Entry: TLdapEntry);
 var
   i: Cardinal;
-  s, uid: string;
+  uid: string;
+  oc: TLdapAttribute;
 begin
   Entry.Delete;
-
-  if fSmartDelete then with Entry.AttributesByName['objectclass'] do
-  for i := 0 to ValueCount - 1 do
+  if fSmartDelete then
   begin
-    s := lowercase(Values[i].AsString);
-    if s = 'posixaccount' then with SourceSession do
+    oc := Entry.AttributesByName['objectclass'];
+    for i := 0 to oc.ValueCount - 1 do
     begin
-      { Remove any references to uid from groups before deleting user itself; }
-      //TODO: Entry := TPosixAccount.Create(SourceSession, dn);
-      uid := GetNameFromDN(Entry.dn);
-      ModifySet(Format(sMY_GROUPS,[uid, Entry.dn]), Base, LDAP_SCOPE_SUBTREE,
-                ['memberUid', 'uniqueMember', 'member'],
-                [uid, Entry.dn, Entry.dn], [], LdapOpDelete);
-      break;
+      if CompareText(oc.Values[i].AsString, 'posixaccount') = 0 then with SourceSession do
+      begin
+        { Remove any references to uid from groups before deleting user itself; }
+        //TODO: Entry := TPosixAccount.Create(SourceSession, dn);
+        uid := GetNameFromDN(Entry.dn);
+        ModifySet(Format(sMY_GROUPS,[uid, Entry.dn]), Base, LDAP_SCOPE_SUBTREE,
+                  ['memberUid', 'uniqueMember', 'member'],
+                  [uid, Entry.dn, Entry.dn], [], LdapOpDelete);
+        break;
+      end;
     end;
   end;
 end;
+{$IFDEF VER130}
+{$O+}
+{$ENDIF}
 
 { This procedure checks for leaf's children and deletes them recursively if
   boolean fDeleteAll is set to true. Otherwise, user is prompted to delete }
@@ -291,32 +311,46 @@ begin
 end;
 
 procedure TLdapOpDlg.CopyTree(const dn, pdn, rdn: string; Move: Boolean);
+var
+  tgtdn: string;
 begin
- if Move and (System.Copy(pdn, Pos(dn, pdn), Length(pdn)) = dn) then
-   raise Exception.Create(stMoveOverlap);
+  if rdn = '' then
+    tgtdn := GetRdnFromDn(dn) + ',' + pdn
+  else
+    tgtdn := rdn + ',' + pdn;
+
+  if not CheckPathOverlap(dn, tgtdn) then
+    exit;
   Prepare(dn);
   if Move then
     Message.Caption := cMoving
   else
     Message.Caption := cCopying;
   ModalResult := mrNone;
-  Copy(dn, pdn, rdn, Move);
+
+  Copy(dn, tgtdn, Move);
   if Move and (ModalResult = mrNone) then // if not interrupted by user
   begin
     SourceSession.DeleteEntry(dn);
     if rdn <> '' then // base entry renamed, adjust posix group references
-      with SourceSession do
+      with SourceSession do try
       ModifySet(Format(sMY_POSIX_GROUPS,[GetNameFromDn(dn)]), Base, LDAP_SCOPE_SUBTREE,
                 ['memberUid'],
                 [GetNameFromDn(dn)],
                 [GetNameFromDn(rdn)], LdapOpReplace);
+      except
+        on E: ErrLDAP do
+          MessageDlg(Format(stRefUpdateError, [E.Message]), mtError, [mbOk], 0);
+        else
+          raise;
+      end;
   end;
 end;
 
 procedure TLdapOpDlg.CopyTree(List: TStringList; const DestDn: string; Move: Boolean);
 var
   i: Integer;
-  dn: string;
+  tgtdn: string;
 begin
   Prepare(List);
   if Move then
@@ -326,20 +360,15 @@ begin
   ModalResult := mrNone;
   for i := 0 to List.Count - 1 do
   begin
-    if Move then
+    tgtdn := GetRdnFromDn(List[i]) + ',' + DestDn;
+    if CheckPathOverlap(List[i], tgtdn) then
     begin
-      dn := List[i];
-      if System.Copy(DestDn, Pos(dn, DestDn), Length(DestDn)) = dn then
-        raise Exception.Create(stMoveOverlap);
-    end;
-    Copy(List[i], DestDn, '', Move);
-    if ModalResult = mrCancel then
-      Break;
-    if Move then
-    begin
-      SourceSession.DeleteEntry(dn);
-      if List.Objects[i] is TTreeNode then
-        TTreeNode(List.Objects[i]).Delete;
+      Copy(List[i], tgtdn, Move);
+      if ModalResult = mrCancel then
+        Break;
+      if Move then
+        SourceSession.DeleteEntry(List[i]);
+      List.Objects[i] := LDAP_OP_SUCCESS;        
     end;
   end;
 end;
@@ -369,18 +398,23 @@ var
   Entry: TLdapEntry;
   i: Integer;
 begin
-  Message.Caption := cDeleting;
   ModalResult := mrNone;
   Prepare(List);
+  Message.Caption := cDeleting;
   for i := 0 to List.Count - 1 do
   begin
     DeleteChildren(List[i]);
+    if fShowProgress then
+      ProgressBar.StepIt;
+    PathLabel.Caption := List[i];
+    Application.ProcessMessages;
     if ModalResult = mrCancel then
       Break;
     Entry := TLdapEntry.Create(SourceSession, List[i]);
     try
       Entry.Read;
       DeleteLeaf(Entry);
+      List.Objects[i] := LDAP_OP_SUCCESS;
     finally
       Entry.Free;
     end;

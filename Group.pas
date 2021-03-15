@@ -531,17 +531,12 @@ begin
 end;
 
 procedure TGroupDlg.cbSambaDomainChange(Sender: TObject);
-var
-  AlgRidBase: Integer;
 begin
   if Assigned(PosixGroup) and (PosixGroup.gidNumber <> 0) and (cbSambaDomain.ItemIndex <> -1) then
   begin
     RadioGroup1.Enabled := true;
     if cbBuiltin.ItemIndex = -1 then
-    begin
-      AlgRidBase := DomList.Items[cbSambaDomain.ItemIndex].AlgorithmicRIDBase + 1;
-      edRid.Text := IntToStr(2 * PosixGroup.gidNumber + AlgRidBase);
-    end;
+      edRid.Text := IntToStr(DomList.Items[cbSambaDomain.ItemIndex].GetRidFromUid(PosixGroup.gidNumber));
   end
   else
     edRid.Text := '';
@@ -648,7 +643,7 @@ begin
   begin
     arid := edRid.Text;
     if arid = '' then
-      arid := IntToStr(2 * PosixGroup.gidNumber + DomList.Items[cbSambaDomain.ItemIndex].AlgorithmicRIDBase + 1);
+      arid := IntToStr(DomList.Items[cbSambaDomain.ItemIndex].GetRidFromUid(PosixGroup.gidNumber));
     SambaGroup.Sid := Format('%s-%s', [DomList.Items[cbSambaDomain.ItemIndex].SID, arid]);
     OkBtn.Enabled := edName.Text <> '';
   end;
@@ -659,6 +654,7 @@ begin
   Entry.Free;
   PosixGroup.Free;
   GroupOfUniqueNames.Free;
+  DomList.Free;
 end;
 
 end.

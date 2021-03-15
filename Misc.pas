@@ -1,5 +1,5 @@
   {      LDAPAdmin - Misc.pas
-  *      Copyright (C) 2003-2012 Tihomir Karlovic
+  *      Copyright (C) 2003-2014 Tihomir Karlovic
   *
   *      Author: Tihomir Karlovic & Alexander Sokoloff
   *
@@ -32,10 +32,12 @@ type
 { String conversion routines }
 function  UTF8ToStringLen(const src: PAnsiChar; const Len: Integer): widestring;
 function  StringToUTF8Len(const src: PChar; const Len: Integer): AnsiString;
+function  WideStringToUtf8Len(const src: PWideChar; const Len: Integer): AnsiString;
 {$IFNDEF UNICODE}
 function  StringToWide(const S: string): WideString;
 {$ENDIF}
 function  CStrToString(cstr: String): String;
+function  GetValueAsText(Value: TLdapAttributeData): string;
 { Time conversion routines }
 function  DateTimeToUnixTime(const AValue: TDateTime): Int64;
 function  UnixTimeToDateTime(const AValue: Int64): TDateTime;
@@ -54,6 +56,8 @@ procedure ParseURL(const URL: string; var proto, user, password, host, path: str
 function  CheckedMessageDlg(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; CbCaption: string; var CbChecked: Boolean): TModalResult;
 function  ComboMessageDlg(const Msg: string; const csItems: string; var Text: string): TModalResult;
 function  MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+{ Tree sort procedure }
+function TreeSortProc(Node1, Node2: TTreeNode; Data: Integer): Integer; stdcall;
 { everything else :-) }
 function  HexMem(P: Pointer; Count: Integer; Ellipsis: Boolean): string;
 procedure StreamCopy(pf, pt: TStreamProcedure);
@@ -62,6 +66,7 @@ function  PeekKey: Integer;
 procedure RevealWindow(Form: TForm; MoveLeft, MoveTop: Boolean);
 function  CreateComponent(const ClassName: string; Owner: TComponent): TComponent;
 procedure OnScrollTimer(ScrollTimer: TTimer; TreeView: TTreeView; ScrollAccMargin: Integer);
+function LoadBase64(const FileName: string): AnsiString;
 
 const
   mrCustom   = 1000;
@@ -70,7 +75,23 @@ implementation
 
 {$I LdapAdmin.inc}
 
-uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF};
+uses StdCtrls, Messages, Constant, Config {$IFDEF VARIANTS} ,variants {$ENDIF},
+     Base64;
+
+function TreeSortProc(Node1, Node2: TTreeNode; Data: Integer): Integer; stdcall;
+var
+  n1, n2: Integer;
+begin
+  n1 := Node1.ImageIndex;
+  n2 := Node2.ImageIndex;
+  if ((n1 = bmOu) and (n2 <> bmOu)) then
+    Result := -1
+  else
+  if ((n2 = bmOu) and (n1 <> bmOu))then
+    Result := 1
+  else
+    Result := CompareText(Node1.Text, Node2.Text);
+end;
 
 { String conversion routines }
 
@@ -104,16 +125,28 @@ var
   bsiz: Integer;
   Temp: string;
 begin
-  bsiz := Len * 3;
-  SetLength(Temp, bsiz);
-  if bsiz > 0 then
+  if Len > 0 then
   begin
+    bsiz := Len * 3;
+    SetLength(Temp, bsiz);
     StringToWideChar(src, PWideChar(Temp), bsiz);
     SetLength(Result, bsiz);
     bsiz := WideCharToMultiByte(CP_UTF8, 0, PWideChar(Temp), -1, PAnsiChar(Result), bsiz, nil, nil);
     if bsiz > 0 then dec(bsiz);
     SetLength(Result, bsiz);
-  end;
+  end
+  else
+    Result := '';
+end;
+
+function WideStringToUtf8Len(const src: PWideChar; const Len: Integer): AnsiString;
+var
+  bsiz: Integer;
+begin
+  bsiz := Len * 3;
+  SetLength(Result, bsiz);
+  bsiz := WideCharToMultiByte(CP_UTF8, 0, src, Len, PAnsiChar(Result), bsiz, nil, nil);
+  SetLength(Result, bsiz);
 end;
 
 function CStrToString(cstr: String): String;
@@ -202,6 +235,14 @@ begin
   // Set the final length on the result
   SetLength(result, cbytes);
 
+end;
+
+function GetValueAsText(Value: TLdapAttributeData): string;
+begin
+  if Value.DataType = dtText then
+    Result := Value.AsString
+  else
+    Result := Base64Encode(Pointer(Value.Data)^, Value.DataSize)
 end;
 
 { Time conversion routines }
@@ -638,27 +679,46 @@ begin
   end;
 end;
 
-{ Uses Caption array to replaces captions and Events array to assign OnClick event to buttons}
-function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons; Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+{ Uses Caption array to replace captions and Events array to assign OnClick event to buttons}
+function MessageDlgEx(const Msg: string; DlgType: TMsgDlgType; Buttons: TMsgDlgButtons;
+         Captions: array of string; Events: array of TNotifyEvent): TModalResult;
+const
+  cbBtnSpacing = 4;
+  cbDlgMargin  = 8;
 var
   Form: TForm;
-  i, ci, ce: Integer;
+  i, ci, ce, w, btnWidth, btnCount, leftPos: Integer;
+  TextRect: TRect;
 begin
   Form:=CreateMessageDialog(Msg, DlgType, Buttons);
   with Form do
   try
     ci := 0;
     ce := 0;
+    btnWidth := 0;
+    btnCount := 0;
     for i:=0 to ComponentCount - 1 do
     begin
       if (Components[i] is TButton) then with TButton(Components[i]) do
       begin
+        inc(btnCount);
         if ci <= High(Captions) then
         begin
           if Captions[ci] <> '' then
+          begin
             Caption := Captions[ci];
+            TextRect := Rect(0,0,0,0);
+            Windows.DrawText( canvas.handle, PChar(Captions[ci]), -1, TextRect,
+                              DT_CALCRECT or DT_LEFT or DT_SINGLELINE or
+                              DrawTextBiDiModeFlagsReadingOnly);
+            //with TextRect do Width := Right - Left + cbBtnSpacing + cbDlgMargin;
+            with TextRect do w := Right - Left + cbBtnSpacing + cbDlgMargin;
+            if w > Width then
+              Width := w;
+          end;
           inc(ci);
         end;
+        inc(btnWidth, Width);
         if ce <= High(Events) then
         begin
           if Assigned(Events[ce]) then
@@ -667,6 +727,20 @@ begin
         end;
       end;
     end;
+
+    // Adjust button positions
+    btnWidth := btnWidth + cbBtnSpacing * (btnCount - 1);
+    if Width < (btnWidth + 2 * cbDlgMargin) then
+      Width := btnWidth + 2 * cbDlgMargin;
+
+    leftPos := (Width - btnWidth) div 2;
+    for i:=0 to ComponentCount - 1 do
+    if (Components[i] is TButton) then with TButton(Components[i]) do
+    begin
+      Left := leftPos;
+      inc(leftPos, Width + cbBtnSpacing);
+    end;
+
     Result := ShowModal;
   finally
     Form.Free;
@@ -835,6 +909,20 @@ begin
     else
       Param := SB_LINEDOWN;
     SendMessage(TreeView.Handle, WM_VSCROLL, Param, 0);
+  end;
+end;
+
+function LoadBase64(const FileName: string): AnsiString;
+var
+  ms: TMemoryStream;
+begin
+  ms := TMemoryStream.Create;
+  try
+    ms.LoadFromFile(FileName);
+    ms.Position := 0;
+    Result := Base64Encode(ms.Memory^, ms.Size);
+  finally
+    ms.free;
   end;
 end;
 
