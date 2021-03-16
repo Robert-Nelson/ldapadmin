@@ -28,7 +28,7 @@ uses
   ComCtrls, Menus, ImgList, ToolWin, WinLdap, StdCtrls, ExtCtrls, Posix, Samba,
   LDAPClasses, Clipbrd, ActnList, uSchemaDlg, Config, Tabs, contnrs, Schema,
   uBetaImgLists, GraphicHint, CustomMenus, Connection, ObjectInfo,
-  System.Actions, Generics.Collections;
+  System.Actions, Generics.Collections, System.ImageList;
 
 type
   TConnectionNode = class

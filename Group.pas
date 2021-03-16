@@ -139,6 +139,9 @@ begin
     else
     if IndexOf('groupofnames') <> -1 then
       GroupOfUniqueNames := TGroupOfNames.Create(Entry)
+    else
+    if IndexOf('groupofmembers') <> -1 then
+      GroupOfUniqueNames := TGroupOfMembers.Create(Entry)
   end;
   edName.Text := Entry.AttributesByName['cn'].AsString;
   edDescription.Text := Entry.AttributesByName['description'].AsString;
@@ -211,6 +214,7 @@ begin
     case AGroupOfUniqueNames of
       1: GroupOfUniqueNames := TGroupOfUniqueNames.Create(Entry);
       2: GroupOfUniqueNames := TGroupOfNames.Create(Entry);
+      3: GroupOfUniqueNames := TGroupOfMembers.Create(Entry);
     end;
     if Assigned(GroupOfUniqueNames) then
       GroupOfUniqueNames.New;

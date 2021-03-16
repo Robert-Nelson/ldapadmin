@@ -215,23 +215,23 @@ const
   sUSERS            = '(&'+sPOSIXACCNT+'(!(uid=*$)))';
   sMAILGROUPS       = '(objectclass=mailGroup)';
   {sMY_GROUP         = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
-                        '(&(objectclass=groupOfNames)(member=%1:s))' +
+                        '(&(|(objectclass=groupOfNames)(objectclass=groupOfMembers))(member=%1:s))' +
                         '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';}
   sMY_AUTHGROUPS    = '(&(objectclass=posixGroup)(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s)))';
   sMY_POSIX_GROUPS  = '(&(objectclass=posixGroup)(memberUid=%s))';
   sMY_SAMBAGROUPS   = '(&(objectclass=sambaGroupMapping)(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s)))';
   sMY_MAILGROUPS    = '(&(objectclass=mailGroup)(member=%s))';
   sMY_GROUPS        = '(|(&(objectclass=posixGroup)(memberUid=%s))'  +
-                      '(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%1:s))' +
+                      '(&(|(objectclass=groupOfNames)(objectclass=mailGroup)(objectclass=groupOfMembers))(member=%1:s))' +
                       '(&(objectclass=groupOfUniqueNames)(uniqueMember=%1:s)))';
-  sMY_DN_GROUPS     = '(|(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(member=%0:s))' +
+  sMY_DN_GROUPS     = '(|(&(|(objectclass=groupOfNames)(objectclass=mailGroup)(objectclass=groupOfMembers))(member=%0:s))' +
                       '(&(objectclass=groupOfUniqueNames)(uniqueMember=%0:s)))';
   sNMY_AUTHGROUPS   = '(&(objectclass=posixGroup)(!(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s))))';
   sNMY_POSIX_GROUPS = '(&(objectclass=posixGroup)(!(memberUid=%s)))';
   sNMY_SAMBAGROUPS  = '(&(objectclass=sambaGroupMapping)(!(|(memberUid=%s)(member=%1:s)(uniqueMember=%1:s))))';
   sNMY_MAILGROUPS   = '(&(objectclass=mailGroup)(!(member=%s)))';
   sNMY_GROUPS       = '(|(&(objectclass=posixGroup)(!(memberUid=%s)))'  +
-                      '(&(|(objectclass=groupOfNames)(objectclass=mailGroup))(!(member=%1:s)))' +
+                      '(&(|(objectclass=groupOfNames)(objectclass=mailGroup)(objectclass=groupOfMembers))(!(member=%1:s)))' +
                       '(&(objectclass=groupOfUniqueNames)(!(uniqueMember=%1:s))))';
   sGROUPBYGID       = '(&(objectclass=posixGroup)(gidNumber=%d))';
   sACCNTBYUID       = '(&(objectclass=posixAccount)(uid=%s))';

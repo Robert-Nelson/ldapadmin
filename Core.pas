@@ -81,6 +81,18 @@ type
     property MembersCount: Integer read GetMemberCount;
   end;
 
+  TGroupOfMembers = class(TGroupOfUniqueNames)
+  protected
+    function GetMember(Index: Integer): string; override;
+    function GetMemberCount: Integer; override;
+  public
+    constructor Create(const Entry: TLdapEntry); override;
+    procedure AddMember(const AMember: string); override;
+    procedure RemoveMember(const AMember: string); override;
+    property Members[Index: Integer]: string read GetMember;
+    property MembersCount: Integer read GetMemberCount;
+  end;
+
 implementation
 
 
@@ -140,6 +152,33 @@ begin
 end;
 
 procedure TGroupOfNames.RemoveMember(const AMember: string);
+begin
+  RemoveFromMultiString(eMember, AMember);
+end;
+
+{ TGroupOfMembers }
+
+function TGroupOfMembers.GetMember(Index: Integer): string;
+begin
+  Result := GetMultiString(Index, eMember);
+end;
+
+function TGroupOfMembers.GetMemberCount: Integer;
+begin
+  Result := GetMultiStringCount(eMember);
+end;
+
+constructor TGroupOfMembers.Create(const Entry: TLdapEntry);
+begin
+  inherited Create(Entry, 'groupOfMembers', @PropAttrNames);
+end;
+
+procedure TGroupOfMembers.AddMember(const AMember: string);
+begin
+  AddToMultiString(eMember, AMember);
+end;
+
+procedure TGroupOfMembers.RemoveMember(const AMember: string);
 begin
   RemoveFromMultiString(eMember, AMember);
 end;

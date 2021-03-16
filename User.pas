@@ -1026,7 +1026,7 @@ begin
             MemberValue := Self.Entry.dn;
           end
           else
-          if IndexOf('groupofnames') <> -1 then
+          if (IndexOf('groupofnames') <> -1) or (IndexOf('groupofmembers') <> -1) then
           begin
             MemberAttr := GroupEntry.AttributesByName['member'];
             MemberValue := Self.Entry.dn;

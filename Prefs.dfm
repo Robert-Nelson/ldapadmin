@@ -140,17 +140,14 @@ object PrefDlg: TPrefDlg
           TabOrder = 3
           Items.Strings = (
             'GroupOfUniqueNames'
-            'GroupOfNames')
+            'GroupOfNames'
+            'GroupOfMembers')
         end
       end
     end
     object tsID: TTabSheet
       Caption = '&ID Settings'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object gbUserLimits: TGroupBox
         Left = 16
         Top = 136
@@ -244,10 +241,6 @@ object PrefDlg: TPrefDlg
     object tsSamba: TTabSheet
       Caption = '&Samba'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object gbServer: TGroupBox
         Left = 16
         Top = 16
@@ -296,10 +289,6 @@ object PrefDlg: TPrefDlg
         TabOrder = 1
         object TabSheet1: TTabSheet
           Caption = 'Default &paths'
-          ExplicitLeft = 0
-          ExplicitTop = 0
-          ExplicitWidth = 0
-          ExplicitHeight = 0
           object lblScript: TLabel
             Left = 71
             Top = 91
@@ -390,10 +379,6 @@ object PrefDlg: TPrefDlg
         object TabSheet2: TTabSheet
           Caption = '&Options'
           ImageIndex = 1
-          ExplicitLeft = 0
-          ExplicitTop = 0
-          ExplicitWidth = 0
-          ExplicitHeight = 0
           object Bevel1: TBevel
             Left = 24
             Top = 112
@@ -427,10 +412,6 @@ object PrefDlg: TPrefDlg
     object tsMAil: TTabSheet
       Caption = '&Mail'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object gbMailDefaults: TGroupBox
         Left = 16
         Top = 24
